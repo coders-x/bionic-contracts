@@ -7,5 +7,10 @@
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^4.9.2",
     "@thirdweb-dev/contracts": "^3.5.9"
+  },
+  "scripts": {
+    "build": "npx thirdweb@latest detect",
+    "deploy": "npx thirdweb@latest deploy",
+    "release": "npx thirdweb@latest release"
   }
 }
