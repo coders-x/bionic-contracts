@@ -1,6 +1,6 @@
 import { Mumbai } from '@thirdweb-dev/chains'
 import dotenv from 'dotenv';
-import { PrivateKeyWallet, SmartWallet, SmartWalletConfig, WalletOptions, getAllSmartWallets } from "@thirdweb-dev/wallets";
+import { PrivateKeyWallet, SmartWallet, SmartWalletConfig, WalletOptions, getAllSmartWallets, isSmartWalletDeployed } from "@thirdweb-dev/wallets";
 import { NFT, SmartContract, ThirdwebSDK } from '@thirdweb-dev/sdk';
 import { BaseContract, ethers } from 'ethers';
 dotenv.config()
@@ -32,27 +32,57 @@ async function main() {
         console.log("Personal wallet address:", personalWalletAddress);
 
 
-        const sdk = new ThirdwebSDK(chain);
+        let sdk = new ThirdwebSDK(chain);
         const contract = await sdk.getContract(nftDropAddress);
         const nft = await contract.erc721.get(0);
 
 
         // Configure the smart wallet
         const config: SmartWalletConfig = TBAConfig(nft);
+
+        // NOT WORKING FOR ERC6551 Factory doesn't support this
+        // // [Optional] get all the smart wallets associated with the personal wallet
+        // const accounts = await getAllSmartWallets(
+        //     chain,
+        //     factoryAddress,
+        //     personalWalletAddress
+        // );
+        // console.log(`Associated smart wallets for personal wallet`, accounts);
+
+        // [Optional] check if the smart wallet is deployed for the personal wallet
+        // const isWalletDeployed = await isSmartWalletDeployed(
+        //     chain,
+        //     factoryAddress,
+        //     personalWalletAddress
+        // );
+        // console.log(`Is smart wallet deployed?`, isWalletDeployed);
+
+        // Connect the smart wallet
         const smartWallet = new SmartWallet(config);
         await smartWallet.connect({
-            personalWallet
-        })
-        let smart_address = await smartWallet.getAddress();
+            personalWallet,
+        });
 
-        console.log(`smart wallets for personal wallet`, smart_address);
+        // now use the SDK normally to perform transactions with the smart wallet
+        sdk = await ThirdwebSDK.fromWallet(smartWallet, chain);
+
+        console.log("Smart Account addr:", await sdk.wallet.getAddress());
+        console.log("balance (eth):", (await sdk.wallet.balance()).displayValue);
+
+        // Bionic ERC20 Token
+        const bionicContract = await sdk.getContract(
+            "0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F"
+        );
+        const tokenBalance = await bionicContract.erc20.balance();
+        console.log("ERC20 Bionic token balance:", tokenBalance.displayValue);
+        const tx = await bionicContract.erc20.transfer("0x534136eE30A39B731802DB8C027C76d95B35E37D", 1);
+        console.log("Sent 1 Bionic, tx hash:", tx.receipt.transactionHash);
+
+
 
     } catch (error) {
         console.error(error);
     }
-
-
-
 }
 
 
