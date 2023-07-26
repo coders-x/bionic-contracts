@@ -19,6 +19,7 @@
     "build": "npx thirdweb@latest detect",
     "deploy": "npx thirdweb@latest deploy",
     "release": "npx thirdweb@latest release",
+    "test": "hardhat test",
     "dev": "ts-node scripts/index.ts"
   }
 }
