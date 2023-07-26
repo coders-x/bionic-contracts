@@ -83,6 +83,8 @@ contract BionicInvestorPass is
         uint256 batchSize
     ) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        require(this.balanceOf(to)==0,"already have been MINTED Membership");
+
     }
 
     function _authorizeUpgrade(
