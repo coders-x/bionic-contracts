@@ -5,8 +5,8 @@ pragma solidity >=0.7.0 <0.9.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 
@@ -14,9 +14,13 @@ import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 /// @author BlockRocket.tech
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
-contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
+contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+
+    bytes32 public constant BROKER_ROLE = keccak256("BROKER_ROLE");
+    bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
+
 
     /// @dev Details about each user in a pool
     struct UserInfo {
@@ -92,6 +96,10 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     /// @notice Pool ID => User Address => User Info
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
+
+    ///@notice user's total pledge accross diffrent pools and programs.
+    mapping(address => uint256) public userTotalPledge;
+
     // Available before staking ends for any given project. Essentitally 100% to 18 dp
     uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
 
@@ -111,6 +119,11 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         stakingToken = _stakingToken;
         rewardGuildBank = new FundRaisingGuild(address(this));
 
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(BROKER_ROLE, _msgSender());
+        _grantRole(TREASURY_ROLE, _msgSender());
+
+
         emit ContractDeployed(address(rewardGuildBank));
     }
 
@@ -128,7 +141,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 _targetRaise,
         uint256 _maxPledgingAmountPerUser,
         bool _withUpdate
-    ) public onlyOwner {
+    ) public onlyRole(BROKER_ROLE) {
         address rewardTokenAddress = address(_rewardToken);
         require(rewardTokenAddress != address(0), "add: _rewardToken is zero address");
         require(_tokenAllocationStartBlock < _pledgeingEndBlock, "add: _tokenAllocationStartBlock must be before pledging end");
@@ -152,7 +165,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     }
 
     // step 1
-    function pledge(uint256 _pid, uint256 _amount) external nonReentrant {
+    // @dev should first query the pleadged amount already and then try to sign amount+ alreadey_pledged permit to be used here
+    function pledge(uint256 _pid, uint256 _amount, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external nonReentrant {
         require(_pid < poolInfo.length, "pledge: Invalid PID");
 
         PoolInfo storage pool = poolInfo[_pid];
@@ -165,19 +179,23 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         updatePool(_pid);
 
         user.amount = user.amount.add(_amount);
+        userTotalPledge[_msgSender()].add(_amount);
         user.tokenAllocDebt = user.tokenAllocDebt.add(_amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18));
 
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
 
-        stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+        // #approve the contract for the total amount of pledge
+        // @dev maybe we should let user himself do this instead?
+        IERC20Permit(address(stakingToken)).permit(_msgSender(),address(this),userTotalPledge[_msgSender()],deadline,v,r,s);
+        // stakingToken.safeTransferFrom(address(_msgSender()), address(this), _amount);
 
-        emit Pledge(msg.sender, _pid, _amount);
+        emit Pledge(_msgSender(), _pid, _amount);
     }
 
     function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
         require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
         PoolInfo memory pool = poolInfo[_pid];
-        UserInfo memory user = userInfo[_pid][msg.sender];
+        UserInfo memory user = userInfo[_pid][_msgSender()];
 
         (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
 
@@ -192,7 +210,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     //     updatePool(_pid);
 
     //     PoolInfo storage pool = poolInfo[_pid];
-    //     UserInfo storage user = userInfo[_pid][msg.sender];
+    //     UserInfo storage user = userInfo[_pid][_msgSender()];
 
     //     require(user.pledgeFundingAmount == 0, "fundPledge: Pledge has already been funded");
 
@@ -212,9 +230,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
     //     user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
 
-    //     stakingToken.safeTransfer(address(msg.sender), user.amount);
+    //     stakingToken.safeTransfer(address(_msgSender()), user.amount);
 
-    //     emit PledgeFunded(msg.sender, _pid, msg.value);
+    //     emit PledgeFunded(_msgSender(), _pid, msg.value);
     // }
 
     // // pre-step 3 for project
@@ -246,7 +264,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
     //     poolIdToRewardEndBlock[_pid] = _rewardEndBlock;
 
-    //     pool.rewardToken.safeTransferFrom(msg.sender, address(rewardGuildBank), _rewardAmount);
+    //     pool.rewardToken.safeTransferFrom(_msgSender(), address(rewardGuildBank), _rewardAmount);
 
     //     emit RewardsSetUp(_pid, _rewardAmount, _rewardEndBlock);
     // }
@@ -356,7 +374,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         require(block.number >= poolIdToRewardCliffEndBlock[_pid], "claimReward: Not past cliff");
 
-        UserInfo storage user = userInfo[_pid][msg.sender];
+        UserInfo storage user = userInfo[_pid][_msgSender()];
         require(user.pledgeFundingAmount > 0, "claimReward: Nice try pal");
 
         PoolInfo storage pool = poolInfo[_pid];
@@ -369,9 +387,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         if (pending > 0) {
             user.rewardDebtRewards = userPercentageAllocated.mul(accRewardPerShare).div(1e18);
-            safeRewardTransfer(pool.rewardToken, msg.sender, pending);
+            safeRewardTransfer(pool.rewardToken, _msgSender(), pending);
 
-            emit RewardClaimed(msg.sender, _pid, pending);
+            emit RewardClaimed(_msgSender(), _pid, pending);
         }
     }
 
@@ -381,7 +399,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(_pid < poolInfo.length, "withdraw: invalid _pid");
 
         PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][msg.sender];
+        UserInfo storage user = userInfo[_pid][_msgSender()];
 
         require(user.amount > 0, "withdraw: No stake to withdraw");
         require(user.pledgeFundingAmount == 0, "withdraw: Only allow non-funders to withdraw");
@@ -390,14 +408,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 withdrawAmount = user.amount;
 
         // remove the record for this user
-        delete userInfo[_pid][msg.sender];
+        delete userInfo[_pid][_msgSender()];
 
-        stakingToken.safeTransfer(msg.sender, withdrawAmount);
+        stakingToken.safeTransfer(_msgSender(), withdrawAmount);
 
-        emit Withdraw(msg.sender, _pid, withdrawAmount);
+        emit Withdraw(_msgSender(), _pid, withdrawAmount);
     }
 
-    function claimFundRaising(uint256 _pid) external nonReentrant onlyOwner {
+    function claimFundRaising(uint256 _pid) external nonReentrant onlyRole("TREASURY_ROLE") {
         require(_pid < poolInfo.length, "claimFundRaising: invalid _pid");
 
         uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
@@ -405,9 +423,11 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(poolIdToFundsClaimed[_pid] == false, "claimFundRaising: Already claimed funds");
 
         poolIdToFundsClaimed[_pid] = true;
-        owner().call{value: poolIdToTotalRaised[_pid]}("");
+        address payable msgSender = payable(_msgSender());
+        if(!msgSender.send(poolIdToTotalRaised[_pid]))
+            revert();
 
-        emit FundRaisingClaimed(_pid, owner(), poolIdToTotalRaised[_pid]);
+        emit FundRaisingClaimed(_pid, msgSender, poolIdToTotalRaised[_pid]);
     }
 
     ////////////
