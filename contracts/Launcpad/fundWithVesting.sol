@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -7,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 
 import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 
@@ -179,11 +179,10 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         updatePool(_pid);
 
         user.amount = user.amount.add(_amount);
-        userTotalPledge[_msgSender()].add(_amount);
+        userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(_amount);
         user.tokenAllocDebt = user.tokenAllocDebt.add(_amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18));
 
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
-
         // #approve the contract for the total amount of pledge
         // @dev maybe we should let user himself do this instead?
         IERC20Permit(address(stakingToken)).permit(_msgSender(),address(this),userTotalPledge[_msgSender()],deadline,v,r,s);
