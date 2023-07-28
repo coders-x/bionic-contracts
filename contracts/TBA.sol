@@ -35,8 +35,9 @@ contract TokenBoundAccount is Account, IERC6551Account {
 
     /// @notice Returns whether a signer is authorized to perform transactions using the wallet.
     function isValidSigner(
-        address _signer
+        address _signer, UserOperation calldata _userOp
     ) public view override returns (bool) {
+        super.isValidSigner(_signer,_userOp);
         return (owner() == _signer);
     }
 
