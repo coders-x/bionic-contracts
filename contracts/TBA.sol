@@ -6,6 +6,9 @@ import "@thirdweb-dev/contracts/eip/interface/IERC721.sol";
 import "./reference/src/lib/ERC6551AccountLib.sol";
 import "./reference/src/interfaces/IERC6551Account.sol";
 
+import "hardhat/console.sol";
+
+
 contract TokenBoundAccount is Account, IERC6551Account {
     /*///////////////////////////////////////////////////////////////
                             Events
@@ -28,8 +31,11 @@ contract TokenBoundAccount is Account, IERC6551Account {
         IEntryPoint _entrypoint,
         address _factory
     ) Account(_entrypoint, _factory) {
+        console.log("pre constructor");
         _disableInitializers();
+        console.log("post constructor");
     }
+
 
     receive() external payable override(IERC6551Account, Account) {}
 

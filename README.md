@@ -8,7 +8,7 @@ Try running some of the following tasks:
 npx hardhat help
 npx hardhat test
 REPORT_GAS=true npx hardhat test
-npx hardhat node
+npx hardhat node --fork https://eth-mainnet.alchemyapi.io/v2/<key> --fork-block-number 14390000
 npx hardhat run scripts/deploy.ts
 ```
 
