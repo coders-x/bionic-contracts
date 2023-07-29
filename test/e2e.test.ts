@@ -3,13 +3,14 @@ import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Contract, utils } from "ethers";
-import { IERC20Permit, ERC6551Registry } from "../typechain-types";
+import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting } from "../typechain-types";
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-    ERC6551RegAddr = "0x02101dfB77FDE026414827Fdc604ddAF224F0921";
+    ERC6551RegAddr = "0x02101dfB77FDE026414827Fdc604ddAF224F0921",
+    PLEDGING_END_BLOCK = 40000000;
 
 describe("e2e", function () {
-    let bionicContract: Contract | any, bipContract: Contract | any, fundWithVesting: Contract | any,
+    let bionicContract: Contract | any, bipContract: Contract | any, fundWithVesting: LaunchPoolFundRaisingWithVesting,
         tokenBoundContract: Contract | any, tokenBoundContractRegistry: ERC6551Registry;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
@@ -100,19 +101,19 @@ describe("e2e", function () {
     describe("FundingRegistry", () => {
         describe("Add", function () {
             it("Should fail if the not BROKER", async function () {
-                await expect(fundWithVesting.connect(client).add(bionicContract.address, 0, 3000, 1000000000, 1000, false))
+                await expect(fundWithVesting.connect(client).add(bionicContract.address, 0, PLEDGING_END_BLOCK, 1000000000, 1000, false))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await fundWithVesting.hasRole(await fundWithVesting.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(fundWithVesting.add(bionicContract.address, 0, 3000, 1000000000, 1000, false))
+                await expect(fundWithVesting.add(bionicContract.address, 0, PLEDGING_END_BLOCK, 1000000000, 1000, false))
                     .to.emit(fundWithVesting, "PoolAdded").withArgs(0);
             });
             it("Should return same Pool upon request", async () => {
                 let pool = await fundWithVesting.poolInfo(0);
                 expect(pool.rewardToken).to.equal(bionicContract.address);
                 expect(pool.tokenAllocationStartBlock).to.equal(0);
-                expect(pool.pledgingEndBlock).to.equal(3000);
+                expect(pool.pledgingEndBlock).to.equal(PLEDGING_END_BLOCK);
                 expect(pool.targetRaise).to.equal(1000000000);
                 expect(pool.maxPledgingAmountPerUser).to.equal(1000);
             })
@@ -159,24 +160,24 @@ describe("e2e", function () {
                 expect(await bionicContract.allowance(client.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount));
             });
 
-            // it("Should add on user pledge and permit contract with new amount", async function () {
-            //     const deadline = ethers.constants.MaxUint256;
-            //     const alreadyPledged = await fundWithVesting.userTotalPledge(client.address);
-            //     expect(alreadyPledged).to.not.equal(BigNumber.from(0));
-            //     const amount = BigNumber.from(10);
-            //     const { v, r, s } = await getPermitSignature(
-            //         client,
-            //         bionicContract,
-            //         fundWithVesting.address,
-            //         alreadyPledged.add(amount),
-            //         deadline
-            //     )
-
-            //     expect(await fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
-            //         .to.emit(fundWithVesting, "Pledge").withArgs(client.address, amount)
-            //         .to.emit(bionicContract, "Approval").withArgs(client.address, fundWithVesting.address, alreadyPledged.add(amount));
-            //     expect(await bionicContract.allowance(client.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount)).not.equal(amount);
-            // });
+            it("Should add on user pledge and permit contract with new amount", async function () {
+                const deadline = ethers.constants.MaxUint256;
+                const alreadyPledged = await fundWithVesting.userTotalPledge(client.address);
+                expect(alreadyPledged).to.not.equal(BigNumber.from(0));
+                const amount = BigNumber.from(10);
+                const { v, r, s } = await getPermitSignature(
+                    client,
+                    bionicContract,
+                    fundWithVesting.address,
+                    alreadyPledged.add(amount),
+                    deadline
+                )
+                await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
+                expect(await fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
+                    .to.emit(fundWithVesting, "Pledge").withArgs(client.address, amount)
+                    .to.emit(bionicContract, "Approval").withArgs(client.address, fundWithVesting.address, alreadyPledged.add(amount));
+                expect(await bionicContract.allowance(client.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount)).not.equal(amount);
+            });
         });
     })
 
