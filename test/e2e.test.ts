@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Contract, utils } from "ethers";
-import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting } from "../typechain-types";
+import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, IERC6551Account, TokenBoundAccount } from "../typechain-types";
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ERC6551RegAddr = "0x02101dfB77FDE026414827Fdc604ddAF224F0921",
@@ -89,13 +89,33 @@ describe("e2e", function () {
             expect(res).to.equal(accountAddress);
         })
         it("should deploy a new address for the user based on their token", async () => {
-            let balance = await owner.getBalance();
             await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
             let res = await tokenBoundContractRegistry.createAccount(tokenBoundContract.address,
                 network.config.chainId as number, bipContract.address,
                 "0", "0", []);
             let newAcc = await res.wait();
             expect(newAcc?.events[0]?.args?.account).to.equal(accountAddress);
+        })
+        it("should permit fundingContract to transfer currencies out of users wallet", async () => {
+            let abstractedAccount = await ethers.getContractAt("TokenBoundAccount", accountAddress);
+            const deadline = ethers.constants.MaxUint256;
+            const alreadyPledged = await abstractedAccount.allowance(client.address, fundWithVesting.address);
+            expect(alreadyPledged).to.equal(BigNumber.from(0));
+            const amount = BigNumber.from(10);
+            const { v, r, s } = await getCurrencyPermitSignature(
+                client,
+                abstractedAccount,
+                bionicContract,
+                fundWithVesting.address,
+                alreadyPledged.add(amount),
+                deadline
+            )
+
+            console.log(`client:${client.address}, abstractedAccount:${abstractedAccount.address}, bionicContract:${bionicContract.address}, fundWithVesting.address:${fundWithVesting.address}
+            alreadyPledged.add(amount) ${alreadyPledged.add(amount)}, deadline ${deadline}`);
+            expect(await abstractedAccount.connect(client).permit(bionicContract.address, fundWithVesting.address, amount, deadline, v, r, s))
+                .to.emit(abstractedAccount, "CurrencyApproval").withArgs(bionicContract.address, fundWithVesting, amount);
+            expect(await abstractedAccount.allowance(bionicContract.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount));
         })
     });
     describe("FundingRegistry", () => {
@@ -204,7 +224,7 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
                 name,
                 version,
                 chainId,
-                verifyingContract: token.address,
+                verifyingContract: token.address.toLowerCase(),
             },
             {
                 Permit: [
@@ -232,6 +252,56 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
             },
             {
                 owner: signer.address,
+                spender,
+                value,
+                nonce,
+                deadline,
+            }
+        )
+    )
+}
+async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20Permit | any, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
+    const [nonce, name, version, chainId] = await Promise.all([
+        account.nonces(signer.address),
+        "Account",
+        "1",
+        signer.getChainId(),
+    ])
+
+    return ethers.utils.splitSignature(
+        await signer._signTypedData(
+            {
+                name,
+                version,
+                chainId,
+                verifyingContract: account.address,
+            },
+            {
+                Permit: [
+                    {
+                        name: "currency",
+                        type: "address",
+                    },
+                    {
+                        name: "spender",
+                        type: "address",
+                    },
+                    {
+                        name: "value",
+                        type: "uint256",
+                    },
+                    {
+                        name: "nonce",
+                        type: "uint256",
+                    },
+                    {
+                        name: "deadline",
+                        type: "uint256",
+                    },
+                ],
+            },
+            {
+                currency: currency.address,
                 spender,
                 value,
                 nonce,
