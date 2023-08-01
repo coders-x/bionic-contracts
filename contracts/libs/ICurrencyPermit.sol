@@ -12,6 +12,13 @@ pragma solidity >=0.7.0 <0.9.0;
  * need to send a transaction, and thus is not required to hold Ether at all.
  */
 interface ICurrencyPermit {
+
+    /**
+     * @dev Emitted when the allowance of a `spender` for an `owner` is set by
+     * a call to {approve}. `value` is the new allowance.
+     */
+    event CurrencyApproval(address indexed currency, address indexed spender, uint256 value);
+
     /**
      * @dev Sets `value` as the allowance of `spender` over ``owner``'s currency,
      * given ``owner``'s signed approval.
