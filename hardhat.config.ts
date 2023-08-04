@@ -3,6 +3,7 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@nomiclabs/hardhat-ethers";
 import "@openzeppelin/hardhat-upgrades";
 import "@nomiclabs/hardhat-etherscan";
+import "@nomicfoundation/hardhat-foundry";
 import dotenv from "dotenv";
 dotenv.config()
 
@@ -20,6 +21,10 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
+      forking: {
+        url: process.env.MUMBAI_RPC as string,
+        blockNumber: 38395581
+      }
     },
     // goerli: {
     //   url: process.env.RPC_URL,
