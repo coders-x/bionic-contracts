@@ -137,6 +137,14 @@ describe("e2e", function () {
                 expect(pool.targetRaise).to.equal(1000000000);
                 expect(pool.maxPledgingAmountPerUser).to.equal(1000);
             })
+            it("Should be able to move funds it's been allowed", async () => {
+                let pool = await fundWithVesting.poolInfo(0);
+                expect(pool.rewardToken).to.equal(bionicContract.address);
+                expect(pool.tokenAllocationStartBlock).to.equal(0);
+                expect(pool.pledgingEndBlock).to.equal(PLEDGING_END_BLOCK);
+                expect(pool.targetRaise).to.equal(1000000000);
+                expect(pool.maxPledgingAmountPerUser).to.equal(1000);
+            })
         });
 
 
@@ -331,7 +339,14 @@ async function deployBIP() {
     return await bipContract.deployed();
 }
 async function deployFundWithVesting(tokenAddress: string) {
-    const BIPContract = await ethers.getContractFactory("LaunchPoolFundRaisingWithVesting");
+    const Lib = await ethers.getContractFactory("IterableMapping");
+    const lib = await Lib.deploy();
+    await lib.deployed();
+    const BIPContract = await ethers.getContractFactory("LaunchPoolFundRaisingWithVesting", {
+        libraries: {
+            IterableMapping: lib.address
+        }
+    });
     console.log("Deploying LaunchPoolFundRaisingWithVesting contract...");
     return await BIPContract.deploy(tokenAddress);
 }
