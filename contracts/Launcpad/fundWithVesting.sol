@@ -5,9 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@thirdweb-dev/contracts/smart-wallet/utils/UserOperation.sol";
 
 import "../libs/IterableMapping.sol";
 import "../libs/BionicStructs.sol";
+import "../TBA.sol";
 
 import {FundRaisingGuild} from "./FundRaisingGuild.sol";
 
@@ -25,6 +27,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
 
     /// @notice staking token is fixed for all pools
     IERC20 public stakingToken;
+    /// @notice investing token is fixed for all pools (e.g. USDT)
+    IERC20 public investingToken;
 
     /// @notice Container for holding all rewards
     FundRaisingGuild public rewardGuildBank;
@@ -108,13 +112,19 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     );
 
     /// @param _stakingToken Address of the staking token for all pools
-    constructor(IERC20 _stakingToken) {
+    /// @param _investingToken Address of the staking token for all pools
+    constructor(IERC20 _stakingToken, IERC20 _investingToken) {
         require(
             address(_stakingToken) != address(0),
             "constructor: _stakingToken must not be zero address"
         );
+        require(
+            address(_investingToken) != address(0),
+            "constructor: _investingToken must not be zero address"
+        );
 
         stakingToken = _stakingToken;
+        investingToken = _investingToken;
         rewardGuildBank = new FundRaisingGuild(address(this));
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -249,37 +259,50 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     function raffle(uint256 _pid) external payable nonReentrant {
         require(_pid < poolInfo.length, "fundPledge: Invalid PID");
 
-        BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
+        for (uint256 i = 0; i < userInfo[_pid].size(); i++) {
+            TokenBoundAccount _userAddress = TokenBoundAccount(
+                userInfo[_pid].getKeyAtIndex(i)
+            );
+            BionicStructs.UserInfo storage user = userInfo[_pid].get(
+                address(_userAddress)
+            );
+            if (user.pledgeFundingAmount == 0 && user.amount > 0) {
+                UserOperation memory op = UserOperation({
+                    sender: address(_userAddress),
+                    nonce: _userAddress.nonce(),
+                    callGasLimit: 0,
+                    verificationGasLimit: 100000,
+                    preVerificationGas: 21000,
+                    maxFeePerGas: BigNumber{value: "1541441108"},
+                    maxPriorityFeePerGas: 1000000000
+                });
+            }
 
-        require(
-            user.pledgeFundingAmount == 0,
-            "fundPledge: Pledge has already been funded"
-        );
+            // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
+            //     msg.value
+            // );
 
-        require(user.amount > 0, "fundPledge: Must have staked");
+            // (
+            //     uint256 accPercentPerShare,
 
-        poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(msg.value);
+            // ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
+            // uint256 userPercentageAllocated = user
+            //     .amount
+            //     .mul(accPercentPerShare)
+            //     .div(1e18)
+            //     .sub(user.tokenAllocDebt);
+            // poolIdToTotalFundedPercentageOfTargetRaise[
+            //     _pid
+            // ] = poolIdToTotalFundedPercentageOfTargetRaise[_pid].add(
+            //     userPercentageAllocated
+            // );
 
-        (
-            uint256 accPercentPerShare,
+            // user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
 
-        ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-        uint256 userPercentageAllocated = user
-            .amount
-            .mul(accPercentPerShare)
-            .div(1e18)
-            .sub(user.tokenAllocDebt);
-        poolIdToTotalFundedPercentageOfTargetRaise[
-            _pid
-        ] = poolIdToTotalFundedPercentageOfTargetRaise[_pid].add(
-            userPercentageAllocated
-        );
+            // stakingToken.safeTransfer(address(_msgSender()), user.amount);
 
-        user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
-
-        stakingToken.safeTransfer(address(_msgSender()), user.amount);
-
-        emit PledgeFunded(_msgSender(), _pid, msg.value);
+            emit PledgeFunded(_msgSender(), _pid, msg.value);
+        }
     }
 
     // // step 2
