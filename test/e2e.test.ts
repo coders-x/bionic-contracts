@@ -7,6 +7,7 @@ import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, IERC65
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ERC6551RegAddr = "0x02101dfB77FDE026414827Fdc604ddAF224F0921",
+    USDTAddr = "0xdAC17F958D2ee523a2206206994597C13D831ec7",
     PLEDGING_END_BLOCK = 40000000;
 
 describe("e2e", function () {
@@ -348,7 +349,7 @@ async function deployFundWithVesting(tokenAddress: string) {
         }
     });
     console.log("Deploying LaunchPoolFundRaisingWithVesting contract...");
-    return await BIPContract.deploy(tokenAddress);
+    return await BIPContract.deploy(tokenAddress, USDTAddr);
 }
 async function deployTBA() {
     const TBAContract = await ethers.getContractFactory("TokenBoundAccount");
