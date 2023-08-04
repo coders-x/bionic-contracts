@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 
+
 import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 
 /// @title Fund raising platform facilitated by launch pool

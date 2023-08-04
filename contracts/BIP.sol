@@ -55,7 +55,7 @@ contract BionicInvestorPass is
         _grantRole(UPGRADER_ROLE, msg.sender);
 
 
-        _pause();//don't allow transfers only claim
+        // _pause();//don't allow transfers only claim //todo fix _mint issue
     }
 
     function pause() public onlyRole(PAUSER_ROLE) {
