@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { Contract, utils } from "ethers";
-import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, IERC6551Account, TokenBoundAccount } from "../typechain-types";
+import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20, TokenBoundAccount, BionicInvestorPass, Bionic, IERC20 } from "../typechain-types";
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ERC6551RegAddr = "0x02101dfB77FDE026414827Fdc604ddAF224F0921",
@@ -11,8 +11,8 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     PLEDGING_END_BLOCK = 40000000;
 
 describe("e2e", function () {
-    let bionicContract: Contract | any, bipContract: Contract | any, fundWithVesting: LaunchPoolFundRaisingWithVesting,
-        tokenBoundContract: Contract | any, tokenBoundContractRegistry: ERC6551Registry;
+    let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: LaunchPoolFundRaisingWithVesting,
+        tokenBoundContract: TokenBoundAccount, usdtContract: ERC20, tokenBoundContractRegistry: ERC6551Registry;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
     let bionicDecimals: number;
@@ -21,6 +21,7 @@ describe("e2e", function () {
         bionicContract = await deployBionic();
         bipContract = await deployBIP();
         tokenBoundContractRegistry = await ethers.getContractAt("ERC6551Registry", ERC6551RegAddr);
+        usdtContract = await ethers.getContractAt("ERC20Upgradeable", USDTAddr);
         tokenBoundContract = await deployTBA();
         fundWithVesting = await deployFundWithVesting(bionicContract.address);
         bionicDecimals = await bionicContract.decimals();
@@ -114,8 +115,8 @@ describe("e2e", function () {
 
             console.log(`client:${client.address}, abstractedAccount:${abstractedAccount.address}, bionicContract:${bionicContract.address}, fundWithVesting.address:${fundWithVesting.address}
             alreadyPledged.add(amount) ${alreadyPledged.add(amount)}, deadline ${deadline}`);
-            expect(await abstractedAccount.connect(client).permit(bionicContract.address, fundWithVesting.address, amount, deadline, v, r, s))
-                .to.emit(abstractedAccount, "CurrencyApproval").withArgs(bionicContract.address, fundWithVesting, amount);
+            await expect(abstractedAccount.connect(client).permit(bionicContract.address, fundWithVesting.address, amount, deadline, v, r, s))
+                .to.emit(abstractedAccount, "CurrencyApproval").withArgs(bionicContract.address, fundWithVesting.address, amount);
             expect(await abstractedAccount.allowance(bionicContract.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount));
         })
     });
@@ -138,14 +139,7 @@ describe("e2e", function () {
                 expect(pool.targetRaise).to.equal(1000000000);
                 expect(pool.maxPledgingAmountPerUser).to.equal(1000);
             })
-            it("Should be able to move funds it's been allowed", async () => {
-                let pool = await fundWithVesting.poolInfo(0);
-                expect(pool.rewardToken).to.equal(bionicContract.address);
-                expect(pool.tokenAllocationStartBlock).to.equal(0);
-                expect(pool.pledgingEndBlock).to.equal(PLEDGING_END_BLOCK);
-                expect(pool.targetRaise).to.equal(1000000000);
-                expect(pool.maxPledgingAmountPerUser).to.equal(1000);
-            })
+
         });
 
 
@@ -183,8 +177,8 @@ describe("e2e", function () {
                     deadline
                 )
 
-                expect(await fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
-                    .to.emit(fundWithVesting, "Pledge").withArgs(client.address, amount)
+                await expect(fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
+                    .to.emit(fundWithVesting, "Pledge").withArgs(client.address, 0, amount)
                     .to.emit(bionicContract, "Approval").withArgs(client.address, fundWithVesting.address, alreadyPledged.add(amount));
                 expect(await bionicContract.allowance(client.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount));
             });
@@ -202,11 +196,29 @@ describe("e2e", function () {
                     deadline
                 )
                 await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
-                expect(await fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
-                    .to.emit(fundWithVesting, "Pledge").withArgs(client.address, amount)
+                await expect(fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
+                    .to.emit(fundWithVesting, "Pledge").withArgs(client.address, 0, amount)
                     .to.emit(bionicContract, "Approval").withArgs(client.address, fundWithVesting.address, alreadyPledged.add(amount));
                 expect(await bionicContract.allowance(client.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount)).not.equal(amount);
             });
+
+            // it("Should fail to start lottery with non sorting account", async () => {
+            //     await expect(fundWithVesting.connect(client).raffle(0))
+            //         .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
+            // })
+
+            // it("Should be able to move funds it's been allowed", async () => {
+            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
+            //     // expect(await usdtContract.balanceOf(tokenBoundContract.address)).to.be.equal(1000);
+            //     await expect(fundWithVesting.raffle(0))
+            //         .to.emit(fundWithVesting, "PledgeFunded").withArgs(tokenBoundContract.address, 0, 1000);
+            //     // expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(1000);
+            //     // expect(await usdtContract.balanceOf(tokenBoundContract.address)).to.be.equal(0);
+
+
+            // })
+
+
         });
     })
 
