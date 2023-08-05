@@ -15,6 +15,7 @@ import "hardhat/console.sol";
 contract TokenBoundAccount is
     ICurrencyPermit,
     IERC6551Account,
+    IERC165,
     Context,
     Account
 {
@@ -147,6 +148,12 @@ contract TokenBoundAccount is
             block.timestamp <= deadline,
             "CurrencyPermit: expired deadline"
         );
+        console.log(
+            "CurrencyPermit: currency: %s  %s<= %s",
+            currency,
+            block.timestamp,
+            deadline
+        );
 
         address _signer = owner();
         uint256 n = _useNonce(_signer);
@@ -251,6 +258,10 @@ contract TokenBoundAccount is
         return getNonce();
     }
 
+    function supportsInterface(bytes4 interfaceId) public view virtual override(IERC165, Account) returns (bool) {
+        return interfaceId == type(IERC6551Account).interfaceId || super.supportsInterface(interfaceId);
+    }
+
     /*///////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
@@ -287,9 +298,9 @@ contract TokenBoundAccount is
                 currentAllowance >= amount,
                 "ERC20: insufficient allowance"
             );
-            unchecked {
-                _approve(currency, spender, currentAllowance - amount);
-            }
+            // unchecked {
+            _approve(currency, spender, currentAllowance - amount);
+            // }
         }
     }
 
