@@ -12,8 +12,12 @@ import "./libs/ICurrencyPermit.sol";
 
 import "hardhat/console.sol";
 
-
-contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account {
+contract TokenBoundAccount is
+    ICurrencyPermit,
+    IERC6551Account,
+    Context,
+    Account
+{
     /*///////////////////////////////////////////////////////////////
                             States
     //////////////////////////////////////////////////////////////*/
@@ -21,16 +25,17 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
 
     mapping(address => Counters.Counter) private _nonces;
     /**
-     * 
+     *
      * @notice Keeps the Allowance Per spender over currency
      * @dev currency => spender +> allowed amount
      *  if currency is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE the spender will have access to the native coin
-     */ 
+     */
     mapping(address => mapping(address => uint256)) private _allowances;
     // solhint-disable-next-line var-name-mixedcase
     bytes32 private constant _CURRENCY_PERMIT_TYPEHASH =
-        keccak256("Permit(address currency,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-
+        keccak256(
+            "Permit(address currency,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
 
     /*///////////////////////////////////////////////////////////////
                             Events
@@ -56,17 +61,19 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
         _disableInitializers();
     }
 
-
-
     receive() external payable virtual override(Account, IERC6551Account) {}
 
     /// @notice Returns whether a signer is authorized to perform transactions using the wallet.
-    function isValidSigner(address _signer, UserOperation calldata _userOp) public view virtual override returns (bool) {
-        AccountPermissionsStorage.Data storage data = AccountPermissionsStorage.accountPermissionsStorage();
+    function isValidSigner(
+        address _signer,
+        UserOperation calldata _userOp
+    ) public view virtual override returns (bool) {
+        AccountPermissionsStorage.Data storage data = AccountPermissionsStorage
+            .accountPermissionsStorage();
 
         // First, check if the signer is the owner.
-        if (_signer==owner()) {
-            console.log("owner called: %s",owner());
+        if (_signer == owner()) {
+            console.log("owner called: %s", owner());
             return true;
         } else {
             // If not an admin, check restrictions for the role held by the signer.
@@ -84,9 +91,13 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
 
             if (sig == this.execute.selector) {
                 // Extract the `target` and `value` arguments from the calldata for `execute`.
-                (address target, uint256 value, bytes memory callData) = decodeExecuteCalldata(_userOp.callData);
+                (
+                    address target,
+                    uint256 value,
+                    bytes memory callData
+                ) = decodeExecuteCalldata(_userOp.callData);
 
-                if(_allowances[target][_signer]>0){
+                if (_allowances[target][_signer] > 0) {
                     return true;
                 }
                 // if(IEIP165(target).supportsInterface(type(IERC20).interfaceId)){
@@ -98,11 +109,15 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
                 // require(data.approvedTargets[role].contains(target), "Account: target not approved.");
             } else if (sig == this.executeBatch.selector) {
                 // Extract the `target` and `value` array arguments from the calldata for `executeBatch`.
-                (address[] memory targets, uint256[] memory values, ) = decodeExecuteBatchCalldata(_userOp.callData);
+                (
+                    address[] memory targets,
+                    uint256[] memory values,
+
+                ) = decodeExecuteBatchCalldata(_userOp.callData);
 
                 // For each target+value pair, check if the value is within the allowed range and if the target is approved.
                 for (uint256 i = 0; i < targets.length; i++) {
-                    if(_allowances[targets[i]][_signer]>0){
+                    if (_allowances[targets[i]][_signer] > 0) {
                         return true;
                     }
                     // require(data.approvedTargets[role].contains(targets[i]), "Account: target not approved.");
@@ -127,26 +142,53 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external  onlyAdminOrEntrypoint {
-        require(block.timestamp <= deadline, "CurrencyPermit: expired deadline");
+    ) external onlyAdminOrEntrypoint {
+        require(
+            block.timestamp <= deadline,
+            "CurrencyPermit: expired deadline"
+        );
 
-        address _signer=owner();
-        uint256 n=_useNonce(_signer);
-        bytes32 structHash = keccak256(abi.encode(_CURRENCY_PERMIT_TYPEHASH, currency, spender, value, n, deadline));
+        address _signer = owner();
+        uint256 n = _useNonce(_signer);
+        bytes32 structHash = keccak256(
+            abi.encode(
+                _CURRENCY_PERMIT_TYPEHASH,
+                currency,
+                spender,
+                value,
+                n,
+                deadline
+            )
+        );
 
         bytes32 hash = _hashTypedDataV4(structHash);
 
-
         address signer = ECDSA.recover(hash, v, r, s);
-        require(signer == _signer, string(abi.encode(signer,"!=",_signer, hash)));
+        require(
+            signer == _signer,
+            string(abi.encode(signer, "!=", _signer, hash))
+        );
         _approve(currency, spender, value);
     }
 
+    function transferCurrency(
+        address currency,
+        address to,
+        uint256 amount
+    ) public virtual returns (bool) {
+        console.log("currency: %s, to: %s, amount: %s", currency, to, amount);
+        address spender = _msgSender();
+        _spendAllowance(currency, spender, amount);
+        IERC20(currency).transfer(to, amount);
+        return true;
+    }
 
     /**
      * @dev See {ICurrencyPermit-nonces}.
      */
-    function nonces(address _owner) public view virtual override returns (uint256) {
+    function nonces(
+        address _owner
+    ) public view virtual override returns (uint256) {
         return _nonces[_owner].current();
     }
 
@@ -161,7 +203,10 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address currency, address spender) public view virtual returns (uint256) {
+    function allowance(
+        address currency,
+        address spender
+    ) public view virtual returns (uint256) {
         return _allowances[currency][spender];
     }
 
@@ -206,7 +251,6 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
         return getNonce();
     }
 
-
     /*///////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
@@ -224,16 +268,42 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
         }
     }
 
+    /**
+     * @dev Updates `owner` s allowance for `spender` based on spent `amount`.
+     *
+     * Does not update the allowance amount in case of infinite allowance.
+     * Revert if not enough allowance is available.
+     *
+     * Might emit an {Approval} event.
+     */
+    function _spendAllowance(
+        address currency,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        uint256 currentAllowance = allowance(currency, spender);
+        if (currentAllowance != type(uint256).max) {
+            require(
+                currentAllowance >= amount,
+                "ERC20: insufficient allowance"
+            );
+            unchecked {
+                _approve(currency, spender, currentAllowance - amount);
+            }
+        }
+    }
+
     function _erc20TransferCheck(
         address _target,
         uint256 value,
         bytes calldata _calldata
     ) internal virtual returns (bool success) {
-        success=false;
-        if(IERC165(_target).supportsInterface(type(IERC20).interfaceId)){
-                if (getFunctionSignature(_calldata)==IERC20.transfer.selector||getFunctionSignature(_calldata)==IERC20.transferFrom.selector){
-
-                }
+        success = false;
+        if (IERC165(_target).supportsInterface(type(IERC20).interfaceId)) {
+            if (
+                getFunctionSignature(_calldata) == IERC20.transfer.selector ||
+                getFunctionSignature(_calldata) == IERC20.transferFrom.selector
+            ) {}
         }
     }
 
@@ -250,9 +320,19 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
     //  * - `currency` cannot be the zero address. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE will denote to native coin (eth,matic, and etc.)
     //  * - `spender` cannot be the zero address.
     //  */
-    function _approve(address currency, address spender, uint256 amount) internal  {
-        require(currency != address(0), "CurrencyPermit: approve from the zero address");
-        require(spender != address(0), "CurrencyPermit: approve to the zero address");
+    function _approve(
+        address currency,
+        address spender,
+        uint256 amount
+    ) internal {
+        require(
+            currency != address(0),
+            "CurrencyPermit: approve from the zero address"
+        );
+        require(
+            spender != address(0),
+            "CurrencyPermit: approve to the zero address"
+        );
 
         _allowances[currency][spender] = amount;
         emit CurrencyApproval(currency, spender, amount);
@@ -263,11 +343,14 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
      *
      * _Available since v4.1._
      */
-    function _useNonce(address _owner) internal virtual returns (uint256 current) {
+    function _useNonce(
+        address _owner
+    ) internal virtual returns (uint256 current) {
         Counters.Counter storage nonce = _nonces[_owner];
         current = nonce.current();
         nonce.increment();
     }
+
     /*///////////////////////////////////////////////////////////////
                             Modifiers
     //////////////////////////////////////////////////////////////*/
@@ -280,14 +363,10 @@ contract TokenBoundAccount is ICurrencyPermit, IERC6551Account, Context, Account
         _;
     }
 
-
-
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/#storage_gaps
      */
     uint256[49] private __gap;
-
 }
