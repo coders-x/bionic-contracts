@@ -5,11 +5,11 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "@thirdweb-dev/contracts/smart-wallet/utils/UserOperation.sol";
 
+import "hardhat/console.sol";
 import "../libs/IterableMapping.sol";
 import "../libs/BionicStructs.sol";
-import "../TBA.sol";
+import {TokenBoundAccount} from "../TBA.sol";
 
 import {FundRaisingGuild} from "./FundRaisingGuild.sol";
 
@@ -23,6 +23,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     using IterableMapping for BionicStructs.Map;
 
     bytes32 public constant BROKER_ROLE = keccak256("BROKER_ROLE");
+    bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
 
     /// @notice staking token is fixed for all pools
@@ -130,6 +131,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(BROKER_ROLE, _msgSender());
         _grantRole(TREASURY_ROLE, _msgSender());
+        _grantRole(SORTER_ROLE, _msgSender());
 
         emit ContractDeployed(address(rewardGuildBank));
     }
@@ -214,6 +216,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         );
 
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
+
         // #approve the contract for the total amount of pledge
         // @dev maybe we should let user himself do this instead?
         IERC20Permit(address(stakingToken)).permit(
@@ -226,7 +229,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             s
         );
         // stakingToken.safeTransferFrom(address(_msgSender()), address(this), _amount);
-
+        userInfo[_pid].set(_msgSender(), user);
         emit Pledge(_msgSender(), _pid, _amount);
     }
 
@@ -256,26 +259,56 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     /**
      * @dev will get the money out of users wallet into investment wallet
      */
-    function raffle(uint256 _pid) external payable nonReentrant {
+    function raffle(
+        uint256 _pid
+    ) external payable nonReentrant onlyRole(SORTER_ROLE) {
         require(_pid < poolInfo.length, "fundPledge: Invalid PID");
 
         for (uint256 i = 0; i < userInfo[_pid].size(); i++) {
-            TokenBoundAccount _userAddress = TokenBoundAccount(
+            address payable userAddress = payable(
                 userInfo[_pid].getKeyAtIndex(i)
             );
-            BionicStructs.UserInfo storage user = userInfo[_pid].get(
-                address(_userAddress)
+            TokenBoundAccount userAccount = TokenBoundAccount(userAddress);
+            BionicStructs.UserInfo memory user = userInfo[_pid].get(
+                userAddress
+            );
+            console.log(
+                "amount: %s, pledgeFundingAmount: %s",
+                user.amount,
+                user.pledgeFundingAmount
             );
             if (user.pledgeFundingAmount == 0 && user.amount > 0) {
-                UserOperation memory op = UserOperation({
-                    sender: address(_userAddress),
-                    nonce: _userAddress.nonce(),
-                    callGasLimit: 0,
-                    verificationGasLimit: 100000,
-                    preVerificationGas: 21000,
-                    maxFeePerGas: BigNumber{value: "1541441108"},
-                    maxPriorityFeePerGas: 1000000000
-                });
+                console.log("transfering currency ...");
+                // (bool res, bytes memory returndata) = userAccount
+                //     .transferCurrency(
+                //         address(investingToken),
+                //         address(this),
+                //         user.amount
+                //     );
+                (bool res, bytes memory returndata) = userAddress.call(
+                    abi.encodeWithSignature(
+                        "transferCurrency(address,address,uint256)",
+                        address(investingToken),
+                        address(this),
+                        user.amount
+                    )
+                );
+
+                console.log("transferred currency res:%s", res);
+                console.logBytes(returndata);
+                emit PledgeFunded(userAddress, _pid, user.amount);
+                // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
+                //     msg.value
+                // );
+                // UserOperation memory op = UserOperation({
+                //     sender: address(_userAddress),
+                //     nonce: _userAddress.nonce(),
+                //     callGasLimit: 0,
+                //     verificationGasLimit: 100000,
+                //     preVerificationGas: 21000,
+                //     maxFeePerGas: BigNumber{value: "1541441108"},
+                //     maxPriorityFeePerGas: 1000000000
+                // });
             }
 
             // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
@@ -301,7 +334,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
 
             // stakingToken.safeTransfer(address(_msgSender()), user.amount);
 
-            emit PledgeFunded(_msgSender(), _pid, msg.value);
+            // emit PledgeFunded(_msgSender(), _pid, msg.value);
         }
     }
 
