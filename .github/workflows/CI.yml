@@ -29,4 +29,5 @@ jobs:
       - run: npm install
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+      - run: git submodule
       - run: npm test
