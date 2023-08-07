@@ -158,89 +158,95 @@ describe("e2e", function () {
 
 
         describe("pledge", function () {
-            it("Should fail if Pool doesn't Exist", async function () {
-                await expect(fundWithVesting.connect(client).pledge(10000, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
-                    .to.be.revertedWith("pledge: Invalid PID");
-            });
             it("Should fail if not sent via TBA", async function () {
                 await expect(fundWithVesting.connect(client).pledge(0, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
                     .to.be.revertedWith("Contract does not support TokenBoundAccount");
             });
-            // it("Should fail if expired deadline", async function () {
-            //     await expect(fundWithVesting.connect(client).pledge(0, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
-            //         .to.be.revertedWith("ERC20Permit: expired deadline");
-            // });
-            // it("Should fail if not enough amount pledged", async function () {
-            //     await expect(fundWithVesting.connect(client).pledge(0, 0, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
-            //         .to.be.revertedWith("pledge: No pledge specified");
-            // });
-            // it("Should fail if pledge exceeds the max user share", async function () {
-            //     await expect(fundWithVesting.connect(client).pledge(0, 1001, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
-            //         .to.be.revertedWith("pledge: can not exceed max staking amount per user");
-            // });
-            // it("Should fail on invalid signature", async function () {
-            //     await expect(fundWithVesting.connect(client).pledge(0, 10, 32000000000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
-            //         .to.be.revertedWith("ECDSA: invalid signature");
-            // });
-            // it("Should pledge user and permit contract to move amount", async function () {
-            //     const deadline = ethers.constants.MaxUint256;
-            //     const alreadyPledged = await fundWithVesting.userTotalPledge(client.address);
-            //     expect(alreadyPledged).to.equal(0);
-            //     const amount = BigNumber.from(10);
-            //     const { v, r, s } = await getPermitSignature(
-            //         client,
-            //         bionicContract,
-            //         fundWithVesting.address,
-            //         alreadyPledged.add(amount),
-            //         deadline
-            //     )
+            it("Should fail if Pool doesn't Exist", async function () {
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [10000, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
+                    .to.be.revertedWith("pledge: Invalid PID")//("pledge: Invalid PID");
+            });
+            it("Should fail if not enough amount pledged", async function () {
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 0, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
+                    .to.be.revertedWith("pledge: No pledge specified");
+            });
 
-            //     await expect(fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
-            //         .to.emit(fundWithVesting, "Pledge").withArgs(client.address, 0, amount)
-            //         .to.emit(bionicContract, "Approval").withArgs(client.address, fundWithVesting.address, alreadyPledged.add(amount));
-            //     expect(await bionicContract.allowance(client.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount));
-            // });
+            it("Should fail if pledge exceeds the max user share", async function () {
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 1001, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
+                    .to.be.revertedWith("pledge: can not exceed max staking amount per user");
+            });
+            it("Should fail if expired deadline", async function () {
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
+                    .to.be.revertedWith("CurrencyPermit: expired deadline");
+            });
+            it("Should fail on invalid signature", async function () {
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 10, 32000000000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
+                    .to.be.revertedWith("ECDSA: invalid signature");
+            });
+            it("Should pledge user and permit contract to move amount", async function () {
+                const deadline = ethers.constants.MaxUint256;
+                const alreadyPledged = await fundWithVesting.userTotalPledge(abstractedAccount.address);
+                expect(alreadyPledged).to.equal(0);
+                const amount = BigNumber.from(10);
+                const { v, r, s } = await getCurrencyPermitSignature(
+                    client,
+                    abstractedAccount,
+                    usdtContract,
+                    fundWithVesting.address,
+                    alreadyPledged.add(amount),
+                    deadline
+                )
 
-            // it("Should add on user pledge and permit contract with new amount", async function () {
-            //     const deadline = ethers.constants.MaxUint256;
-            //     const alreadyPledged = await fundWithVesting.userTotalPledge(client.address);
-            //     expect(alreadyPledged).to.not.equal(BigNumber.from(0));
-            //     const amount = BigNumber.from(10);
-            //     const { v, r, s } = await getPermitSignature(
-            //         client,
-            //         bionicContract,
-            //         fundWithVesting.address,
-            //         alreadyPledged.add(amount),
-            //         deadline
-            //     )
-            //     await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
-            //     await expect(fundWithVesting.connect(client).pledge(0, amount, deadline, v, r, s))
-            //         .to.emit(fundWithVesting, "Pledge").withArgs(client.address, 0, amount)
-            //         .to.emit(bionicContract, "Approval").withArgs(client.address, fundWithVesting.address, alreadyPledged.add(amount));
-            //     expect(await bionicContract.allowance(client.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount)).not.equal(amount);
-            // });
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
+                await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
+                    .to.emit(fundWithVesting, "Pledge").withArgs(abstractedAccount.address, 0, amount)
+                    .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, alreadyPledged.add(amount));
+                expect(await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount));
+            });
+
+            it("Should add on user pledge and permit contract with new amount", async function () {
+                const deadline = ethers.constants.MaxUint256;
+                const alreadyPledged = await fundWithVesting.userTotalPledge(abstractedAccount.address);
+                expect(alreadyPledged).to.not.equal(BigNumber.from(0));
+                const amount = BigNumber.from(10);
+                const { v, r, s } = await getCurrencyPermitSignature(
+                    client,
+                    abstractedAccount,
+                    usdtContract,
+                    fundWithVesting.address,
+                    alreadyPledged.add(amount),
+                    deadline
+                )
+                await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
+                await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
+                    .to.emit(fundWithVesting, "Pledge").withArgs(abstractedAccount.address, 0, amount)
+                    .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, alreadyPledged.add(amount));
+                expect(await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount)).not.equal(amount);
+            });
 
             it("Should fail to start lottery with non sorting account", async () => {
                 await expect(fundWithVesting.connect(client).raffle(0))
                     .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
             })
 
-            // it("Should be able to move funds it's been allowed", async () => {
-            //     const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
+            it("Should be able to move funds it's been allowed", async () => {
+                const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
 
-            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
-            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
-            //     let amount = await abstractedAccount.allowance(client.address, fundWithVesting.address);
-            //     let userInfo = await fundWithVesting.userInfo(0);
-            //     console.log(`${amount} == ${userInfo}`);
-
-            //     await expect(fundWithVesting.raffle(0))
-            //         .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, amount);
-            //     // expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(1000);
-            //     // expect(await usdtContract.balanceOf(tokenBoundContract.address)).to.be.equal(0);
-
-
-            // })
+                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
+                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
+                let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
+                let balance = await usdtContract.balanceOf(abstractedAccount.address)
+                await expect(fundWithVesting.raffle(0))
+                    .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, allowed);
+                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
+                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
+            })
 
 
         });
@@ -305,13 +311,14 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
         )
     )
 }
-async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20Permit | any, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
+async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
         account.nonces(signer.address),
         "Account",
         "1",
         signer.getChainId(),
     ])
+
 
     return ethers.utils.splitSignature(
         await signer._signTypedData(
@@ -384,7 +391,7 @@ async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: 
             IterableMapping: lib.address
         }
     });
-    console.log("Deploying LaunchPoolFundRaisingWithVesting contract...");
+    console.log(`Deploying LaunchPoolFundRaisingWithVesting contract...`);
     return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass);
 }
 async function deployTBA() {
