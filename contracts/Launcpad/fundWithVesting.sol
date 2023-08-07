@@ -143,6 +143,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         investingToken = _investingToken;
         rewardGuildBank = new FundRaisingGuild(address(this));
 
+
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(BROKER_ROLE, _msgSender());
         _grantRole(TREASURY_ROLE, _msgSender());
@@ -211,32 +212,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         require(_pid < poolInfo.length, "pledge: Invalid PID");
 
 
-        // try TokenBoundAccount(payable(_msgSender())).token() returns (
-        //     uint256,
-        //     address tokenContract,
-        //     uint256
-        // ) {
-        //     require(
-        //         tokenContract == bionicInvestorPass,
-        //         "pledge: Invalid Bionic TokenBoundAccount."
-        //     );
-        //     console.log("2");
-        // } catch (bytes memory reason) {
-        //     console.log("3");
-        //     if (reason.length == 0) {
-        //         revert("ERC721: transfer to non ERC721Receiver implementer");
-        //     } else {
-        //         /// @solidity memory-safe-assembly
-        //         assembly {
-        //             revert(add(32, reason), mload(reason))
-        //         }
-        //     }
-        // }
-        // console.log("4");
-
-        // (, address tokenContract, ) = TokenBoundAccount(payable(_msgSender()))
-        //     .token();
-        // console.log("token:%s bip:%s", tokenContract, bionicInvestorPass);
 
         BionicStructs.PoolInfo storage pool = poolInfo[_pid];
         BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
@@ -260,47 +235,10 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
 
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
 
-        // #approve the contract for the total amount of pledge
-        // @dev maybe we should let user himself do this instead?
-        // IERC20Permit(address(stakingToken)).permit(
-        //     _msgSender(),
-        //     address(this),
-        //     userTotalPledge[_msgSender()],
-        //     deadline,
-        //     v,
-        //     r,
-        //     s
-        // );
 
-        // try
-        //     ICurrencyPermit(_msgSender()).permit(
-        //         address(stakingToken),
-        //         address(this),
-        //         userTotalPledge[_msgSender()],
-        //         deadline,
-        //         v,
-        //         r,
-        //         s
-        //     )
-        // {
-        //     console.log("NOT reverting.");
-        //     userInfo[_pid].set(_msgSender(), user);
-        //     emit Pledge(_msgSender(), _pid, _amount);
-        // } catch (bytes memory reason) {
-        //     if (reason.length == 0) {
-        //         revert("ERC721: transfer to non ERC721Receiver implementer");
-        //     } else {
-        //         /// @solidity memory-safe-assembly
-        //         assembly {
-        //             revert(add(32, reason), mload(reason))
-        //         }
-        //     }
-        // }
-
-        (bool success, bytes memory returndata) = _msgSender().call{value: 0}(
-            abi.encodeWithSignature(
-                "permit(address,address,uint256,uint256,uint8,bytes32,bytes32)",
-                address(stakingToken),
+        try
+            ICurrencyPermit(_msgSender()).permit(
+                address(investingToken),
                 address(this),
                 userTotalPledge[_msgSender()],
                 deadline,
@@ -308,15 +246,19 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
                 r,
                 s
             )
-        );
-        console.log(
-            "pledge: success: %s, deadline: %s _msgSender: %s returndata",
-            success,
-            deadline,
-            _msgSender()
-        );
-        console.logBytes(returndata);
-
+        {
+            userInfo[_pid].set(_msgSender(), user);
+            emit Pledge(_msgSender(), _pid, _amount);
+        } catch (bytes memory reason) {
+            if (reason.length == 0) {
+                revert("ICurrencyPermit: no reason");
+            } else {
+                /// @solidity memory-safe-assembly
+                assembly {
+                    revert(add(32, reason), mload(reason))
+                }
+            }
+        }
         // stakingToken.safeTransferFrom(address(_msgSender()), address(this), _amount);
     }
 
@@ -359,31 +301,26 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             BionicStructs.UserInfo memory user = userInfo[_pid].get(
                 userAddress
             );
-            console.log(
-                "amount: %s, pledgeFundingAmount: %s",
-                user.amount,
-                user.pledgeFundingAmount
-            );
+
             if (user.pledgeFundingAmount == 0 && user.amount > 0) {
-                console.log("transfering currency ...");
-                // (bool res, bytes memory returndata) = userAccount
-                //     .transferCurrency(
-                //         address(investingToken),
-                //         address(this),
-                //         user.amount
-                //     );
-                (bool res, bytes memory returndata) = userAddress.call(
-                    abi.encodeWithSignature(
-                        "transferCurrency(address,address,uint256)",
+                try
+                    userAccount.transferCurrency(
                         address(investingToken),
                         address(this),
-                        user.amount
-                    )
-                );
-
-                console.log("transferred currency res:%s", res);
-                console.logBytes(returndata);
-                emit PledgeFunded(userAddress, _pid, user.amount);
+                        user.amount) 
+                        returns (bool res)
+                    {
+                        emit PledgeFunded(userAddress, _pid, user.amount);
+                    } catch (bytes memory reason) {
+                        if (reason.length == 0) {
+                            revert("ICurrencyPermit: no reason");
+                        } else {
+                            /// @solidity memory-safe-assembly
+                            assembly {
+                                revert(add(32, reason), mload(reason))
+                            }
+                        }
+                    }
                 // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
                 //     msg.value
                 // );
@@ -780,6 +717,31 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             ),
             "Contract does not support TokenBoundAccount"
         );
+
+
+        try TokenBoundAccount(payable(_msgSender())).token() returns (
+            uint256,
+            address tokenContract,
+            uint256
+        ) {
+            require(
+                tokenContract == bionicInvestorPass,
+                "onlyBionicAccount: Invalid Bionic TokenBoundAccount."
+            );
+        } catch (bytes memory reason) {
+            if (reason.length == 0) {
+                revert("onlyBionicAccount: Invalid Bionic TokenBoundAccount.");
+            } else {
+                /// @solidity memory-safe-assembly
+                assembly {
+                    revert(add(32, reason), mload(reason))
+                }
+            }
+        }
+
+        (, address tokenContract, ) = TokenBoundAccount(payable(_msgSender()))
+            .token();
+
         _;
     }
 }

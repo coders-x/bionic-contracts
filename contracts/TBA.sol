@@ -74,7 +74,6 @@ contract TokenBoundAccount is
 
         // First, check if the signer is the owner.
         if (_signer == owner()) {
-            console.log("owner called: %s", owner());
             return true;
         } else {
             // If not an admin, check restrictions for the role held by the signer.
@@ -143,18 +142,11 @@ contract TokenBoundAccount is
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external onlyAdminOrEntrypoint {
+    ) external  {
         require(
             block.timestamp <= deadline,
             "CurrencyPermit: expired deadline"
         );
-        console.log(
-            "CurrencyPermit: currency: %s  %s<= %s",
-            currency,
-            block.timestamp,
-            deadline
-        );
-
         address _signer = owner();
         uint256 n = _useNonce(_signer);
         bytes32 structHash = keccak256(
@@ -167,6 +159,7 @@ contract TokenBoundAccount is
                 deadline
             )
         );
+
 
         bytes32 hash = _hashTypedDataV4(structHash);
 
@@ -183,8 +176,8 @@ contract TokenBoundAccount is
         address to,
         uint256 amount
     ) public virtual returns (bool) {
-        console.log("currency: %s, to: %s, amount: %s", currency, to, amount);
         address spender = _msgSender();
+        uint256 allowance=allowance(currency, spender);
         _spendAllowance(currency, spender, amount);
         IERC20(currency).transfer(to, amount);
         return true;
