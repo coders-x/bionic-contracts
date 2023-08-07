@@ -143,6 +143,7 @@ contract TokenBoundAccount is
         bytes32 r,
         bytes32 s
     ) external  {
+        // solhint-disable-next-line not-rely-on-time
         require(
             block.timestamp <= deadline,
             "CurrencyPermit: expired deadline"
@@ -177,7 +178,6 @@ contract TokenBoundAccount is
         uint256 amount
     ) public virtual returns (bool) {
         address spender = _msgSender();
-        uint256 allowance=allowance(currency, spender);
         _spendAllowance(currency, spender, amount);
         IERC20(currency).transfer(to, amount);
         return true;
@@ -297,19 +297,6 @@ contract TokenBoundAccount is
         }
     }
 
-    function _erc20TransferCheck(
-        address _target,
-        uint256 value,
-        bytes calldata _calldata
-    ) internal virtual returns (bool success) {
-        success = false;
-        if (IERC165(_target).supportsInterface(type(IERC20).interfaceId)) {
-            if (
-                getFunctionSignature(_calldata) == IERC20.transfer.selector ||
-                getFunctionSignature(_calldata) == IERC20.transferFrom.selector
-            ) {}
-        }
-    }
 
     // /**
     //  * @dev Sets `amount` as the allowance of `spender` over the owner's `currency` tokens.
@@ -331,7 +318,7 @@ contract TokenBoundAccount is
     ) internal {
         require(
             currency != address(0),
-            "CurrencyPermit: approve from the zero address"
+            "CurrencyPermit: approve currency of zero address"
         );
         require(
             spender != address(0),
@@ -350,9 +337,9 @@ contract TokenBoundAccount is
     function _useNonce(
         address _owner
     ) internal virtual returns (uint256 current) {
-        Counters.Counter storage nonce = _nonces[_owner];
-        current = nonce.current();
-        nonce.increment();
+        Counters.Counter storage n = _nonces[_owner];
+        current = n.current();
+        n.increment();
     }
 
     /*///////////////////////////////////////////////////////////////
