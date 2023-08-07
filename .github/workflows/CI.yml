@@ -32,5 +32,4 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
       - run: npm install
-      - run: cd contracts/refrense && npm install
       - run: npm test
