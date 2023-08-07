@@ -12,12 +12,15 @@ pragma solidity >=0.7.0 <0.9.0;
  * need to send a transaction, and thus is not required to hold Ether at all.
  */
 interface ICurrencyPermit {
-
     /**
      * @dev Emitted when the allowance of a `spender` for an `owner` is set by
      * a call to {approve}. `value` is the new allowance.
      */
-    event CurrencyApproval(address indexed currency, address indexed spender, uint256 value);
+    event CurrencyApproval(
+        address indexed currency,
+        address indexed spender,
+        uint256 value
+    );
 
     /**
      * @dev Sets `value` as the allowance of `spender` over ``owner``'s currency,
@@ -49,6 +52,28 @@ interface ICurrencyPermit {
         bytes32 r,
         bytes32 s
     ) external;
+
+    /**
+     * @dev See {ICurrencyPermit-transferCurrency}.
+     *
+     * Emits an {Approval} event indicating the updated allowance. This is not
+     * required by the EIP. See the note at the beginning of {ERC20}.
+     *
+     * NOTE: Does not update the allowance if the current allowance
+     * is the maximum `uint256`.
+     *
+     * Requirements:
+     *
+     * - `currency` and `to` cannot be the zero address.
+     * - `this` must have a balance of at least `amount`.
+     * - the caller must have allowance for ``currency``'s tokens of at least
+     * `amount`.
+     */
+    function transferCurrency(
+        address currency,
+        address to,
+        uint256 amount
+    ) external returns (bool);
 
     /**
      * @dev Returns the current nonce for `owner`. This value must be
