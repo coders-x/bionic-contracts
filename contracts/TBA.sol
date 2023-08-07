@@ -143,9 +143,9 @@ contract TokenBoundAccount is
         bytes32 r,
         bytes32 s
     ) external  {
-        // solhint-disable-next-line not-rely-on-time
+
         require(
-            block.timestamp <= deadline,
+            block.timestamp <= deadline,        // solhint-disable-line not-rely-on-time
             "CurrencyPermit: expired deadline"
         );
         address _signer = owner();
