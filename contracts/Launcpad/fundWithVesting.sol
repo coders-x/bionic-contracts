@@ -166,7 +166,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         uint256 _targetRaise,
         uint256 _maxPledgingAmountPerUser,
         bool _withUpdate
-    ) public onlyRole(BROKER_ROLE) {
+    ) public onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
         require(
             rewardTokenAddress != address(0),
@@ -192,11 +192,12 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             })
         );
 
+        pid=poolInfo.length.sub(1);
         poolIdToLastPercentageAllocTime[
-            poolInfo.length.sub(1)
+            pid
         ] = _tokenAllocationStartTime;
 
-        emit PoolAdded(poolInfo.length.sub(1));
+        emit PoolAdded(pid);
     }
 
     // step 1
