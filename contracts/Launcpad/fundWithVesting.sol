@@ -45,7 +45,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
 
     // Pool to accumulated share counters
     mapping(uint256 => uint256) public poolIdToAccPercentagePerShare;
-    mapping(uint256 => uint256) public poolIdToLastPercentageAllocBlock;
+    mapping(uint256 => uint256) public poolIdToLastPercentageAllocTime;
 
     // Number of reward tokens distributed per block for this pool
     mapping(uint256 => uint256) public poolIdToRewardPerBlock;
@@ -161,8 +161,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     /// @dev Can only be called by the contract owner
     function add(
         IERC20 _rewardToken,
-        uint256 _tokenAllocationStartBlock,
-        uint256 _pledgeingEndBlock,
+        uint256 _tokenAllocationStartTime,
+        uint256 _pledgeingEndTime,
         uint256 _targetRaise,
         uint256 _maxPledgingAmountPerUser,
         bool _withUpdate
@@ -173,8 +173,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             "add: _rewardToken is zero address"
         );
         require(
-            _tokenAllocationStartBlock < _pledgeingEndBlock,
-            "add: _tokenAllocationStartBlock must be before pledging end"
+            _tokenAllocationStartTime < _pledgeingEndTime,
+            "add: _tokenAllocationStartTime must be before pledging end"
         );
         require(_targetRaise > 0, "add: Invalid raise amount");
 
@@ -185,16 +185,16 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         poolInfo.push(
             BionicStructs.PoolInfo({
                 rewardToken: _rewardToken,
-                tokenAllocationStartBlock: _tokenAllocationStartBlock,
-                pledgingEndBlock: _pledgeingEndBlock,
+                tokenAllocationStartTime: _tokenAllocationStartTime,
+                pledgingEndTime: _pledgeingEndTime,
                 targetRaise: _targetRaise,
                 maxPledgingAmountPerUser: _maxPledgingAmountPerUser
             })
         );
 
-        poolIdToLastPercentageAllocBlock[
+        poolIdToLastPercentageAllocTime[
             poolInfo.length.sub(1)
-        ] = _tokenAllocationStartBlock;
+        ] = _tokenAllocationStartTime;
 
         emit PoolAdded(poolInfo.length.sub(1));
     }
@@ -221,6 +221,11 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         require(
             user.amount.add(_amount) <= pool.maxPledgingAmountPerUser,
             "pledge: can not exceed max staking amount per user"
+        );
+        
+        require(
+            block.timestamp >= pool.pledgingEndTime,   // solhint-disable-line not-rely-on-time
+            "pledge: time window of pledging for this pool has passed"
         );
 
         updatePool(_pid);
@@ -487,23 +492,24 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         require(_pid < poolInfo.length, "updatePool: invalid _pid");
 
         // staking not started
-        if (block.number < poolInfo[_pid].tokenAllocationStartBlock) {
+        // solhint-disable-next-line not-rely-on-time
+        if (block.timestamp < poolInfo[_pid].tokenAllocationStartTime) {
             return;
         }
 
         // if no one staked, nothing to do
         if (poolIdToTotalStaked[_pid] == 0) {
-            poolIdToLastPercentageAllocBlock[_pid] = block.number;
+            poolIdToLastPercentageAllocTime[_pid] = block.number;
             return;
         }
 
         // token allocation not finished
         uint256 maxEndBlockForPercentAlloc = block.number <=
-            poolInfo[_pid].pledgingEndBlock
-            ? block.number
-            : poolInfo[_pid].pledgingEndBlock;
+            poolInfo[_pid].pledgingEndTime
+            ? block.timestamp // solhint-disable-line not-rely-on-time
+            : poolInfo[_pid].pledgingEndTime;
         uint256 blocksSinceLastPercentAlloc = getMultiplier(
-            poolIdToLastPercentageAllocBlock[_pid],
+            poolIdToLastPercentageAllocTime[_pid],
             maxEndBlockForPercentAlloc
         );
 
@@ -515,7 +521,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
                 uint256 lastAllocBlock
             ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
             poolIdToAccPercentagePerShare[_pid] = accPercentPerShare;
-            poolIdToLastPercentageAllocBlock[_pid] = lastAllocBlock;
+            poolIdToLastPercentageAllocTime[_pid] = lastAllocBlock;
         }
 
         // project has not sent rewards
@@ -561,19 +567,19 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         returns (uint256 accPercentPerShare, uint256 lastAllocBlock)
     {
         uint256 tokenAllocationPeriodInBlocks = poolInfo[_pid]
-            .pledgingEndBlock
-            .sub(poolInfo[_pid].tokenAllocationStartBlock);
+            .pledgingEndTime
+            .sub(poolInfo[_pid].tokenAllocationStartTime);
 
         uint256 allocationAvailablePerBlock = TOTAL_TOKEN_ALLOCATION_POINTS.div(
             tokenAllocationPeriodInBlocks
         );
 
         uint256 maxEndBlockForPercentAlloc = block.number <=
-            poolInfo[_pid].pledgingEndBlock
+            poolInfo[_pid].pledgingEndTime
             ? block.number
-            : poolInfo[_pid].pledgingEndBlock;
+            : poolInfo[_pid].pledgingEndTime;
         uint256 multiplier = getMultiplier(
-            poolIdToLastPercentageAllocBlock[_pid],
+            poolIdToLastPercentageAllocTime[_pid],
             maxEndBlockForPercentAlloc
         );
         uint256 totalPercentageUnlocked = multiplier.mul(
@@ -641,7 +647,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             "withdraw: Only allow non-funders to withdraw"
         );
         require(
-            block.number > pool.pledgingEndBlock,
+            block.number > pool.pledgingEndTime,
             "withdraw: Not yet permitted"
         );
 
