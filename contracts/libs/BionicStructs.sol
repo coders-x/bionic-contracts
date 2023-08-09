@@ -22,8 +22,8 @@ library BionicStructs {
     /// @dev Info of each pool.
     struct PoolInfo {
         IERC20 rewardToken; // Address of the reward token contract.
-        uint256 tokenAllocationStartBlock; // Block when users stake counts towards earning reward token allocation
-        uint256 pledgingEndBlock; // Before this block pledge is permitted
+        uint256 tokenAllocationStartTime; // Time when users stake counts towards earning reward token allocation
+        uint256 pledgingEndTime; // Before this Time pledge is permitted
         uint256 targetRaise; // Amount that the project wishes to raise
         uint256 maxPledgingAmountPerUser; // Max. amount of tokens that can be staked per account/user
     }
