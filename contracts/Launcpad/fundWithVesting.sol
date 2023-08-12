@@ -16,6 +16,10 @@ import {TokenBoundAccount} from "../TBA.sol";
 
 import {FundRaisingGuild} from "./FundRaisingGuild.sol";
 
+
+/* Errors */
+error LPFRWV__NotDefinedError();
+
 /// @title Fund raising platform facilitated by launch pool
 /// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
@@ -257,7 +261,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             emit Pledge(_msgSender(), _pid, _amount);
         } catch (bytes memory reason) {
             if (reason.length == 0) {
-                revert("ICurrencyPermit: no reason");
+                revert ICurrencyPermit__NoReason();
             } else {
                 /// @solidity memory-safe-assembly
                 assembly {
@@ -319,7 +323,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
                         emit PledgeFunded(userAddress, _pid, user.amount);
                     } catch (bytes memory reason) {
                         if (reason.length == 0) {
-                            revert("ICurrencyPermit: no reason");
+                            revert ICurrencyPermit__NoReason();
                         } else {
                             /// @solidity memory-safe-assembly
                             assembly {
@@ -737,7 +741,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             );
         } catch (bytes memory reason) {
             if (reason.length == 0) {
-                revert("onlyBionicAccount: Invalid Bionic TokenBoundAccount.");
+                revert LPFRWV__NotDefinedError();
             } else {
                 /// @solidity memory-safe-assembly
                 assembly {

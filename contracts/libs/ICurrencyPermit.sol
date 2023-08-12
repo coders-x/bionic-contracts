@@ -3,6 +3,10 @@
 
 pragma solidity >=0.7.0 <0.9.0;
 
+
+/* Errors */
+error ICurrencyPermit__NoReason();
+
 /**
  * @dev Interface of the Currency Permit extension allowing approvals to be made via signatures, as defined in
  * https://eips.ethereum.org/EIPS/eip-2612[EIP-2612].
