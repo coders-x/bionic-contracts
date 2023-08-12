@@ -17,7 +17,7 @@ import {TokenBoundAccount} from "../TBA.sol";
 import {FundRaisingGuild} from "./FundRaisingGuild.sol";
 
 /// @title Fund raising platform facilitated by launch pool
-/// @author BlockRocket.tech
+/// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
 contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
