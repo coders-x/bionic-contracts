@@ -38,7 +38,6 @@ contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
     // Lottery Variables
     uint32 private immutable i_winnersCount;
     bool private immutable i_requestVRFPerWinner; // whether should request diffrent random number per winner or just one and calculate all winners off of it.
-    uint256 private immutable i_interval;
     uint256 private s_lastTimeStamp;
     address payable[] private s_winners;
     address payable[] private s_players;
@@ -54,7 +53,6 @@ contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
     constructor(
         address vrfCoordinatorV2,
         bytes32 gasLane, // keyHash
-        uint256 interval,
         uint64 subscriptionId,
         uint32 winnersCount,
         uint32 callbackGasLimit,
@@ -62,7 +60,6 @@ contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
     ) VRFConsumerBaseV2(vrfCoordinatorV2) {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_gasLane = gasLane;
-        i_interval = interval;
         i_subscriptionId = subscriptionId;
         s_raffleState = RaffleState.OPEN;
         s_lastTimeStamp = block.timestamp;//solhint-disable-line not-rely-on-time
@@ -217,9 +214,7 @@ contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
         return s_lastTimeStamp;
     }
 
-    function getInterval() public view returns (uint256) {
-        return i_interval;
-    }
+
 
 
     function getNumberOfPlayers() public view returns (uint256) {
