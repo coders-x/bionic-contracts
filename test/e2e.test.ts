@@ -269,7 +269,7 @@ describe("e2e", function () {
             });
 
             it("Should fail to start lottery with non sorting account", async () => {
-                await expect(fundWithVesting.connect(client).raffle(0))
+                await expect(fundWithVesting.connect(client).draw(0))
                     .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
             })
 
@@ -280,7 +280,7 @@ describe("e2e", function () {
                 expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
                 let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
                 let balance = await usdtContract.balanceOf(abstractedAccount.address)
-                await expect(fundWithVesting.raffle(0))
+                await expect(fundWithVesting.draw(0))
                     .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, allowed);
                 expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
                 expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));

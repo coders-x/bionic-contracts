@@ -19,6 +19,8 @@ import {FundRaisingGuild} from "./FundRaisingGuild.sol";
 
 /* Errors */
 error LPFRWV__NotDefinedError();
+error LPFRWV__InvalidPool();
+error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 
 /// @title Fund raising platform facilitated by launch pool
 /// @author Ali Mahdavi
@@ -298,78 +300,16 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     /**
      * @dev will get the money out of users wallet into investment wallet
      */
-    function raffle(
+    function draw(
         uint256 _pid
     ) external payable nonReentrant onlyRole(SORTER_ROLE) {
-        require(_pid < poolInfo.length, "fundPledge: Invalid PID");
-
-        for (uint256 i = 0; i < userInfo[_pid].size(); i++) {
-            address payable userAddress = payable(
-                userInfo[_pid].getKeyAtIndex(i)
-            );
-            TokenBoundAccount userAccount = TokenBoundAccount(userAddress);
-            BionicStructs.UserInfo memory user = userInfo[_pid].get(
-                userAddress
-            );
-
-            if (user.pledgeFundingAmount == 0 && user.amount > 0) {
-                try
-                    userAccount.transferCurrency(
-                        address(investingToken),
-                        address(this),
-                        user.amount) 
-                        returns (bool res)
-                    {
-                        emit PledgeFunded(userAddress, _pid, user.amount);
-                    } catch (bytes memory reason) {
-                        if (reason.length == 0) {
-                            revert ICurrencyPermit__NoReason();
-                        } else {
-                            /// @solidity memory-safe-assembly
-                            assembly {
-                                revert(add(32, reason), mload(reason))
-                            }
-                        }
-                    }
-                // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
-                //     msg.value
-                // );
-                // UserOperation memory op = UserOperation({
-                //     sender: address(_userAddress),
-                //     nonce: _userAddress.nonce(),
-                //     callGasLimit: 0,
-                //     verificationGasLimit: 100000,
-                //     preVerificationGas: 21000,
-                //     maxFeePerGas: BigNumber{value: "1541441108"},
-                //     maxPriorityFeePerGas: 1000000000
-                // });
-            }
-
-            // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
-            //     msg.value
-            // );
-
-            // (
-            //     uint256 accPercentPerShare,
-
-            // ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-            // uint256 userPercentageAllocated = user
-            //     .amount
-            //     .mul(accPercentPerShare)
-            //     .div(1e18)
-            //     .sub(user.tokenAllocDebt);
-            // poolIdToTotalFundedPercentageOfTargetRaise[
-            //     _pid
-            // ] = poolIdToTotalFundedPercentageOfTargetRaise[_pid].add(
-            //     userPercentageAllocated
-            // );
-
-            // user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
-
-            // stakingToken.safeTransfer(address(_msgSender()), user.amount);
-
-            // emit PledgeFunded(_msgSender(), _pid, msg.value);
+        if(_pid >= poolInfo.length){
+            revert LPFRWV__InvalidPool();
         }
+        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
+        if(pool.tokenAllocationStartTime > block.timestamp) revert LPFRWV__PoolIsOnPledgingPhase(pool.tokenAllocationStartTime);
+
+        fundUserPledge(_pid);
     }
 
     // // step 2
@@ -690,7 +630,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     ////////////
 
     /// @dev Safe reward transfer function, just in case if rounding error causes pool to not have enough rewards.
-
     function safeRewardTransfer(
         IERC20 _rewardToken,
         address _to,
@@ -702,6 +641,42 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         } else {
             rewardGuildBank.withdrawTo(_rewardToken, _to, _amount);
         }
+    }
+    /// @dev invest on the pool via already pledged amount of investing token provided by user.
+    function fundUserPledge(
+        uint256 _pid
+    ) private {
+        for (uint256 i = 0; i < userInfo[_pid].size(); i++) {
+            address payable userAddress = payable(
+                userInfo[_pid].getKeyAtIndex(i)
+            );
+            TokenBoundAccount userAccount = TokenBoundAccount(userAddress);
+            BionicStructs.UserInfo memory user = userInfo[_pid].get(
+                userAddress
+            );
+
+            if (user.pledgeFundingAmount == 0 && user.amount > 0) {
+                try
+                    userAccount.transferCurrency(
+                        address(investingToken),
+                        address(this),
+                        user.amount) 
+                        returns (bool /* res */)
+                    {
+                        emit PledgeFunded(userAddress, _pid, user.amount);
+                    } catch (bytes memory reason) {
+                        if (reason.length == 0) {
+                            revert ICurrencyPermit__NoReason();
+                        } else {
+                            /// @solidity memory-safe-assembly
+                            assembly {
+                                revert(add(32, reason), mload(reason))
+                            }
+                        }
+                    }
+            }
+        }
+
     }
 
     /// @notice Return reward multiplier over the given _from to _to block.
