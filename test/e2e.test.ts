@@ -2,18 +2,38 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20, TokenBoundAccount, BionicInvestorPass, Bionic, IERC20 } from "../typechain-types";
+import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20, TokenBoundAccount, BionicInvestorPass, Bionic, IERC20, VRFCoordinatorV2Mock }
+    from "../typechain-types";
+
+
+
+const NETWORK_CONFIG = {
+    name: "mumbai",
+    linkToken: "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
+    ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
+    keyHash: "0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f",
+    vrfCoordinator: "0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed",
+    vrfWrapper: "0x99aFAf084eBA697E584501b8Ed2c0B37Dd136693",
+    oracle: "0x40193c8518BB267228Fc409a613bDbD8eC5a97b3",
+    jobId: "ca98366cc7314957b8c012c72f05aeeb",
+    fee: "100000000000000000",
+    fundAmount: "100000000000000000", // 0.1
+    automationUpdateInterval: "30",
+};
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ERC6551_REGISTERY_ADDR = "0x02101dfB77FDE026414827Fdc604ddAF224F0921",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
     ACCOUNT_ADDRESS = "0xcBe55885F8C8d48dD729c336dba3f29a15d5F436",
+    CALLBACK_GAS_LIMIT = 100000,
+    WINNERS_COUNT = 5,
     PLEDGING_END_TIME = 40000000;
 
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: LaunchPoolFundRaisingWithVesting,
-        tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, usdtContract: ERC20, tokenBoundContractRegistry: ERC6551Registry;
+        tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, usdtContract: ERC20,
+        tokenBoundContractRegistry: ERC6551Registry;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
     let bionicDecimals: number;
@@ -41,6 +61,24 @@ describe("e2e", function () {
         await usdtContract.connect(whale).transfer(abstractedAccount.address, HUNDRED_THOUSAND);
         whaleBal = await usdtContract.balanceOf(USDT_WHALE);
         tokenBoundAccBal = await usdtContract.balanceOf(abstractedAccount.address);
+
+
+        // setup VRF_MOCK
+        //replace with FWV contract
+        let { VRFCoordinatorV2MockContract, subscriptionId } = await deployVRFCoordinatorV2Mock();
+
+        const keyHash =
+            NETWORK_CONFIG["keyHash"] ||
+            "0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc"
+
+        const RaffleFactory = await ethers.getContractFactory(
+            "Raffle"
+        )
+        const raffleContract = await RaffleFactory
+            .deploy(VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, WINNERS_COUNT, CALLBACK_GAS_LIMIT, true);
+
+        await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, raffleContract.address)
+        await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address)
 
     });
 
@@ -399,6 +437,28 @@ async function deployTBA() {
     console.log("Deploying TokenBoundAccount contract...");
 
     return await TBAContract.deploy(ENTRY_POINT, ERC6551_REGISTERY_ADDR);
+}
+async function deployVRFCoordinatorV2Mock() {
+    const VRFCoordinatorV2MockFactory = await ethers.getContractFactory("VRFCoordinatorV2Mock");
+    console.log("Deploying VRFCoordinatorV2Mock contract...");
+    /**
+     * @dev Read more at https://docs.chain.link/docs/chainlink-vrf/
+     */
+    const BASE_FEE = "100000000000000000"
+    const GAS_PRICE_LINK = "1000000000" // 0.000000001 LINK per gas
+
+    const VRFCoordinatorV2MockContract: VRFCoordinatorV2Mock = await VRFCoordinatorV2MockFactory.deploy(
+        BASE_FEE,
+        GAS_PRICE_LINK
+    )
+
+    const fundAmount = NETWORK_CONFIG["fundAmount"] || "1000000000000000000"
+    const transaction = await VRFCoordinatorV2MockContract.createSubscription()
+    const transactionReceipt = await transaction.wait(1)
+    const subscriptionId = ethers.BigNumber.from(transactionReceipt?.events[0].topics[1])
+    await VRFCoordinatorV2MockContract.fundSubscription(subscriptionId, fundAmount);
+
+    return { VRFCoordinatorV2MockContract, subscriptionId }
 }
 // async function deployERC6551Registry() {
 //     const ERC6551RegContract = await ethers.getContractFactory("ERC6551Registry");
