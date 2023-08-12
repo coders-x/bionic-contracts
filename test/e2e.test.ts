@@ -4,6 +4,7 @@ import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20, TokenBoundAccount, BionicInvestorPass, Bionic, IERC20, VRFCoordinatorV2Mock }
     from "../typechain-types";
+import { BytesLike } from "ethers";
 
 
 
@@ -44,7 +45,6 @@ describe("e2e", function () {
         tokenBoundContractRegistry = await ethers.getContractAt("ERC6551Registry", ERC6551_REGISTERY_ADDR);
         usdtContract = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", USDT_ADDR);
         tokenBoundImpContract = await deployTBA();
-        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address);
         bionicDecimals = await bionicContract.decimals();
         abstractedAccount = await ethers.getContractAt("TokenBoundAccount", ACCOUNT_ADDRESS);
 
@@ -71,13 +71,13 @@ describe("e2e", function () {
             NETWORK_CONFIG["keyHash"] ||
             "0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc"
 
-        const RaffleFactory = await ethers.getContractFactory(
-            "Raffle"
-        )
-        const raffleContract = await RaffleFactory
-            .deploy(VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, WINNERS_COUNT, CALLBACK_GAS_LIMIT, true);
+        // const RaffleFactory = await ethers.getContractFactory(
+        //     "Raffle"
+        // )
+        // const raffleContract = await RaffleFactory
+        //     .deploy(VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, WINNERS_COUNT, CALLBACK_GAS_LIMIT, true);
 
-        await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, raffleContract.address)
+        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, CALLBACK_GAS_LIMIT, true);
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address)
 
     });
@@ -175,12 +175,12 @@ describe("e2e", function () {
     describe("FundingRegistry", () => {
         describe("Add", function () {
             it("Should fail if the not BROKER", async function () {
-                await expect(fundWithVesting.connect(client).add(bionicContract.address, 0, PLEDGING_END_TIME, 1000000000, 1000, false))
+                await expect(fundWithVesting.connect(client).add(bionicContract.address, 0, PLEDGING_END_TIME, 1000000000, 1000, WINNERS_COUNT, false))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await fundWithVesting.hasRole(await fundWithVesting.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(fundWithVesting.add(bionicContract.address, 0, PLEDGING_END_TIME, 1000000000, 1000, false))
+                await expect(fundWithVesting.add(bionicContract.address, 0, PLEDGING_END_TIME, 1000000000, 1000, WINNERS_COUNT, false))
                     .to.emit(fundWithVesting, "PoolAdded").withArgs(0);
             });
             it("Should return same Pool upon request", async () => {
@@ -273,18 +273,33 @@ describe("e2e", function () {
                     .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
             })
 
-            it("Should be able to move funds it's been allowed", async () => {
-                const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
+            it("Should request random numbers for the pool Winners Raffle", async () => {
+                await expect(fundWithVesting.draw(100000), "invalid poolId")
+                    .to.revertedWithCustomError(fundWithVesting, "LPFRWV__InvalidPool");
+                // await expect(fundWithVesting.draw(100000), "invalid poolId")
+                //     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__PoolIsOnPledgingPhase");
 
-                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
-                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
-                let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
-                let balance = await usdtContract.balanceOf(abstractedAccount.address)
                 await expect(fundWithVesting.draw(0))
-                    .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, allowed);
-                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
-                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
+                    .to.emit(fundWithVesting, "DrawInitiated").withArgs(0, 1);
+
+                await expect(fundWithVesting.draw(0), "invalid poolId")
+                    .to.revertedWithCustomError(fundWithVesting, "LPFRWV__DrawForThePoolHasAlreadyStarted");
+
             })
+
+
+            // it("Should be able to move funds it's been allowed", async () => {
+            //     const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
+
+            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
+            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
+            //     let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
+            //     let balance = await usdtContract.balanceOf(abstractedAccount.address)
+            //     await expect(fundWithVesting.draw(0))
+            //         .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, allowed);
+            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
+            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
+            // })
 
 
         });
@@ -420,7 +435,7 @@ async function deployBIP() {
     });
     return await bipContract.deployed();
 }
-async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: string) {
+async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, cbGasLimit: number, reqVRFPerWinner: boolean) {
     const Lib = await ethers.getContractFactory("IterableMapping");
     const lib = await Lib.deploy();
     await lib.deployed();
@@ -430,7 +445,7 @@ async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: 
         }
     });
     console.log(`Deploying LaunchPoolFundRaisingWithVesting contract...`);
-    return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass);
+    return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass, vrfCoordinatorV2, gaslane, subId, cbGasLimit, reqVRFPerWinner);
 }
 async function deployTBA() {
     const TBAContract = await ethers.getContractFactory("TokenBoundAccount");

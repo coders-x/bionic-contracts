@@ -26,6 +26,7 @@ library BionicStructs {
         uint256 pledgingEndTime; // Before this Time pledge is permitted
         uint256 targetRaise; // Amount that the project wishes to raise
         uint256 maxPledgingAmountPerUser; // Max. amount of tokens that can be staked per account/user
+        uint32 winnersCount; // Max. amount of tokens that can be staked per account/user
     }
 
     // Iterable mapping from address to uint;
