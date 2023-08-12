@@ -24,6 +24,7 @@ error LPFRWV__NotDefinedError();
 error LPFRWV__InvalidPool();
 error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
+error LPFRWV__NotEnoughRandomWordsForLottery();
 
 /// @title Fund raising platform facilitated by launch pool
 /// @author Ali Mahdavi
@@ -110,6 +111,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
 
     ///@notice requestId of vrf request on the pool
     mapping(uint256 => uint256) public poolIdToRequestId;
+    mapping(uint256 => uint256) public requestIdToPoolId;
 
     // Available before staking ends for any given project. Essentitally 100% to 18 dp
     uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
@@ -348,50 +350,44 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
             i_requestVRFPerWinner ? pool.winnersCount : 1
         );
         poolIdToRequestId[_pid]=requestId;
-        emit DrawInitiated(_pid,requestId);
+        requestIdToPoolId[requestId]=_pid;
 
-        // fundUserPledge(_pid);
+        emit DrawInitiated(_pid,requestId);
     }
 
-        /**
+    /**
      * @dev This is the function that Chainlink VRF node
      * calls to send the money to the random winner.
-     */
+    */
     function fulfillRandomWords(
-        uint256, /* requestId */
+        uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
-        // if(i_requestVRFPerWinner){
-        //     if (randomWords.length!=i_winnersCount) 
-        //         revert Raffle__NotEnoughRandomWordsForLottery();
-            
-        //     for (uint i=0;i<i_winnersCount;i++){
-        //         uint256 indexOfWinner = randomWords[i] % s_players.length;
-        //         s_winners.push(s_players[indexOfWinner]);
-        //     }
-        // }else{ //just get one word and calculate other random values off of it
-        //     uint256 rand=randomWords[0];
-        //     for (uint32 i=0;i<i_winnersCount;i++){
-        //         s_winners.push(s_players[rand % s_players.length]);
-        //         rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
-        //     }
-        // }
+        uint pid=requestIdToPoolId[requestId];
 
+        BionicStructs.PoolInfo memory pool = poolInfo[pid];
+        address[] memory winners;
 
-        // uint256 indexOfWinner = randomWords[0] % s_players.length;
-        // address payable recentWinner = s_players[indexOfWinner];
-        // s_recentWinner = recentWinner;
-        // s_players = new address payable[](0);
-        // s_raffleState = RaffleState.OPEN;
-        // s_lastTimeStamp = block.timestamp;
-        // (bool success, ) = recentWinner.call{value: address(this).balance}("");
-        // // require(success, "Transfer failed");
-        // if (!success) {
-        //     revert Raffle__TransferFailed();
-        // }
+        if(pool.winnersCount>=userInfo[pid].size()){
+            winners=userInfo[pid].keys;
+        }else{
+            if(i_requestVRFPerWinner){
+                if (randomWords.length!=pool.winnersCount) 
+                    revert LPFRWV__NotEnoughRandomWordsForLottery();
+                
+                for (uint i=0;i<pool.winnersCount;i++){
+                    winners[i]=userInfo[pid].getKeyAtIndex(randomWords[i] % userInfo[pid].size());
+                }
+            }else{ //just get one word and calculate other random values off of it
+                uint256 rand=randomWords[0];
+                for (uint32 i=0;i<pool.winnersCount;i++){
+                    winners[i]=userInfo[pid].getKeyAtIndex(rand % userInfo[pid].size());
+                    rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
+                }
+            }
+        }
 
-
-        // emit WinnersPicked(s_winners);
+        fundUserPledge(pid,winners);
     }
 
     // // step 2
@@ -725,12 +721,14 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         }
     }
     /// @dev invest on the pool via already pledged amount of investing token provided by user.
+    /// @dev todo maybe instead of reverting on onunsuccessfull transfer emit an event?
     function fundUserPledge(
-        uint256 _pid
+        uint256 _pid,
+        address[] memory winners
     ) private {
-        for (uint256 i = 0; i < userInfo[_pid].size(); i++) {
+        for (uint256 i = 0; i < winners.length; i++) {
             address payable userAddress = payable(
-                userInfo[_pid].getKeyAtIndex(i)
+                winners[i]
             );
             TokenBoundAccount userAccount = TokenBoundAccount(userAddress);
             BionicStructs.UserInfo memory user = userInfo[_pid].get(

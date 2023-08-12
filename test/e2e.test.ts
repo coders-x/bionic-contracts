@@ -34,7 +34,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: LaunchPoolFundRaisingWithVesting,
         tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, usdtContract: ERC20,
-        tokenBoundContractRegistry: ERC6551Registry;
+        tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
     let bionicDecimals: number;
@@ -71,14 +71,10 @@ describe("e2e", function () {
             NETWORK_CONFIG["keyHash"] ||
             "0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc"
 
-        // const RaffleFactory = await ethers.getContractFactory(
-        //     "Raffle"
-        // )
-        // const raffleContract = await RaffleFactory
-        //     .deploy(VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, WINNERS_COUNT, CALLBACK_GAS_LIMIT, true);
 
+        vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
         fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, CALLBACK_GAS_LIMIT, true);
-        await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address)
+        await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address);
 
     });
 
@@ -284,24 +280,26 @@ describe("e2e", function () {
 
                 await expect(fundWithVesting.draw(0), "invalid poolId")
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__DrawForThePoolHasAlreadyStarted");
+            });
 
-            })
+            it("Should Receive Random words and chose winners", async () => {
+                const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
 
+                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
+                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
+                let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
+                // simulate callback from the oracle network
+                await expect(
+                    vrfCoordinatorV2MockContract.fulfillRandomWords(
+                        1,
+                        fundWithVesting.address
+                    )
+                ).to.emit(fundWithVesting, "PledgeFunded")
 
-            // it("Should be able to move funds it's been allowed", async () => {
-            //     const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
+                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
+                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
 
-            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
-            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
-            //     let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
-            //     let balance = await usdtContract.balanceOf(abstractedAccount.address)
-            //     await expect(fundWithVesting.draw(0))
-            //         .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, allowed);
-            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
-            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
-            // })
-
-
+            });
         });
     })
 
@@ -467,10 +465,11 @@ async function deployVRFCoordinatorV2Mock() {
         GAS_PRICE_LINK
     )
 
-    const fundAmount = NETWORK_CONFIG["fundAmount"] || "1000000000000000000"
+    const fundAmount = BigNumber.from(NETWORK_CONFIG["fundAmount"] || "1000000000000000000").mul(BigNumber.from(10000))
     const transaction = await VRFCoordinatorV2MockContract.createSubscription()
     const transactionReceipt = await transaction.wait(1)
     const subscriptionId = ethers.BigNumber.from(transactionReceipt?.events[0].topics[1])
+    console.log(`subid :${subscriptionId}`)
     await VRFCoordinatorV2MockContract.fundSubscription(subscriptionId, fundAmount);
 
     return { VRFCoordinatorV2MockContract, subscriptionId }
