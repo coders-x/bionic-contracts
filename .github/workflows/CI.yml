@@ -32,5 +32,5 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
       - run: forge install foundry-rs/forge-std --no-commit
-      - run: yarn install
-      - run: yarn test
+      - run: npm install
+      - run: npm test
