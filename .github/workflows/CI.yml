@@ -30,7 +30,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        run: curl -L https://foundry.paradigm.xyz | bash 
+      - run: source ~/.bashrc
+      - run: foundryup
       - run: forge install foundry-rs/forge-std --no-commit
-      - run: npm install
+      - run: npm i
       - run: npm test
