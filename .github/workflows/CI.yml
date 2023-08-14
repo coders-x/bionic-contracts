@@ -24,7 +24,7 @@ jobs:
       - name: Checkout repository and submodules
         uses: actions/checkout@v2
       - name: Checkout submodules
-        run: git submodule update --init
+        run: git submodule update --recursive
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
