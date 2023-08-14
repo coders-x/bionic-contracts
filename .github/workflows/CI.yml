@@ -31,6 +31,6 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - run: npm install
       - run: forge install foundry-rs/forge-std --no-commit
-      - run: npm test
+      - run: yarn install
+      - run: yarn test
