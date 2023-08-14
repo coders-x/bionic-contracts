@@ -24,7 +24,7 @@ jobs:
       - name: Checkout repository and submodules
         uses: actions/checkout@v2
       - name: Checkout submodules
-        run: git submodule update --recursive
+        run: git submodule update --init --recursive
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
@@ -32,4 +32,5 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
       - run: npm install
+      - run: forge install foundry-rs/forge-std
       - run: npm test

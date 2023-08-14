@@ -25,3 +25,10 @@ list of contracts deployed so fat
 | Bionic Token      | 0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F       | 0xcc25bbC5B66F5379eEdD804D7a2efa647B8a008F | https://mumbai.polygonscan.com/address/0xcc25bbC5B66F5379eEdD804D7a2efa647B8a008F#code |
 | Token Bound Account      | -       | 0x34278B198852CCCD6Bd535eb08E45620dcf9ca3b | https://mumbai.polygonscan.com/address/0x34278B198852CCCD6Bd535eb08E45620dcf9ca3b#code |
 | Token Bound Account Factory (ERC6551Registry)    | -       | 0x02101dfB77FDE026414827Fdc604ddAF224F0921 | https://mumbai.polygonscan.com/address/0x02101dfB77FDE026414827Fdc604ddAF224F0921#code |
+
+
+
+```bash
+docker run -t -i -v /home/darkshot/work/Sona/bionic-contracts:/home/code ubuntu /bin/bash
+
+```
