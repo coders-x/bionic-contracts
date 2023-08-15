@@ -5,6 +5,8 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "../reference/src/interfaces/IERC6551Account.sol";
 
 
@@ -16,11 +18,19 @@ import {TokenBoundAccount} from "../TBA.sol";
 
 import {FundRaisingGuild} from "./FundRaisingGuild.sol";
 
+
+/* Errors */
+error LPFRWV__NotDefinedError();
+error LPFRWV__InvalidPool();
+error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
+error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
+error LPFRWV__NotEnoughRandomWordsForLottery();
+
 /// @title Fund raising platform facilitated by launch pool
-/// @author BlockRocket.tech
+/// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
-contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
+contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, AccessControl {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -29,6 +39,15 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     bytes32 public constant BROKER_ROLE = keccak256("BROKER_ROLE");
     bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
+
+    // Chainlink VRF Variables
+    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
+    uint64 private immutable i_subscriptionId;
+    bytes32 private immutable i_gasLane;
+    uint32 private immutable i_callbackGasLimit;
+    bool private immutable i_requestVRFPerWinner; // whether should request diffrent random number per winner or just one and calculate all winners off of it.
+    uint16 private constant REQUEST_CONFIRMATIONS = 3;
+
 
     /// @notice staking token is fixed for all pools
     IERC20 public stakingToken;
@@ -90,12 +109,17 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
 
+    ///@notice requestId of vrf request on the pool
+    mapping(uint256 => uint256) public poolIdToRequestId;
+    mapping(uint256 => uint256) public requestIdToPoolId;
+
     // Available before staking ends for any given project. Essentitally 100% to 18 dp
     uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
 
     event ContractDeployed(address indexed guildBank);
     event PoolAdded(uint256 indexed pid);
     event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
+    event DrawInitiated(uint256 indexed pid, uint256 requestId);
     event PledgeFunded(
         address indexed user,
         uint256 indexed pid,
@@ -123,8 +147,13 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     constructor(
         IERC20 _stakingToken,
         IERC20 _investingToken,
-        address _bionicInvestorPass
-    ) {
+        address _bionicInvestorPass,
+        address vrfCoordinatorV2,
+        bytes32 gasLane, // keyHash
+        uint64 subscriptionId,
+        uint32 callbackGasLimit,
+        bool requestVRFPerWinner
+    ) VRFConsumerBaseV2(vrfCoordinatorV2) {
         require(
             address(_stakingToken) != address(0),
             "constructor: _stakingToken must not be zero address"
@@ -142,6 +171,12 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         stakingToken = _stakingToken;
         investingToken = _investingToken;
         rewardGuildBank = new FundRaisingGuild(address(this));
+
+        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
+        i_gasLane = gasLane;
+        i_subscriptionId = subscriptionId;
+        i_callbackGasLimit = callbackGasLimit;
+        i_requestVRFPerWinner = requestVRFPerWinner;
 
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -165,6 +200,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         uint256 _pledgeingEndTime,
         uint256 _targetRaise,
         uint256 _maxPledgingAmountPerUser,
+        uint32 _winnersCount,
         bool _withUpdate
     ) public onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
@@ -188,7 +224,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
                 tokenAllocationStartTime: _tokenAllocationStartTime,
                 pledgingEndTime: _pledgeingEndTime,
                 targetRaise: _targetRaise,
-                maxPledgingAmountPerUser: _maxPledgingAmountPerUser
+                maxPledgingAmountPerUser: _maxPledgingAmountPerUser,
+                winnersCount:_winnersCount
             })
         );
 
@@ -257,7 +294,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             emit Pledge(_msgSender(), _pid, _amount);
         } catch (bytes memory reason) {
             if (reason.length == 0) {
-                revert("ICurrencyPermit: no reason");
+                revert ICurrencyPermit__NoReason();
             } else {
                 /// @solidity memory-safe-assembly
                 assembly {
@@ -294,78 +331,63 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     /**
      * @dev will get the money out of users wallet into investment wallet
      */
-    function raffle(
+    function draw(
         uint256 _pid
-    ) external payable nonReentrant onlyRole(SORTER_ROLE) {
-        require(_pid < poolInfo.length, "fundPledge: Invalid PID");
+    ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
+        if(_pid >= poolInfo.length)
+            revert LPFRWV__InvalidPool();
+        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
+        if(pool.tokenAllocationStartTime > block.timestamp) 
+            revert LPFRWV__PoolIsOnPledgingPhase(pool.tokenAllocationStartTime);
+        if(poolIdToRequestId[_pid]!=0)
+            revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
 
-        for (uint256 i = 0; i < userInfo[_pid].size(); i++) {
-            address payable userAddress = payable(
-                userInfo[_pid].getKeyAtIndex(i)
-            );
-            TokenBoundAccount userAccount = TokenBoundAccount(userAddress);
-            BionicStructs.UserInfo memory user = userInfo[_pid].get(
-                userAddress
-            );
+        requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane,
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            i_requestVRFPerWinner ? pool.winnersCount : 1
+        );
+        poolIdToRequestId[_pid]=requestId;
+        requestIdToPoolId[requestId]=_pid;
 
-            if (user.pledgeFundingAmount == 0 && user.amount > 0) {
-                try
-                    userAccount.transferCurrency(
-                        address(investingToken),
-                        address(this),
-                        user.amount) 
-                        returns (bool res)
-                    {
-                        emit PledgeFunded(userAddress, _pid, user.amount);
-                    } catch (bytes memory reason) {
-                        if (reason.length == 0) {
-                            revert("ICurrencyPermit: no reason");
-                        } else {
-                            /// @solidity memory-safe-assembly
-                            assembly {
-                                revert(add(32, reason), mload(reason))
-                            }
-                        }
-                    }
-                // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
-                //     msg.value
-                // );
-                // UserOperation memory op = UserOperation({
-                //     sender: address(_userAddress),
-                //     nonce: _userAddress.nonce(),
-                //     callGasLimit: 0,
-                //     verificationGasLimit: 100000,
-                //     preVerificationGas: 21000,
-                //     maxFeePerGas: BigNumber{value: "1541441108"},
-                //     maxPriorityFeePerGas: 1000000000
-                // });
+        emit DrawInitiated(_pid,requestId);
+    }
+
+    /**
+     * @dev This is the function that Chainlink VRF node
+     * calls to send the money to the random winner.
+    */
+    function fulfillRandomWords(
+        uint256 requestId,
+        uint256[] memory randomWords
+    ) internal override {
+        uint pid=requestIdToPoolId[requestId];
+
+        BionicStructs.PoolInfo memory pool = poolInfo[pid];
+        address[] memory winners;
+
+        if(pool.winnersCount>=userInfo[pid].size()){
+            winners=userInfo[pid].keys;
+        }else{
+            if(i_requestVRFPerWinner){
+                if (randomWords.length!=pool.winnersCount) 
+                    revert LPFRWV__NotEnoughRandomWordsForLottery();
+                
+                for (uint i=0;i<pool.winnersCount;i++){
+                    winners[i]=userInfo[pid].getKeyAtIndex(randomWords[i] % userInfo[pid].size());
+                }
+            }else{ //just get one word and calculate other random values off of it
+                uint256 rand=randomWords[0];
+                for (uint32 i=0;i<pool.winnersCount;i++){
+                    winners[i]=userInfo[pid].getKeyAtIndex(rand % userInfo[pid].size());
+                    rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
+                }
             }
-
-            // poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(
-            //     msg.value
-            // );
-
-            // (
-            //     uint256 accPercentPerShare,
-
-            // ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-            // uint256 userPercentageAllocated = user
-            //     .amount
-            //     .mul(accPercentPerShare)
-            //     .div(1e18)
-            //     .sub(user.tokenAllocDebt);
-            // poolIdToTotalFundedPercentageOfTargetRaise[
-            //     _pid
-            // ] = poolIdToTotalFundedPercentageOfTargetRaise[_pid].add(
-            //     userPercentageAllocated
-            // );
-
-            // user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
-
-            // stakingToken.safeTransfer(address(_msgSender()), user.amount);
-
-            // emit PledgeFunded(_msgSender(), _pid, msg.value);
         }
+
+        fundUserPledge(pid,winners);
     }
 
     // // step 2
@@ -686,7 +708,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
     ////////////
 
     /// @dev Safe reward transfer function, just in case if rounding error causes pool to not have enough rewards.
-
     function safeRewardTransfer(
         IERC20 _rewardToken,
         address _to,
@@ -698,6 +719,44 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
         } else {
             rewardGuildBank.withdrawTo(_rewardToken, _to, _amount);
         }
+    }
+    /// @dev invest on the pool via already pledged amount of investing token provided by user.
+    /// @dev todo maybe instead of reverting on onunsuccessfull transfer emit an event?
+    function fundUserPledge(
+        uint256 _pid,
+        address[] memory winners
+    ) private {
+        for (uint256 i = 0; i < winners.length; i++) {
+            address payable userAddress = payable(
+                winners[i]
+            );
+            TokenBoundAccount userAccount = TokenBoundAccount(userAddress);
+            BionicStructs.UserInfo memory user = userInfo[_pid].get(
+                userAddress
+            );
+
+            if (user.pledgeFundingAmount == 0 && user.amount > 0) {
+                try
+                    userAccount.transferCurrency(
+                        address(investingToken),
+                        address(this),
+                        user.amount) 
+                        returns (bool /* res */)
+                    {
+                        emit PledgeFunded(userAddress, _pid, user.amount);
+                    } catch (bytes memory reason) {
+                        if (reason.length == 0) {
+                            revert ICurrencyPermit__NoReason();
+                        } else {
+                            /// @solidity memory-safe-assembly
+                            assembly {
+                                revert(add(32, reason), mload(reason))
+                            }
+                        }
+                    }
+            }
+        }
+
     }
 
     /// @notice Return reward multiplier over the given _from to _to block.
@@ -737,7 +796,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard, AccessControl {
             );
         } catch (bytes memory reason) {
             if (reason.length == 0) {
-                revert("onlyBionicAccount: Invalid Bionic TokenBoundAccount.");
+                revert LPFRWV__NotDefinedError();
             } else {
                 /// @solidity memory-safe-assembly
                 assembly {
