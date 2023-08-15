@@ -9,7 +9,16 @@ import {IERC6551Account} from "./reference/src/interfaces/IERC6551Account.sol";
 import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 import {Account,IEntryPoint,Ownable,ECDSA} from "./libs/Account.sol";
 
-
+// ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
+// ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
+// ┃╰╯╰╮┃┃┃┃╱┃┃╭╮╰╯┃┃┃┃┃╱╰╯
+// ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
+// ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
+// ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
+/// @title ERC6551Account Contract 
+/// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
+/// @notice Fork of TokenBoundAccount.sol from Thirdweb
+/// @dev TokenBoundAccount that gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
 contract TokenBoundAccount is
     ICurrencyPermit,
     IERC6551Account,

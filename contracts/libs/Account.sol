@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.11;
+pragma solidity >=0.7.0 <0.9.0;
 
 /* solhint-disable avoid-low-level-calls */
 /* solhint-disable no-inline-assembly */
@@ -15,7 +15,7 @@ import {Initializable} from "@thirdweb-dev/contracts/dynamic-contracts/extension
 import {ContractMetadata} from "@thirdweb-dev/contracts/dynamic-contracts/extension/ContractMetadata.sol";
 import {ERC1271} from "@thirdweb-dev/contracts/eip/ERC1271.sol";
 import {ERC721Holder,IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import {ERC1155Holder,ERC1155Receiver,IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {ERC1155Holder,IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
@@ -33,6 +33,9 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 // ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
 // ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
+/// @title ERC4337 Account Contract
+/// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
+/// @notice Fork of Account.sol from Thirdweb
 contract Account is
     ERC1271,
     Multicall,
@@ -83,7 +86,7 @@ contract Account is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice See {IERC165-supportsInterface}.
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC1155Receiver) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
         return
             interfaceId == type(IERC1155Receiver).interfaceId ||
             interfaceId == type(IERC721Receiver).interfaceId ||
