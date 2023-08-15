@@ -13,9 +13,9 @@ import {BaseAccountFactory} from "@thirdweb-dev/contracts/smart-wallet/utils/Bas
 import {Multicall} from "@thirdweb-dev/contracts/extension/Multicall.sol";
 import {Initializable} from "@thirdweb-dev/contracts/dynamic-contracts/extension/Initializable.sol";
 import {ContractMetadata} from "@thirdweb-dev/contracts/dynamic-contracts/extension/ContractMetadata.sol";
+import {ERC1271} from "@thirdweb-dev/contracts/eip/ERC1271.sol";
 import {ERC721Holder,IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import {ERC1155Holder,ERC1155Receiver,IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import {ERC1271} from "@thirdweb-dev/contracts/eip/ERC1271.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
@@ -33,7 +33,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 // ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
 // ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
-
 contract Account is
     ERC1271,
     Multicall,
