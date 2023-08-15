@@ -469,7 +469,6 @@ async function deployVRFCoordinatorV2Mock() {
     const transaction = await VRFCoordinatorV2MockContract.createSubscription()
     const transactionReceipt = await transaction.wait(1)
     const subscriptionId = ethers.BigNumber.from(transactionReceipt?.events[0].topics[1])
-    console.log(`subid :${subscriptionId}`)
     await VRFCoordinatorV2MockContract.fundSubscription(subscriptionId, fundAmount);
 
     return { VRFCoordinatorV2MockContract, subscriptionId }

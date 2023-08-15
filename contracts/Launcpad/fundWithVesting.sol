@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
-import "../reference/src/interfaces/IERC6551Account.sol";
+import {SafeERC20,IERC20,Address} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {AccessControl,IERC165} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import {IERC6551Account} from "../reference/src/interfaces/IERC6551Account.sol";
 
 
-import "hardhat/console.sol";
-import "../libs/IterableMapping.sol";
-import "../libs/ICurrencyPermit.sol";
-import "../libs/BionicStructs.sol";
+import {IterableMapping} from  "../libs/IterableMapping.sol";
+import {ICurrencyPermit,ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
+import {BionicStructs} from "../libs/BionicStructs.sol";
 import {TokenBoundAccount} from "../TBA.sol";
 
 import {FundRaisingGuild} from "./FundRaisingGuild.sol";
@@ -25,7 +24,14 @@ error LPFRWV__InvalidPool();
 error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
 error LPFRWV__NotEnoughRandomWordsForLottery();
+error LPFRWV__FundingPledgeFailed(address user, uint pid);
 
+// ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
+// ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
+// ┃╰╯╰╮┃┃┃┃╱┃┃╭╮╰╯┃┃┃┃┃╱╰╯
+// ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
+// ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
+// ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
 /// @title Fund raising platform facilitated by launch pool
 /// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
@@ -337,7 +343,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         if(_pid >= poolInfo.length)
             revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[_pid];
-        if(pool.tokenAllocationStartTime > block.timestamp) 
+        if(pool.tokenAllocationStartTime > block.timestamp) //solhint-disable-line not-rely-on-time
             revert LPFRWV__PoolIsOnPledgingPhase(pool.tokenAllocationStartTime);
         if(poolIdToRequestId[_pid]!=0)
             revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
@@ -741,9 +747,12 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
                         address(investingToken),
                         address(this),
                         user.amount) 
-                        returns (bool /* res */)
+                        returns (bool res)
                     {
-                        emit PledgeFunded(userAddress, _pid, user.amount);
+                        if(res)
+                            emit PledgeFunded(userAddress, _pid, user.amount);
+                        else 
+                            revert LPFRWV__FundingPledgeFailed(userAddress,_pid);
                     } catch (bytes memory reason) {
                         if (reason.length == 0) {
                             revert ICurrencyPermit__NoReason();
@@ -766,7 +775,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     function getMultiplier(
         uint256 _from,
         uint256 _to
-    ) private view returns (uint256) {
+    ) private pure returns (uint256) {
         return _to.sub(_from);
     }
 
@@ -805,8 +814,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
             }
         }
 
-        (, address tokenContract, ) = TokenBoundAccount(payable(_msgSender()))
-            .token();
 
         _;
     }
