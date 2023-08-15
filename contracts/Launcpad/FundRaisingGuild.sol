@@ -10,7 +10,7 @@ contract FundRaisingGuild {
 
     address public stakingContract;
 
-    constructor(address _stakingContract) public {
+    constructor(address _stakingContract)  {
         stakingContract = _stakingContract;
     }
 
@@ -19,7 +19,7 @@ contract FundRaisingGuild {
         _token.safeTransfer(_recipient, _amount);
     }
 
-    function tokenBalance(IERC20 _token) external returns (uint256) {
+    function tokenBalance(IERC20 _token) external view returns (uint256) {
         return _token.balanceOf(address(this));
     }
 }
