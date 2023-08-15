@@ -6,22 +6,22 @@ pragma solidity ^0.8.11;
 /* solhint-disable reason-string */
 
 // Base
-import "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccount.sol";
-import "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccountFactory.sol";
+import {BaseAccount,IEntryPoint,UserOperation} from "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccount.sol";
+import {BaseAccountFactory} from "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccountFactory.sol";
 
 // Extensions
-import "@thirdweb-dev/contracts/extension/Multicall.sol";
-import "@thirdweb-dev/contracts/dynamic-contracts/extension/Initializable.sol";
-import "@thirdweb-dev/contracts/dynamic-contracts/extension/ContractMetadata.sol";
-import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
-import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
-import "@thirdweb-dev/contracts/eip/ERC1271.sol";
+import {Multicall} from "@thirdweb-dev/contracts/extension/Multicall.sol";
+import {Initializable} from "@thirdweb-dev/contracts/dynamic-contracts/extension/Initializable.sol";
+import {ContractMetadata} from "@thirdweb-dev/contracts/dynamic-contracts/extension/ContractMetadata.sol";
+import {ERC721Holder,IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
+import {ERC1155Holder,ERC1155Receiver,IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
+import {ERC1271} from "@thirdweb-dev/contracts/eip/ERC1271.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 
 // Utils
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 
 
@@ -35,7 +35,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
 
 contract Account is
-    Initializable,
     ERC1271,
     Multicall,
     BaseAccount,
@@ -66,13 +65,10 @@ contract Account is
     receive() external payable virtual {}
 
     constructor(IEntryPoint _entrypoint, address _factory, string memory _name, string memory _version) EIP712(_name, _version) {
-        _disableInitializers();
         factory = _factory;
         entrypointContract = _entrypoint;
     }
 
-    /// @notice Initializes the smart contract wallet.
-    function initialize(address _defaultAdmin, bytes calldata) public virtual initializer{}
 
     /// @notice Checks whether the caller is the EntryPoint contract or the admin.
     modifier onlyAdminOrEntrypoint() virtual {

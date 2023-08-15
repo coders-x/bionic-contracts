@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "./reference/src/lib/ERC6551AccountLib.sol";
-import "./reference/src/interfaces/IERC6551Account.sol";
-import "./libs/ICurrencyPermit.sol";
-import "./libs/Account.sol";
+import {IERC721,IERC165} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
+import {ERC6551AccountLib} from "./reference/src/lib/ERC6551AccountLib.sol";
+import {IERC6551Account} from "./reference/src/interfaces/IERC6551Account.sol";
+import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
+import {Account,IEntryPoint,Ownable,ECDSA} from "./libs/Account.sol";
 
-import "hardhat/console.sol";
 
 contract TokenBoundAccount is
     ICurrencyPermit,
@@ -56,11 +55,9 @@ contract TokenBoundAccount is
     constructor(
         IEntryPoint _entrypoint,
         address _factory
-    ) Account(_entrypoint, _factory,"BionicAccount","1") {
-        _disableInitializers();
-    }
+    ) Account(_entrypoint, _factory,"BionicAccount","1") {} //solhint-disable-line no-empty-blocks
 
-    receive() external payable virtual override(Account, IERC6551Account) {}
+    receive() external payable virtual override(Account, IERC6551Account) {} //solhint-disable-line no-empty-blocks
 
     /**
      * @dev See {ICurrencyPermit-permit}.
