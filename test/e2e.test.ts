@@ -314,7 +314,7 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
 async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
         account.nonces(signer.address),
-        "Account",
+        "BionicAccount",
         "1",
         signer.getChainId(),
     ])

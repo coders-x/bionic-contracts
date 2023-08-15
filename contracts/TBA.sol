@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@thirdweb-dev/contracts/eip/interface/IERC721.sol";
-import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "./reference/src/lib/ERC6551AccountLib.sol";
 import "./reference/src/interfaces/IERC6551Account.sol";
@@ -56,77 +56,11 @@ contract TokenBoundAccount is
     constructor(
         IEntryPoint _entrypoint,
         address _factory
-    ) Account(_entrypoint, _factory) {
+    ) Account(_entrypoint, _factory,"BionicAccount","1") {
         _disableInitializers();
     }
 
     receive() external payable virtual override(Account, IERC6551Account) {}
-
-    /// @notice Returns whether a signer is authorized to perform transactions using the wallet.
-    function isValidSigner(
-        address _signer,
-        UserOperation calldata _userOp
-    ) public view virtual override returns (bool) {
-        AccountPermissionsStorage.Data storage data = AccountPermissionsStorage
-            .accountPermissionsStorage();
-
-        // First, check if the signer is the owner.
-        if (_signer == owner()) {
-            return true;
-        } else {
-            // If not an admin, check restrictions for the role held by the signer.
-            bytes32 role = data.roleOfAccount[_signer];
-            RoleStatic memory restrictions = data.roleRestrictions[role];
-
-            // // Check if the role is active. If the signer has no role, this condition will revert because both start and end timestamps are `0`.
-            // require(
-            //     restrictions.startTimestamp <= block.timestamp && block.timestamp < restrictions.endTimestamp,
-            //     "Account: role not active."
-            // );
-
-            // Extract the function signature from the userOp calldata and check whether the signer is attempting to call `execute` or `executeBatch`.
-            bytes4 sig = getFunctionSignature(_userOp.callData);
-
-            if (sig == this.execute.selector) {
-                // Extract the `target` and `value` arguments from the calldata for `execute`.
-                (
-                    address target,
-                    uint256 value
-                ) = decodeExecuteCalldata(_userOp.callData);
-
-                if (_allowances[target][_signer] > 0) {
-                    return true;
-                }
-                // if(IEIP165(target).supportsInterface(type(IERC20).interfaceId)){
-                //         IERC20.transfer.selector
-                // };
-
-                // Check if the value is within the allowed range and if the target is approved.
-                // require(restrictions.maxValuePerTransaction >= value, "Account: value too high.");
-                // require(data.approvedTargets[role].contains(target), "Account: target not approved.");
-            } else if (sig == this.executeBatch.selector) {
-                // Extract the `target` and `value` array arguments from the calldata for `executeBatch`.
-                (
-                    address[] memory targets,
-                    uint256[] memory values,
-
-                ) = decodeExecuteBatchCalldata(_userOp.callData);
-
-                // For each target+value pair, check if the value is within the allowed range and if the target is approved.
-                for (uint256 i = 0; i < targets.length; i++) {
-                    if (_allowances[targets[i]][_signer] > 0) {
-                        return true;
-                    }
-                    // require(data.approvedTargets[role].contains(targets[i]), "Account: target not approved.");
-                    // require(restrictions.maxValuePerTransaction >= values[i], "Account: value too high.");
-                }
-            } else {
-                revert("Account: calling invalid fn.");
-            }
-
-            return true;
-        }
-    }
 
     /**
      * @dev See {ICurrencyPermit-permit}.
@@ -207,7 +141,7 @@ contract TokenBoundAccount is
         return _allowances[currency][spender];
     }
 
-    function owner() public view returns (address) {
+    function owner() public view override (IERC6551Account,Ownable) returns (address) {
         (
             uint256 chainId,
             address tokenContract,
@@ -342,14 +276,6 @@ contract TokenBoundAccount is
     /*///////////////////////////////////////////////////////////////
                             Modifiers
     //////////////////////////////////////////////////////////////*/
-
-    modifier onlyAdminOrEntrypoint() override {
-        require(
-            _msgSender() == address(entryPoint()) || _msgSender() == owner(),
-            "Account: not admin or EntryPoint."
-        );
-        _;
-    }
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

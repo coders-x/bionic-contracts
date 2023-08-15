@@ -12,14 +12,14 @@ import "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccountFactory.sol";
 // Extensions
 import "@thirdweb-dev/contracts/extension/Multicall.sol";
 import "@thirdweb-dev/contracts/dynamic-contracts/extension/Initializable.sol";
-import "@thirdweb-dev/contracts/dynamic-contracts/extension/AccountPermissions.sol";
 import "@thirdweb-dev/contracts/dynamic-contracts/extension/ContractMetadata.sol";
 import "@openzeppelin/contracts/token/ERC721/utils/ERC721Holder.sol";
 import "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 import "@thirdweb-dev/contracts/eip/ERC1271.sol";
 
 // Utils
-// import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -43,7 +43,8 @@ contract Account is
     Context,
     ERC721Holder,
     Ownable,
-    ERC1155Holder
+    ERC1155Holder,
+    EIP712
 {
     using ECDSA for bytes32;
 
@@ -64,19 +65,17 @@ contract Account is
     // solhint-disable-next-line no-empty-blocks
     receive() external payable virtual {}
 
-    constructor(IEntryPoint _entrypoint, address _factory) EIP712("Account", "1") {
+    constructor(IEntryPoint _entrypoint, address _factory, string memory _name, string memory _version) EIP712(_name, _version) {
         _disableInitializers();
         factory = _factory;
         entrypointContract = _entrypoint;
     }
 
-    // /// @notice Initializes the smart contract wallet.
-    // function initialize(address _defaultAdmin, bytes calldata) public virtual initializer {
-    //     _setAdmin(_defaultAdmin, true);
-    // }
+    /// @notice Initializes the smart contract wallet.
+    function initialize(address _defaultAdmin, bytes calldata) public virtual initializer{}
 
     /// @notice Checks whether the caller is the EntryPoint contract or the admin.
-    modifier onlyAdminOrEntrypoint() override {
+    modifier onlyAdminOrEntrypoint() virtual {
         require(
             _msgSender() == address(entryPoint()) || _msgSender() == owner(),
             "Account: not admin or EntryPoint."
@@ -107,47 +106,14 @@ contract Account is
     }
 
     /// @notice Returns whether a signer is authorized to perform transactions using the wallet.
-    function isValidSigner(address _signer, UserOperation calldata _userOp) public view virtual returns (bool) {
-
-        // First, check if the signer is an admin.
-        if (data.isAdmin[_signer]) {
+    function isValidSigner(
+        address _signer,
+        UserOperation calldata /* _userOp */
+    ) public view virtual returns (bool) {
+        // First, check if the signer is the owner.
+        if (_signer == owner()) 
             return true;
-        } else {
-            // If not an admin, check restrictions for the role held by the signer.
-            bytes32 role = data.roleOfAccount[_signer];
-            RoleStatic memory restrictions = data.roleRestrictions[role];
-
-            // Check if the role is active. If the signer has no role, this condition will revert because both start and end timestamps are `0`.
-            require(
-                restrictions.startTimestamp <= block.timestamp && block.timestamp < restrictions.endTimestamp,
-                "Account: role not active."
-            );
-
-            // Extract the function signature from the userOp calldata and check whether the signer is attempting to call `execute` or `executeBatch`.
-            bytes4 sig = getFunctionSignature(_userOp.callData);
-
-            if (sig == this.execute.selector) {
-                // Extract the `target` and `value` arguments from the calldata for `execute`.
-                (address target, uint256 value) = decodeExecuteCalldata(_userOp.callData);
-
-                // Check if the value is within the allowed range and if the target is approved.
-                require(restrictions.maxValuePerTransaction >= value, "Account: value too high.");
-                require(data.approvedTargets[role].contains(target), "Account: target not approved.");
-            } else if (sig == this.executeBatch.selector) {
-                // Extract the `target` and `value` array arguments from the calldata for `executeBatch`.
-                (address[] memory targets, uint256[] memory values, ) = decodeExecuteBatchCalldata(_userOp.callData);
-
-                // For each target+value pair, check if the value is within the allowed range and if the target is approved.
-                for (uint256 i = 0; i < targets.length; i++) {
-                    require(data.approvedTargets[role].contains(targets[i]), "Account: target not approved.");
-                    require(restrictions.maxValuePerTransaction >= values[i], "Account: value too high.");
-                }
-            } else {
-                revert("Account: calling invalid fn.");
-            }
-
-            return true;
-        }
+        return false;
     }
 
     /// @notice See EIP-1271
@@ -160,14 +126,7 @@ contract Account is
     {
         address signer = _hash.recover(_signature);
 
-        AccountPermissionsStorage.Data storage data = AccountPermissionsStorage.accountPermissionsStorage();
-
-        // Get the role held by the recovered signer.
-        bytes32 role = data.roleOfAccount[signer];
-        RoleStatic memory restrictions = data.roleRestrictions[role];
-
-        // Check if the role is active. If the signer has no role, this condition will fail because both start and end timestamps are `0`.
-        if (restrictions.startTimestamp <= block.timestamp && restrictions.endTimestamp < block.timestamp) {
+        if (signer==owner()) {
             magicValue = MAGICVALUE;
         }
     }
@@ -283,18 +242,6 @@ contract Account is
 
     /// @dev Returns whether contract metadata can be set in the given execution context.
     function _canSetContractURI() internal view virtual override returns (bool) {
-        return isAdmin(_msgSender());
-    }
-
-    function owner() public view override returns (address) {
-    (
-        uint256 chainId,
-        address tokenContract,
-        uint256 tokenId
-    ) = ERC6551AccountLib.token();
-
-    if (chainId != block.chainid) return address(0);
-
-    return IERC721(tokenContract).ownerOf(tokenId);
+        return owner()==_msgSender();
     }
 }
