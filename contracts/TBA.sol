@@ -100,6 +100,12 @@ contract TokenBoundAccount is
         _approve(currency, spender, value);
     }
 
+    /// @notice will transfer Currency approved to the caller
+    /// @dev transferCurrency will allow spender(msg.sender) to transfer the amount of money they already permited to move.
+    /// @param currency the erc20 contract address to spend the amount if it's 0xeeee.eeee it will try transfering native token
+    /// @param to the address amount will be sent
+    /// @param amount the amount of currency wished to be spent
+    /// @return bool if transaction was successfull it will return a boolian value of true if it's native value it might fail with revert
     function transferCurrency(
         address currency,
         address to,
@@ -107,7 +113,11 @@ contract TokenBoundAccount is
     ) public virtual returns (bool) {
         address spender = _msgSender();
         _spendAllowance(currency, spender, amount);
-        IERC20(currency).transfer(to, amount);
+        if (currency==address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)){
+            _call(to, amount, "");
+        }else{
+            return IERC20(currency).transfer(to, amount);
+        }
         return true;
     }
 
