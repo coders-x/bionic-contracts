@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@thirdweb-dev/contracts/smart-wallet/non-upgradeable/Account.sol";
 import "@thirdweb-dev/contracts/eip/interface/IERC721.sol";
 import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
 import "./reference/src/lib/ERC6551AccountLib.sol";
 import "./reference/src/interfaces/IERC6551Account.sol";
 import "./libs/ICurrencyPermit.sol";
+import "./libs/Account.sol";
 
 import "hardhat/console.sol";
 
@@ -16,7 +15,6 @@ contract TokenBoundAccount is
     ICurrencyPermit,
     IERC6551Account,
     IERC165,
-    Context,
     Account
 {
     /*///////////////////////////////////////////////////////////////
