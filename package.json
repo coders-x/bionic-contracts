@@ -1,6 +1,7 @@
 {
   "name": "hardhat-project",
   "devDependencies": {
+    "@chainlink/contracts": "^0.6.1",
     "@nomicfoundation/hardhat-foundry": "^1.0.2",
     "@nomicfoundation/hardhat-toolbox": "^2.0.2",
     "@nomiclabs/hardhat-ethers": "^2.2.2",
@@ -21,6 +22,7 @@
     "build": "npx thirdweb@latest detect",
     "deploy": "npx thirdweb@latest deploy",
     "release": "npx thirdweb@latest release",
+    "compile": "npx hardhat typechain",
     "test": "hardhat test",
     "dev": "ts-node scripts/index.ts"
   }
