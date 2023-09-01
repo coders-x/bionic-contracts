@@ -15,7 +15,7 @@ import {ICurrencyPermit,ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit
 import {BionicStructs} from "../libs/BionicStructs.sol";
 import {TokenBoundAccount} from "../TBA.sol";
 
-import {FundRaisingGuild} from "./FundRaisingGuild.sol";
+import {Treasury} from "./Treasury.sol";
 
 
 /* Errors */
@@ -63,7 +63,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     address public bionicInvestorPass;
 
     /// @notice Container for holding all rewards
-    FundRaisingGuild public rewardGuildBank;
+    Treasury public treasury;
 
     /// @notice List of pools that users can stake into
     BionicStructs.PoolInfo[] public poolInfo;
@@ -122,7 +122,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     // Available before staking ends for any given project. Essentitally 100% to 18 dp
     uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
 
-    event ContractDeployed(address indexed guildBank);
+    event ContractDeployed(address indexed treasury);
     event PoolAdded(uint256 indexed pid);
     event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
     event DrawInitiated(uint256 indexed pid, uint256 requestId);
@@ -176,7 +176,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
         investingToken = _investingToken;
-        rewardGuildBank = new FundRaisingGuild(address(this));
+        treasury = new Treasury(address(this));
 
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_gasLane = gasLane;
@@ -190,7 +190,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         _grantRole(TREASURY_ROLE, _msgSender());
         _grantRole(SORTER_ROLE, _msgSender());
 
-        emit ContractDeployed(address(rewardGuildBank));
+        emit ContractDeployed(address(treasury));
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -719,11 +719,11 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         address _to,
         uint256 _amount
     ) private {
-        uint256 bal = rewardGuildBank.tokenBalance(_rewardToken);
+        uint256 bal = treasury.tokenBalance(_rewardToken);
         if (_amount > bal) {
-            rewardGuildBank.withdrawTo(_rewardToken, _to, bal);
+            treasury.withdrawTo(_rewardToken, _to, bal);
         } else {
-            rewardGuildBank.withdrawTo(_rewardToken, _to, _amount);
+            treasury.withdrawTo(_rewardToken, _to, _amount);
         }
     }
     /// @dev invest on the pool via already pledged amount of investing token provided by user.
