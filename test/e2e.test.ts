@@ -29,6 +29,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ACCOUNT_ADDRESS = "0xcBe55885F8C8d48dD729c336dba3f29a15d5F436",
     CALLBACK_GAS_LIMIT = 100000,
     WINNERS_COUNT = 5,
+    PLEDGING_START_TIME = 20000000,
     PLEDGING_END_TIME = 40000000;
 
 describe("e2e", function () {
@@ -171,20 +172,24 @@ describe("e2e", function () {
     describe("FundingRegistry", () => {
         describe("Add", function () {
             it("Should fail if the not BROKER", async function () {
-                await expect(fundWithVesting.connect(client).add(bionicContract.address, 0, PLEDGING_END_TIME, 1000000000, 1000, WINNERS_COUNT, false))
+                await expect(fundWithVesting.connect(client)
+                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, 1000, 100, PLEDGING_START_TIME + 1000, 10, 100000, [3, 2, 1], false))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await fundWithVesting.hasRole(await fundWithVesting.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(fundWithVesting.add(bionicContract.address, 0, PLEDGING_END_TIME, 1000000000, 1000, WINNERS_COUNT, false))
+                await expect(fundWithVesting.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, 1000, 100, PLEDGING_START_TIME + 1000, 10, 100000, [3, 2, 1], false))
                     .to.emit(fundWithVesting, "PoolAdded").withArgs(0);
             });
             it("Should return same Pool upon request", async () => {
                 let pool = await fundWithVesting.poolInfo(0);
+                let poolTiers = await fundWithVesting.poolIdToTiers(0, 0);
+
+                expect(poolTiers).to.equal(3);
                 expect(pool.rewardToken).to.equal(bionicContract.address);
-                expect(pool.tokenAllocationStartTime).to.equal(0);
+                expect(pool.tokenAllocationStartTime).to.equal(PLEDGING_START_TIME + 1000);
                 expect(pool.pledgingEndTime).to.equal(PLEDGING_END_TIME);
-                expect(pool.targetRaise).to.equal(1000000000);
+                expect(pool.targetRaise).to.equal(100000);
                 expect(pool.maxPledgingAmountPerUser).to.equal(1000);
             })
 
