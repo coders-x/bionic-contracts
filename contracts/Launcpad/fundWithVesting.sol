@@ -336,28 +336,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         stackPledge(_msgSender(),_pid,_amount);
     }
 
-    function getPledgeFundingAmount(
-        uint256 _pid
-    ) public view returns (uint256) {
-        require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
-        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
-        BionicStructs.UserInfo memory user = userInfo[_pid].get(_msgSender());
 
-        (
-            uint256 accPercentPerShare,
-
-        ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-
-        uint256 userPercentageAllocated = user
-            .amount
-            .mul(accPercentPerShare)
-            .div(1e18)
-            .sub(user.tokenAllocDebt);
-        return
-            userPercentageAllocated.mul(pool.targetRaise).div(
-                TOTAL_TOKEN_ALLOCATION_POINTS
-            );
-    }
 
     /**
      * @dev will get the money out of users wallet into investment wallet

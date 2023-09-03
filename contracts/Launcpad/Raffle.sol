@@ -36,25 +36,26 @@ contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
 
     // Lottery Variables
-    uint32 private immutable i_winnersCount;
     bool private immutable i_requestVRFPerWinner; // whether should request diffrent random number per winner or just one and calculate all winners off of it.
     uint256 private s_lastTimeStamp;
-    address payable[] private s_winners;
-    address payable[] private s_players;
     RaffleState private s_raffleState; 
     /*solhint-enable var-name-mixedcase*/
+
+    ///@notice requestId of vrf request on the pool
+    mapping(uint256 => address[]) public requestIdToMembers;
+    mapping(uint256 => uint256) public requestIdToWinnersCount;
+    mapping(uint256 => address[]) public requestIdToLotteryWinners;
 
     /* Events */
     event RequestedRaffleWinner(uint256 indexed requestId);
     event RaffleEnter(address indexed player);
-    event WinnersPicked(address[] winners);
+    event WinnersPicked(uint256 requestId, address[] winners);
 
     /* Functions */
     constructor(
         address vrfCoordinatorV2,
         bytes32 gasLane, // keyHash
         uint64 subscriptionId,
-        uint32 winnersCount,
         uint32 callbackGasLimit,
         bool requestVRFPerWinner
     ) VRFConsumerBaseV2(vrfCoordinatorV2) {
@@ -64,17 +65,81 @@ contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
         s_raffleState = RaffleState.OPEN;
         s_lastTimeStamp = block.timestamp;//solhint-disable-line not-rely-on-time
         i_callbackGasLimit = callbackGasLimit;
-        i_winnersCount = winnersCount;
         i_requestVRFPerWinner = requestVRFPerWinner;
     }
 
-    function addToRaffle(address payable user) internal {
-        if (s_raffleState != RaffleState.OPEN) {
-            revert Raffle__RaffleNotOpen();
-        }
-        s_players.push(user);
-        emit RaffleEnter(user);
+   
+    
+    /**
+     * @dev it kicks off a Chainlink VRF call to get random winners.
+     */
+    function _draw(
+        uint32 winnersCount,
+        address[] memory members
+    ) internal returns (uint requestId){
+        s_raffleState = RaffleState.CALCULATING;
+        requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane,
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            i_requestVRFPerWinner ? winnersCount : 1
+        );
+        requestIdToWinnersCount[requestId]=winnersCount;
+        requestIdToMembers[requestId]=members;
+        emit RequestedRaffleWinner(requestId);
     }
+
+    /**
+     * @dev This is the function that Chainlink VRF node
+     * calls to send the money to the random winner.
+     */
+    function fulfillRandomWords(
+        uint256 requestId,
+        uint256[] memory randomWords
+    ) internal override{
+        uint256 winnersCount=requestIdToWinnersCount[requestId];
+        address[] memory lotteryMembers=requestIdToMembers[requestId];
+        address[] storage lotteryWinners=requestIdToLotteryWinners[requestId];
+        if(i_requestVRFPerWinner){
+            if (randomWords.length!=winnersCount) 
+                revert Raffle__NotEnoughRandomWordsForLottery();
+            
+            for (uint i=0;i<winnersCount;i++){
+                uint256 indexOfWinner = randomWords[i] % lotteryMembers.length;
+                lotteryWinners[i]=lotteryMembers[indexOfWinner];
+            }
+        }else{ //just get one word and calculate other random values off of it
+            uint256 rand=randomWords[0];
+            for (uint32 i=0;i<winnersCount;i++){
+                lotteryWinners[i]=lotteryMembers[rand % lotteryMembers.length];
+                rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
+            }
+        }
+        requestIdToLotteryWinners[requestId]=lotteryWinners;
+
+        emit WinnersPicked(requestId, lotteryWinners);
+    }
+
+    /** Getter Functions */
+    function getRaffleState() public view returns (RaffleState) {
+        return s_raffleState;
+    }
+
+
+    function getRequestConfirmations() public pure returns (uint256) {
+        return REQUEST_CONFIRMATIONS;
+    }
+
+
+    function getLastTimeStamp() public view returns (uint256) {
+        return s_lastTimeStamp;
+    }
+}
+
+
+
+
 
     // /**
     //  * @dev This is the function that the Chainlink Keeper nodes call
@@ -129,95 +194,4 @@ contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
     //         i_winnersCount
     //     );
     //     emit RequestedRaffleWinner(requestId);
-    // }    
-    
-    /**
-     * @dev it kicks off a Chainlink VRF call to get random winners.
-     */
-    function draw(
-    ) internal returns (uint requestId){
-        s_raffleState = RaffleState.CALCULATING;
-        requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
-            i_requestVRFPerWinner ? i_winnersCount : 1
-        );
-        emit RequestedRaffleWinner(requestId);
-    }
-
-    /**
-     * @dev This is the function that Chainlink VRF node
-     * calls to send the money to the random winner.
-     */
-    function fulfillRandomWords(
-        uint256, /* requestId */
-        uint256[] memory randomWords
-    ) internal override {
-        if(i_requestVRFPerWinner){
-            if (randomWords.length!=i_winnersCount) 
-                revert Raffle__NotEnoughRandomWordsForLottery();
-            
-            for (uint i=0;i<i_winnersCount;i++){
-                uint256 indexOfWinner = randomWords[i] % s_players.length;
-                s_winners.push(s_players[indexOfWinner]);
-            }
-        }else{ //just get one word and calculate other random values off of it
-            uint256 rand=randomWords[0];
-            for (uint32 i=0;i<i_winnersCount;i++){
-                s_winners.push(s_players[rand % s_players.length]);
-                rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
-            }
-        }
-
-
-        // uint256 indexOfWinner = randomWords[0] % s_players.length;
-        // address payable recentWinner = s_players[indexOfWinner];
-        // s_recentWinner = recentWinner;
-        // s_players = new address payable[](0);
-        // s_raffleState = RaffleState.OPEN;
-        // s_lastTimeStamp = block.timestamp;
-        // (bool success, ) = recentWinner.call{value: address(this).balance}("");
-        // // require(success, "Transfer failed");
-        // if (!success) {
-        //     revert Raffle__TransferFailed();
-        // }
-
-
-        // emit WinnersPicked(s_winners);
-    }
-
-    /** Getter Functions */
-
-    function getRaffleState() public view returns (RaffleState) {
-        return s_raffleState;
-    }
-
-    function getWinnersCount() public view returns (uint256) {
-        return i_winnersCount;
-    }
-
-    function getRequestConfirmations() public pure returns (uint256) {
-        return REQUEST_CONFIRMATIONS;
-    }
-
-    // function getRecentWinners() public view returns (address[] memory) {
-    //     return s_winners;
-    // }
-
-    function getPlayer(uint256 index) public view returns (address) {
-        return s_players[index];
-    }
-
-    function getLastTimeStamp() public view returns (uint256) {
-        return s_lastTimeStamp;
-    }
-
-
-
-
-    function getNumberOfPlayers() public view returns (uint256) {
-        return s_players.length;
-    }
-}
+    // } 
