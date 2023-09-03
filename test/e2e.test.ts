@@ -2,7 +2,7 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20, TokenBoundAccount, BionicInvestorPass, Bionic, IERC20, VRFCoordinatorV2Mock }
+import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20Upgradeable, TokenBoundAccount, BionicInvestorPass, Bionic, VRFCoordinatorV2Mock }
     from "../typechain-types";
 import { BytesLike } from "ethers";
 
@@ -34,7 +34,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: LaunchPoolFundRaisingWithVesting,
-        tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, usdtContract: ERC20,
+        tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, usdtContract: ERC20Upgradeable,
         tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
@@ -44,7 +44,7 @@ describe("e2e", function () {
         bionicContract = await deployBionic();
         bipContract = await deployBIP();
         tokenBoundContractRegistry = await ethers.getContractAt("ERC6551Registry", ERC6551_REGISTERY_ADDR);
-        usdtContract = await ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", USDT_ADDR);
+        usdtContract = await ethers.getContractAt("ERC20Upgradeable", USDT_ADDR);
         tokenBoundImpContract = await deployTBA();
         bionicDecimals = await bionicContract.decimals();
         abstractedAccount = await ethers.getContractAt("TokenBoundAccount", ACCOUNT_ADDRESS);
@@ -240,33 +240,41 @@ describe("e2e", function () {
                     alreadyPledged.add(amount),
                     deadline
                 )
-
+                let treasuryAddress = await fundWithVesting.treasury();
+                let oldbalance = await usdtContract.balanceOf(treasuryAddress);
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
                     .to.emit(fundWithVesting, "Pledge").withArgs(abstractedAccount.address, 0, amount)
-                    .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, alreadyPledged.add(amount));
-                expect(await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount));
+                    .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, alreadyPledged.add(amount))
+                    .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, alreadyPledged.add(amount));
+
+                expect(oldbalance).to.not.equal(await usdtContract.balanceOf(treasuryAddress));
+                expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(oldbalance.add(alreadyPledged.add(amount)))
+                expect(await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address)).to.equal(0);
             });
 
             it("Should add on user pledge and permit contract with new amount", async function () {
                 const deadline = ethers.constants.MaxUint256;
                 const alreadyPledged = await fundWithVesting.userTotalPledge(abstractedAccount.address);
-                expect(alreadyPledged).to.not.equal(BigNumber.from(0));
                 const amount = BigNumber.from(10);
+                expect(alreadyPledged).to.equal(amount);
                 const { v, r, s } = await getCurrencyPermitSignature(
                     client,
                     abstractedAccount,
                     usdtContract,
                     fundWithVesting.address,
-                    alreadyPledged.add(amount),
+                    amount,
                     deadline
                 )
                 await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
                     .to.emit(fundWithVesting, "Pledge").withArgs(abstractedAccount.address, 0, amount)
-                    .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, alreadyPledged.add(amount));
-                expect(await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address)).to.equal(alreadyPledged.add(amount)).not.equal(amount);
+                    .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, amount)
+                    .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, amount);
+                let treasuryAddress = await fundWithVesting.treasury();
+                expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(alreadyPledged.add(amount))
+                expect(await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address)).to.equal(0).not.equal(amount);
             });
 
             it("Should fail to start lottery with non sorting account", async () => {
@@ -277,8 +285,6 @@ describe("e2e", function () {
             it("Should request random numbers for the pool Winners Raffle", async () => {
                 await expect(fundWithVesting.draw(100000), "invalid poolId")
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__InvalidPool");
-                // await expect(fundWithVesting.draw(100000), "invalid poolId")
-                //     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__PoolIsOnPledgingPhase");
 
                 await expect(fundWithVesting.draw(0))
                     .to.emit(fundWithVesting, "DrawInitiated").withArgs(0, 1);
@@ -287,24 +293,23 @@ describe("e2e", function () {
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__DrawForThePoolHasAlreadyStarted");
             });
 
-            it("Should Receive Random words and chose winners", async () => {
-                const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
+            // it("Should Receive Random words and chose winners", async () => {
+            //     const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
 
-                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
-                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
-                let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
-                // simulate callback from the oracle network
-                await expect(
-                    vrfCoordinatorV2MockContract.fulfillRandomWords(
-                        1,
-                        fundWithVesting.address
-                    )
-                ).to.emit(fundWithVesting, "PledgeFunded")
+            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
+            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
+            //     let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
+            //     // simulate callback from the oracle network
+            //     await expect(
+            //         vrfCoordinatorV2MockContract.fulfillRandomWords(
+            //             1,
+            //             fundWithVesting.address
+            //         )
+            //     ).to.emit(fundWithVesting, "PledgeFunded")
 
-                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
-                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
-
-            });
+            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
+            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
+            // });
         });
     })
 

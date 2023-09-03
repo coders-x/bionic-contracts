@@ -16,7 +16,7 @@ import {BionicStructs} from "../libs/BionicStructs.sol";
 import {TokenBoundAccount} from "../TBA.sol";
 
 import {Treasury} from "./Treasury.sol";
-
+import "hardhat/console.sol";
 
 /* Errors */
 error LPFRWV__NotDefinedError();
@@ -314,7 +314,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
             ICurrencyPermit(_msgSender()).permit(
                 address(investingToken),
                 address(this),
-                userTotalPledge[_msgSender()],
+                _amount,
                 deadline,
                 v,
                 r,
@@ -333,7 +333,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
                 }
             }
         }
-        // stakingToken.safeTransferFrom(address(_msgSender()), address(this), _amount);
+        stackPledge(_msgSender(),_pid,_amount);
     }
 
     function getPledgeFundingAmount(
@@ -751,6 +751,31 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
             treasury.withdrawTo(_rewardToken, _to, _amount);
         }
     }
+    function stackPledge(address account,uint256 pid,uint256 _amount) private {
+        try
+            TokenBoundAccount(payable(account)).transferCurrency(
+                address(investingToken),
+                address(treasury),
+                _amount) 
+                returns (bool res)
+            {
+                if(res)
+                    emit PledgeFunded(account, pid, _amount);
+                else 
+                    revert LPFRWV__FundingPledgeFailed(account,pid);
+            } catch (bytes memory reason) {
+                if (reason.length == 0) {
+                    revert ICurrencyPermit__NoReason();
+                } else {
+                    /// @solidity memory-safe-assembly
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                }
+            }
+    }
+
+
     /// @dev invest on the pool via already pledged amount of investing token provided by user.
     /// @dev todo maybe instead of reverting on onunsuccessfull transfer emit an event?
     function fundUserPledge(
