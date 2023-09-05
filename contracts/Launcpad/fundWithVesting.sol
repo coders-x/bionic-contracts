@@ -16,6 +16,7 @@ import {BionicStructs} from "../libs/BionicStructs.sol";
 import {TokenBoundAccount} from "../TBA.sol";
 
 import {Treasury} from "./Treasury.sol";
+import {Raffle} from "./Raffle.sol";
 import "hardhat/console.sol";
 
 /* Errors */
@@ -25,6 +26,7 @@ error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
 error LPFRWV__NotEnoughRandomWordsForLottery();
 error LPFRWV__FundingPledgeFailed(address user, uint pid);
+error LPFRWV__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
 // ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
@@ -36,7 +38,7 @@ error LPFRWV__FundingPledgeFailed(address user, uint pid);
 /// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
-contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, AccessControl {
+contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessControl {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -46,13 +48,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
 
-    // Chainlink VRF Variables
-    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
-    uint64 private immutable i_subscriptionId;
-    bytes32 private immutable i_gasLane;
-    uint32 private immutable i_callbackGasLimit;
-    bool private immutable i_requestVRFPerWinner; // whether should request diffrent random number per winner or just one and calculate all winners off of it.
-    uint16 private constant REQUEST_CONFIRMATIONS = 3;
 
 
     /// @notice staking token is fixed for all pools
@@ -67,7 +62,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
 
     /// @notice List of pools that users can stake into
     BionicStructs.PoolInfo[] public poolInfo;
-    mapping(uint256 => BionicStructs.Tier[]) public poolIdToTiers;
+
 
     // Pool to accumulated share counters
     mapping(uint256 => uint256) public poolIdToAccPercentagePerShare;
@@ -160,7 +155,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         uint64 subscriptionId,
         uint32 callbackGasLimit,
         bool requestVRFPerWinner
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) {
+    ) Raffle(vrfCoordinatorV2,gasLane,subscriptionId,callbackGasLimit,requestVRFPerWinner) {
         require(
             address(_stakingToken) != address(0),
             "constructor: _stakingToken must not be zero address"
@@ -178,12 +173,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         stakingToken = _stakingToken;
         investingToken = _investingToken;
         treasury = new Treasury(address(this));
-
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
-        i_gasLane = gasLane;
-        i_subscriptionId = subscriptionId;
-        i_callbackGasLimit = callbackGasLimit;
-        i_requestVRFPerWinner = requestVRFPerWinner;
 
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -254,7 +243,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         for (uint i=0;i<_tiers.length;i++){
             tiers[i]=BionicStructs.Tier({
                 count:_tiers[i],
-                members: new address[](_tiers[i])
+                members: new address[](0)
             });
         }
         poolIdToTiers[pid]=tiers;
@@ -336,6 +325,17 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         stackPledge(_msgSender(),_pid,_amount);
     }
 
+    /// @notice Add user members to Lottery Tiers
+    /// @dev Will need to happen before initiating the raffle it self
+    /// @param pid the poolId of the tier
+    /// @param tierId tierId of the poolId needs to be updated
+    /// @param members members for this tier to be considered in raffle
+    function addToTier(uint256 pid,uint256 tierId, address[] memory members) external nonReentrant onlyRole(SORTER_ROLE){
+        if (!userInfo[pid].contains(members)){
+            revert LPFRWV__TierMembersShouldHaveAlreadyPledged(pid,tierId);
+        }
+        _addToTier(pid, tierId, members);
+    }
 
 
     /**
@@ -347,18 +347,12 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         if(_pid >= poolInfo.length)
             revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[_pid];
-        if(pool.tokenAllocationStartTime > block.timestamp) //solhint-disable-line not-rely-on-time
-            revert LPFRWV__PoolIsOnPledgingPhase(pool.tokenAllocationStartTime);
+        if(pool.pledgingEndTime > block.timestamp) //solhint-disable-line not-rely-on-time
+            revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
         if(poolIdToRequestId[_pid]!=0)
             revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
 
-        requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
-            i_requestVRFPerWinner ? poolIdToTiers[_pid][0].count : 1
-        );
+        requestId = _draw(_pid);
         poolIdToRequestId[_pid]=requestId;
         requestIdToPoolId[requestId]=_pid;
 
@@ -373,31 +367,30 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
+        address[] memory winners=_fulfillRandomWords(requestId,randomWords);
         uint pid=requestIdToPoolId[requestId];
-
         BionicStructs.PoolInfo memory pool = poolInfo[pid];
-        address[] memory winners;
 
-        if(poolIdToTiers[pid][0].count>=userInfo[pid].size()){
-            winners=userInfo[pid].keys;
-        }else{
-            if(i_requestVRFPerWinner){
-                if (randomWords.length!=poolIdToTiers[pid][0].count) 
-                    revert LPFRWV__NotEnoughRandomWordsForLottery();
+        // if(poolIdToTiers[pid][0].count>=userInfo[pid].size()){
+        //     winners=userInfo[pid].keys;
+        // }else{
+        //     if(i_requestVRFPerWinner){
+        //         if (randomWords.length!=poolIdToTiers[pid][0].count) 
+        //             revert LPFRWV__NotEnoughRandomWordsForLottery();
                 
-                for (uint i=0;i<poolIdToTiers[pid][0].count;i++){
-                    winners[i]=userInfo[pid].getKeyAtIndex(randomWords[i] % userInfo[pid].size());
-                }
-            }else{ //just get one word and calculate other random values off of it
-                uint256 rand=randomWords[0];
-                for (uint32 i=0;i<poolIdToTiers[pid][0].count;i++){
-                    winners[i]=userInfo[pid].getKeyAtIndex(rand % userInfo[pid].size());
-                    rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
-                }
-            }
-        }
+        //         for (uint i=0;i<poolIdToTiers[pid][0].count;i++){
+        //             winners[i]=userInfo[pid].getKeyAtIndex(randomWords[i] % userInfo[pid].size());
+        //         }
+        //     }else{ //just get one word and calculate other random values off of it
+        //         uint256 rand=randomWords[0];
+        //         for (uint32 i=0;i<poolIdToTiers[pid][0].count;i++){
+        //             winners[i]=userInfo[pid].getKeyAtIndex(rand % userInfo[pid].size());
+        //             rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
+        //         }
+        //     }
+        // }
 
-        fundUserPledge(pid,winners);
+        // fundUserPledge(pid,winners);
     }
 
     // // step 2

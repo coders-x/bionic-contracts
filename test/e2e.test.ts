@@ -277,9 +277,27 @@ describe("e2e", function () {
                 expect(await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address)).to.equal(0).not.equal(amount);
             });
 
+
             it("Should fail to start lottery with non sorting account", async () => {
                 await expect(fundWithVesting.connect(client).draw(0))
                     .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
+            })
+
+            it("Should fail to start if tiers haven't been added", async () => {
+                await expect(fundWithVesting.draw(0))
+                    .to.revertedWithCustomError(fundWithVesting, "Raffle__TiersHaveNotBeenInitialized");
+            })
+
+            it("should add user to tier 1", async () => {
+                let pid = 0, tierId = 0, members = [abstractedAccount.address];
+                await expect(fundWithVesting.addToTier(pid, tierId, members))
+                    .to.emit(fundWithVesting, "TierInitiated").withArgs(pid, tierId, members);
+            })
+            it("should fail to add user to other tier", async () => {
+                let pid = 0, tierId = 1, members = [abstractedAccount.address];
+                await expect(fundWithVesting.addToTier(pid, tierId, members))
+                    .to.revertedWithCustomError(fundWithVesting, "Raffle__MembersOnlyPermittedInOneTier")
+                    .withArgs(members[0], 0, tierId);
             })
 
             it("Should request random numbers for the pool Winners Raffle", async () => {

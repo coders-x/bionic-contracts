@@ -22,6 +22,19 @@ library IterableMapping {
         return map.keys.length;
     }
 
+    function contains(BionicStructs.Map storage map, address[] memory members) public view returns (bool){
+        // loop through array1
+        for(uint i = 0; i < members.length; i++) {
+            // check if each element in array1 exists in array2
+            // if any element in array1 is not found in array2, return false
+            if(!map.inserted[members[i]]) {
+                return false; 
+            }
+        }
+        // if all elements in array1 are found in array2, return true
+        return true;
+    }
+
     function set(
         BionicStructs.Map storage map,
         address key,
@@ -60,6 +73,7 @@ contract TestIterableMap {
     using IterableMapping for BionicStructs.Map;
 
     BionicStructs.Map private map;
+    address[] private MemberAddresses;
 
     function testIterableMap() public {
         map.set(
@@ -121,5 +135,11 @@ contract TestIterableMap {
         assert(map.getKeyAtIndex(0) == address(0));
         assert(map.getKeyAtIndex(1) == address(3));
         assert(map.getKeyAtIndex(2) == address(2));
+        
+        MemberAddresses.push(address(0));
+        MemberAddresses.push(address(2));
+        assert(map.contains(MemberAddresses)==true);
+        MemberAddresses.push(address(1));
+        assert(map.contains(MemberAddresses)==false);
     }
 }
