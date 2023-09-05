@@ -13,6 +13,7 @@ import {IERC6551Account} from "../reference/src/interfaces/IERC6551Account.sol";
 import {IterableMapping} from  "../libs/IterableMapping.sol";
 import {ICurrencyPermit,ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
+import {Utils} from "../libs/Utils.sol";
 import {TokenBoundAccount} from "../TBA.sol";
 
 import {Treasury} from "./Treasury.sol";
@@ -27,6 +28,8 @@ error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
 error LPFRWV__NotEnoughRandomWordsForLottery();
 error LPFRWV__FundingPledgeFailed(address user, uint pid);
 error LPFRWV__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
+error LPFRWV__TiersHaveNotBeenInitialized();
+
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
 // ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
@@ -221,7 +224,15 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             massUpdatePools();
         }
 
-
+        uint256 winnersCount=0;
+        BionicStructs.Tier[] memory tiers=new BionicStructs.Tier[](_tiers.length);
+        for (uint i=0;i<_tiers.length;i++){
+            tiers[i]=BionicStructs.Tier({
+                count:_tiers[i],
+                members: new address[](0)
+            });
+            winnersCount+=_tiers[i];
+        }
 
         poolInfo.push(
             BionicStructs.PoolInfo({
@@ -232,20 +243,15 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
                 tokenAllocationPerBlock: _tokenAllocationPerBlock,
                 tokenAllocationStartTime: _tokenAllocationStartTime,
                 tokenAllocationPerShare: _tokenAllocationPerShare,
-                targetRaise: _targetRaise
+                targetRaise: _targetRaise,
+                winnersCount: winnersCount
             })
         );
 
 
 
         pid=poolInfo.length.sub(1);
-        BionicStructs.Tier[] memory tiers=new BionicStructs.Tier[](_tiers.length);
-        for (uint i=0;i<_tiers.length;i++){
-            tiers[i]=BionicStructs.Tier({
-                count:_tiers[i],
-                members: new address[](0)
-            });
-        }
+
         poolIdToTiers[pid]=tiers;
 
 
@@ -337,13 +343,10 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         _addToTier(pid, tierId, members);
     }
 
-
     /**
-     * @dev will get the money out of users wallet into investment wallet
+     * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
-    function draw(
-        uint256 _pid
-    ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
+    function preDraw(uint256 _pid) internal{
         if(_pid >= poolInfo.length)
             revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[_pid];
@@ -351,6 +354,32 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
         if(poolIdToRequestId[_pid]!=0)
             revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
+
+        //check all tiers except last(all other users) has members
+        BionicStructs.Tier[] storage tiers=poolIdToTiers[_pid];
+        address[] memory lastTierMembers = userInfo[_pid].keys;
+        for (uint k = 0; k < tiers.length-1; k++) {
+            console.log("tier %d has %d members remainig %d",k,tiers[k].members.length,lastTierMembers.length);
+            if(tiers[k].members.length<1){
+                revert LPFRWV__TiersHaveNotBeenInitialized();
+            }
+            lastTierMembers=Utils.excludeAddresses(lastTierMembers,tiers[k].members);
+        }
+        //check if last tier is empty add rest of people pledged to the tier
+        if(tiers[tiers.length-1].members.length<1){
+            _addToTier(_pid, tiers.length-1, lastTierMembers);
+            // tiers[tiers.length-1].members=lastTierMembers;
+        }
+        console.log("last tier has %d members",tiers[tiers.length-1].members.length);
+    }
+
+    /**
+     * @dev will get the money out of users wallet into investment wallet
+     */
+    function draw(
+        uint256 _pid
+    ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
+        preDraw(_pid);
 
         requestId = _draw(_pid);
         poolIdToRequestId[_pid]=requestId;

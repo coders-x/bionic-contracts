@@ -310,9 +310,15 @@ describe("e2e", function () {
 
             it("Should fail to start if tiers haven't been added", async () => {
                 await expect(fundWithVesting.draw(0))
-                    .to.revertedWithCustomError(fundWithVesting, "Raffle__TiersHaveNotBeenInitialized");
+                    .to.revertedWithCustomError(fundWithVesting, "LPFRWV__TiersHaveNotBeenInitialized");
             })
 
+            it("should fail if member hasn't pledged to lottery", async () => {
+                let pid = 0, tierId = 0, members = ["0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"];
+                await expect(fundWithVesting.addToTier(pid, tierId, members))
+                    .to.revertedWithCustomError(fundWithVesting, "LPFRWV__TierMembersShouldHaveAlreadyPledged")
+                    .withArgs(pid, tierId);
+            })
             it("should add user to tier 1", async () => {
                 let pid = 0, tierId = 0, members = [abstractedAccount.address];
                 await expect(fundWithVesting.addToTier(pid, tierId, members))
@@ -496,12 +502,16 @@ async function deployBIP() {
     return await bipContract.deployed();
 }
 async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, cbGasLimit: number, reqVRFPerWinner: boolean) {
-    const Lib = await ethers.getContractFactory("IterableMapping");
-    const lib = await Lib.deploy();
+    const IterableMappingLib = await ethers.getContractFactory("IterableMapping");
+    const lib = await IterableMappingLib.deploy();
     await lib.deployed();
+    const UtilsLib = await ethers.getContractFactory("Utils");
+    const utils = await UtilsLib.deploy();
+    await utils.deployed();
     const FundWithVestingContract = await ethers.getContractFactory("LaunchPoolFundRaisingWithVesting", {
         libraries: {
-            IterableMapping: lib.address
+            IterableMapping: lib.address,
+            Utils: utils.address
         }
     });
     console.log(`Deploying LaunchPoolFundRaisingWithVesting contract...`);

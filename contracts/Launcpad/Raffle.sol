@@ -17,7 +17,6 @@ error Raffle__RaffleNotOpen();
 error Raffle__TierMembersCountInvalid(uint256 expectedMemberCount, uint256 receivedMemberCount);
 error Raffle__NotEnoughRandomWordsForLottery();
 error Raffle__MembersOnlyPermittedInOneTier(address member,uint256 existingTier, uint256 newTier);
-error Raffle__TiersHaveNotBeenInitialized();
 
 /**@title A sample Raffle Contract
  * @author Ali Mahdavi
@@ -101,15 +100,8 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
     function _draw(
         uint pid
     ) internal returns (uint requestId){
-        //check all tiers except last(all other users) has members
-        uint winnersCount=0;
-        BionicStructs.Tier[] storage tiers=poolIdToTiers[pid];
-        for (uint k = 0; k < tiers.length-1; k++) {
-            if(tiers[k].members.length<1){
-                revert Raffle__TiersHaveNotBeenInitialized();
-            }
-            winnersCount+=tiers[k].count;
-        }
+
+
         // // s_raffleState = RaffleState.CALCULATING;
         // // todo replace with poolIdToRaffleStatus
         // requestId = i_vrfCoordinator.requestRandomWords(
