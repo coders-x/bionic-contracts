@@ -114,9 +114,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
 
-    ///@notice requestId of vrf request on the pool
-    mapping(uint256 => uint256) public poolIdToRequestId;
-    mapping(uint256 => uint256) public requestIdToPoolId;
+
 
     // Available before staking ends for any given project. Essentitally 100% to 18 dp
     uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
@@ -382,8 +380,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         preDraw(_pid);
 
         requestId = _draw(_pid,pool.winnersCount);
-        poolIdToRequestId[_pid]=requestId;
-        requestIdToPoolId[requestId]=_pid;
+
 
         emit DrawInitiated(_pid,requestId);
     }
@@ -396,30 +393,17 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
+        console.log("called fulfillment");
         address[] memory winners=_fulfillRandomWords(requestId,randomWords);
         uint pid=requestIdToPoolId[requestId];
-        BionicStructs.PoolInfo memory pool = poolInfo[pid];
-
-        // if(poolIdToTiers[pid][0].count>=userInfo[pid].size()){
-        //     winners=userInfo[pid].keys;
-        // }else{
-        //     if(i_requestVRFPerWinner){
-        //         if (randomWords.length!=poolIdToTiers[pid][0].count) 
-        //             revert LPFRWV__NotEnoughRandomWordsForLottery();
-                
-        //         for (uint i=0;i<poolIdToTiers[pid][0].count;i++){
-        //             winners[i]=userInfo[pid].getKeyAtIndex(randomWords[i] % userInfo[pid].size());
-        //         }
-        //     }else{ //just get one word and calculate other random values off of it
-        //         uint256 rand=randomWords[0];
-        //         for (uint32 i=0;i<poolIdToTiers[pid][0].count;i++){
-        //             winners[i]=userInfo[pid].getKeyAtIndex(rand % userInfo[pid].size());
-        //             rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
-        //         }
-        //     }
-        // }
+        console.log("picked winners");
 
         // fundUserPledge(pid,winners);
+        postLottary(pid,winners);
+    }
+
+    function postLottary(uint256 pid, address[] memory winners) internal{
+        // todo return lossers pledges;
     }
 
     // // step 2

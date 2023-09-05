@@ -13,7 +13,7 @@ import "hardhat/console.sol";
 error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
 error Raffle__TransferFailed();
 error Raffle__SendMoreToEnterRaffle();
-error Raffle__RaffleNotOpen();
+error Raffle__RaffleAlreadyInProgressOrDone();
 error Raffle__TierMembersCountInvalid(uint256 expectedMemberCount, uint256 receivedMemberCount);
 error Raffle__NotEnoughRandomWordsForLottery();
 error Raffle__MembersOnlyPermittedInOneTier(address member,uint256 existingTier, uint256 newTier);
@@ -46,9 +46,11 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
     /*solhint-enable var-name-mixedcase*/
 
     ///@notice requestId of vrf request on the pool
-    mapping(uint256 => address[]) public requestIdToMembers;
-    mapping(uint256 => uint256) public requestIdToWinnersCount;
     mapping(uint256 => RaffleState) public poolIdToRaffleStatus;
+
+    ///@notice requestId of vrf request on the pool
+    mapping(uint256 => uint256) public poolIdToRequestId;
+    mapping(uint256 => uint256) public requestIdToPoolId;
 
     /// @notice poolId to Tiers information of the pool
     mapping(uint256 => BionicStructs.Tier[]) public poolIdToTiers;
@@ -57,7 +59,7 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
     event RequestedRaffleWinner(uint256 indexed requestId);
     event RaffleEnter(address indexed player);
     event TierInitiated(uint256 pid,uint256 tierId, address[] members);
-    event WinnersPicked(uint256 requestId, address[] winners);
+    event WinnersPicked(uint256 requestId,uint256 pid, address[] winners);
 
     /* Functions */
     constructor(
@@ -101,6 +103,10 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
         uint pid,
         uint32 winnersCount
     ) internal returns (uint requestId){
+        if(poolIdToRequestId[pid]!=0){
+            revert Raffle__RaffleAlreadyInProgressOrDone();
+        }
+
         BionicStructs.Tier[] storage tiers=poolIdToTiers[pid];
         // s_raffleState = RaffleState.CALCULATING;
         // todo replace with poolIdToRaffleStatus
@@ -111,6 +117,11 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
             i_callbackGasLimit,
             i_requestVRFPerWinner ? winnersCount : uint32(tiers.length)
         );
+
+
+
+        poolIdToRequestId[pid]=requestId;
+        requestIdToPoolId[requestId]=pid;
         emit RequestedRaffleWinner(requestId);
     }
 
@@ -122,25 +133,31 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
         uint256 requestId,
         uint256[] memory randomWords
     ) internal returns (address[] memory lotteryWinners){
-        uint256 winnersCount=requestIdToWinnersCount[requestId];
-        address[] memory lotteryMembers=requestIdToMembers[requestId];
+        uint pid=requestIdToPoolId[requestId];
+        BionicStructs.Tier[] storage tiers=poolIdToTiers[pid];
+        // Initialize the lotteryWinners array with the correct length
+        lotteryWinners = new address[](getRaffleTotalWinners(pid));
         if(i_requestVRFPerWinner){
-            if (randomWords.length!=winnersCount) 
-                revert Raffle__NotEnoughRandomWordsForLottery();
-            
-            for (uint i=0;i<winnersCount;i++){
-                uint256 indexOfWinner = randomWords[i] % lotteryMembers.length;
-                lotteryWinners[i]=lotteryMembers[indexOfWinner];
+            uint wordIdx=0;
+            for (uint i = 0; i < tiers.length; i++) {
+                address[] memory lotteryMembers=tiers[i].members;
+                for (uint j = 0; j < tiers[i].count; j++) {
+                    lotteryWinners[wordIdx]=lotteryMembers[randomWords[wordIdx] % lotteryMembers.length];
+                    wordIdx++;
+                }
             }
-        }else{ //just get one word and calculate other random values off of it
-            uint256 rand=randomWords[0];
-            for (uint32 i=0;i<winnersCount;i++){
-                lotteryWinners[i]=lotteryMembers[rand % lotteryMembers.length];
-                rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
+        }else{
+            for (uint i = 0; i < tiers.length; i++) {
+                uint256 rand=randomWords[i];
+                for (uint j = 0; j < tiers[i].count; j++) {
+                    address[] memory lotteryMembers=tiers[i].members;
+                    lotteryWinners[i]=lotteryMembers[rand % lotteryMembers.length];
+                    rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
+                }
             }
         }
 
-        emit WinnersPicked(requestId, lotteryWinners);
+        emit WinnersPicked(requestId,pid, lotteryWinners);
         return lotteryWinners;
     }
 
@@ -148,6 +165,15 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
     // function getRaffleState(pid) public view returns (RaffleState) {
     //     return s_raffleState;
     // }
+
+    // /** Getter Functions */
+    // Calculate the total number of winners to determine the length of the lotteryWinners array
+    function getRaffleTotalWinners(uint pid) public view returns (uint32 totalWinners) {
+        BionicStructs.Tier[] storage tiers=poolIdToTiers[pid];
+        for (uint i = 0; i < tiers.length; i++) {
+            totalWinners += tiers[i].count;
+        }
+    }
 
 
     function getRequestConfirmations() public pure returns (uint256) {

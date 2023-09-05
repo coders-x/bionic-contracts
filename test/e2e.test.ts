@@ -80,7 +80,7 @@ describe("e2e", function () {
                 i, "0", []);
             let newAcc = await res.wait();
             let acc = await ethers.getContractAt("TokenBoundAccount", newAcc?.events[0]?.args?.account);
-            await usdtContract.connect(whale).transfer(acc.address, HUNDRED_THOUSAND.mul(i + 1));
+            await usdtContract.connect(whale).transfer(acc.address, HUNDRED_THOUSAND);
             AbstractAccounts.push(acc);
         }
 
@@ -351,23 +351,36 @@ describe("e2e", function () {
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__DrawForThePoolHasAlreadyStarted");
             });
 
-            // it("Should Receive Random words and chose winners", async () => {
-            //     const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
+            it("Should Receive Random words and chose winners", async () => {
+                const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
+                const winners = ["0x1E78A4a08e885dbd42B981C054a9Cf71f7230afD",
+                    "0xc5C7dBdF73B06fc60BE777A59605dA28A064fdb6",
+                    "0xcBe55885F8C8d48dD729c336dba3f29a15d5F436",
+                    "0x744326EcB8EA6CE498c750315B5bBC5AA7c0C436",
+                    "0x83A898b99ecC709267Dfe4970B20b35F85e347D9",
+                    "0x9Edd13C0F16D3E522A2b789dBf5ffD331ED56e96",]
+                expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
+                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(30));
+                // simulate callback from the oracle network
+                await expect(
+                    vrfCoordinatorV2MockContract.fulfillRandomWords(
+                        1,
+                        fundWithVesting.address
+                    )
+                ).to.emit(fundWithVesting, "WinnersPicked")
+                    .withArgs(1, 0, winners)
 
-            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
-            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND);
-            //     let allowed = await abstractedAccount.allowance(usdtContract.address, fundWithVesting.address);
-            //     // simulate callback from the oracle network
-            //     await expect(
-            //         vrfCoordinatorV2MockContract.fulfillRandomWords(
-            //             1,
-            //             fundWithVesting.address
-            //         )
-            //     ).to.emit(fundWithVesting, "PledgeFunded")
+                let losers = AbstractAccounts.filter((v, i) => !winners.includes(v.address) && i < 12)
+                expect(losers.length).to.equal(5);
+                for (const w of winners) {
+                    let pledge = await fundWithVesting.userTotalPledge(w)
+                    expect(await usdtContract.balanceOf(w), "winners should have been paid their pledge").to.be.equal(HUNDRED_THOUSAND.sub(pledge));
+                }
 
-            //     expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(allowed);
-            //     expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(allowed));
-            // });
+                for (const l of losers) {
+                    expect(await usdtContract.balanceOf(l.address), "losers should get back their pledge deposit").to.be.equal(HUNDRED_THOUSAND);
+                }
+            });
         });
     })
 
