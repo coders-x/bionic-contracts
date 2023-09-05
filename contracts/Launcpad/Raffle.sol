@@ -105,7 +105,6 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
         uint winnersCount=0;
         BionicStructs.Tier[] storage tiers=poolIdToTiers[pid];
         for (uint k = 0; k < tiers.length-1; k++) {
-            console.log("tier %d with members #%d",k,tiers[k].members.length);
             if(tiers[k].members.length<1){
                 revert Raffle__TiersHaveNotBeenInitialized();
             }
