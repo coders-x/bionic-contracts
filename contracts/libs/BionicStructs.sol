@@ -29,7 +29,7 @@ library BionicStructs {
         uint256 tokenAllocationStartTime; // when users can start claiming their first reward
         uint256 tokenAllocationPerShare; // amount of token will be allocated per investers share(usdt) per month.
         uint256 targetRaise; // Amount that the project wishes to raise
-        uint256 winnersCount;
+        uint32 winnersCount;
     }
 
     /// @dev Info of each TierInPool.

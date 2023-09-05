@@ -224,7 +224,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             massUpdatePools();
         }
 
-        uint256 winnersCount=0;
+        uint32 winnersCount=0;
         BionicStructs.Tier[] memory tiers=new BionicStructs.Tier[](_tiers.length);
         for (uint i=0;i<_tiers.length;i++){
             tiers[i]=BionicStructs.Tier({
@@ -347,14 +347,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
     function preDraw(uint256 _pid) internal{
-        if(_pid >= poolInfo.length)
-            revert LPFRWV__InvalidPool();
-        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
-        if(pool.pledgingEndTime > block.timestamp) //solhint-disable-line not-rely-on-time
-            revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
-        if(poolIdToRequestId[_pid]!=0)
-            revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
-
         //check all tiers except last(all other users) has members
         BionicStructs.Tier[] storage tiers=poolIdToTiers[_pid];
         address[] memory lastTierMembers = userInfo[_pid].keys;
@@ -379,9 +371,17 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     function draw(
         uint256 _pid
     ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
+        if(_pid >= poolInfo.length)
+            revert LPFRWV__InvalidPool();
+        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
+        if(pool.pledgingEndTime > block.timestamp) //solhint-disable-line not-rely-on-time
+            revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
+        if(poolIdToRequestId[_pid]!=0)
+            revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
+            
         preDraw(_pid);
 
-        requestId = _draw(_pid);
+        requestId = _draw(_pid,pool.winnersCount);
         poolIdToRequestId[_pid]=requestId;
         requestIdToPoolId[requestId]=_pid;
 

@@ -98,22 +98,20 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
      * @dev it kicks off a Chainlink VRF call to get random winners.
      */
     function _draw(
-        uint pid
+        uint pid,
+        uint32 winnersCount
     ) internal returns (uint requestId){
-
-
-        // // s_raffleState = RaffleState.CALCULATING;
-        // // todo replace with poolIdToRaffleStatus
-        // requestId = i_vrfCoordinator.requestRandomWords(
-        //     i_gasLane,
-        //     i_subscriptionId,
-        //     REQUEST_CONFIRMATIONS,
-        //     i_callbackGasLimit,
-        //     i_requestVRFPerWinner ? winnersCount : tiers.length
-        // );
-        // requestIdToWinnersCount[requestId]=winnersCount;
-        // requestIdToMembers[requestId]=members;
-        // emit RequestedRaffleWinner(requestId);
+        BionicStructs.Tier[] storage tiers=poolIdToTiers[pid];
+        // s_raffleState = RaffleState.CALCULATING;
+        // todo replace with poolIdToRaffleStatus
+        requestId = i_vrfCoordinator.requestRandomWords(
+            i_gasLane,
+            i_subscriptionId,
+            REQUEST_CONFIRMATIONS,
+            i_callbackGasLimit,
+            i_requestVRFPerWinner ? winnersCount : uint32(tiers.length)
+        );
+        emit RequestedRaffleWinner(requestId);
     }
 
     /**
