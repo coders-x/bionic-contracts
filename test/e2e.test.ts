@@ -27,7 +27,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
     ACCOUNT_ADDRESS = "0x6e9f8116F6a82C6039D4C905C00166C04579221f",
-    CALLBACK_GAS_LIMIT = 100000,
+    CALLBACK_GAS_LIMIT = 300000,
     WINNERS_COUNT = 5,
     PLEDGING_START_TIME = 20000000,
     PLEDGING_END_TIME = 40000000,
@@ -367,8 +367,14 @@ describe("e2e", function () {
                         1,
                         fundWithVesting.address
                     )
-                ).to.emit(fundWithVesting, "WinnersPicked")
-                    .withArgs(1, 0, winners)
+                ).to.emit(fundWithVesting, "WinnersPicked").withArgs(0, winners)
+                .to.emit(fundWithVesting,"LotteryRefunded");
+
+                // for (let i = 0; i < winners.length; i++) {
+                //     expect(winners).to.contains(await fundWithVesting.poolTolotteryWinners(0,i))
+                // }
+
+                // expect(await fundWithVesting.postLottery(0)).to.emit(fundWithVesting,"LotteryRefunded")
 
                 let losers = AbstractAccounts.filter((v, i) => !winners.includes(v.address) && i < 12)
                 expect(losers.length).to.equal(5);

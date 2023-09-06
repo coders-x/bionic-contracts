@@ -20,7 +20,7 @@ error Raffle__MembersOnlyPermittedInOneTier(address member,uint256 existingTier,
 
 /**@title A sample Raffle Contract
  * @author Ali Mahdavi
- * @notice This contract will do the raffles for lottary and keep track of the tiering system for that
+ * @notice This contract will do the raffles for lottery and keep track of the tiering system for that
  * @dev This implements the Chainlink VRF Version 2
  */
 abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface */ {
@@ -45,8 +45,9 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
     uint256 private s_lastTimeStamp;
     /*solhint-enable var-name-mixedcase*/
 
-    ///@notice requestId of vrf request on the pool
-    mapping(uint256 => RaffleState) public poolIdToRaffleStatus;
+    ///@notice winners per raffle
+    mapping(uint256 => address[]) public poolTolotteryWinners;
+
 
     ///@notice requestId of vrf request on the pool
     mapping(uint256 => uint256) public poolIdToRequestId;
@@ -59,7 +60,7 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
     event RequestedRaffleWinner(uint256 indexed requestId);
     event RaffleEnter(address indexed player);
     event TierInitiated(uint256 pid,uint256 tierId, address[] members);
-    event WinnersPicked(uint256 requestId,uint256 pid, address[] winners);
+    event WinnersPicked(uint256 pid, address[] winners);
 
     /* Functions */
     constructor(
@@ -129,37 +130,50 @@ abstract contract Raffle is VRFConsumerBaseV2 /*, AutomationCompatibleInterface 
      * @dev This is the function that Chainlink VRF node
      * calls to send the money to the random winner.
      */
-    function _fulfillRandomWords(
-        uint256 requestId,
-        uint256[] memory randomWords
-    ) internal returns (address[] memory lotteryWinners){
-        uint pid=requestIdToPoolId[requestId];
-        BionicStructs.Tier[] storage tiers=poolIdToTiers[pid];
-        // Initialize the lotteryWinners array with the correct length
-        lotteryWinners = new address[](getRaffleTotalWinners(pid));
-        if(i_requestVRFPerWinner){
-            uint wordIdx=0;
-            for (uint i = 0; i < tiers.length; i++) {
-                address[] memory lotteryMembers=tiers[i].members;
-                for (uint j = 0; j < tiers[i].count; j++) {
-                    lotteryWinners[wordIdx]=lotteryMembers[randomWords[wordIdx] % lotteryMembers.length];
-                    wordIdx++;
-                }
-            }
-        }else{
-            for (uint i = 0; i < tiers.length; i++) {
-                uint256 rand=randomWords[i];
-                for (uint j = 0; j < tiers[i].count; j++) {
-                    address[] memory lotteryMembers=tiers[i].members;
-                    lotteryWinners[i]=lotteryMembers[rand % lotteryMembers.length];
-                    rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
-                }
+function _fulfillRandomWords(
+    uint256 pid,
+    uint256[] memory randomWords
+) internal returns (address[] memory winners) {
+    BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
+    uint totalWinners = getRaffleTotalWinners(pid);
+
+    // Preallocate the winners array
+    winners = new address[](totalWinners);
+    uint winnerId = 0;
+
+    if (i_requestVRFPerWinner) {
+        for (uint i = 0; i < tiers.length; i++) {
+            address[] memory lotteryMembers = tiers[i].members;
+            uint memberCount = lotteryMembers.length;
+
+            for (uint j = 0; j < tiers[i].count; j++) {
+                                    console.log("1 before push, %d",gasleft());
+                winners[winnerId] = lotteryMembers[randomWords[winnerId] % memberCount];
+                                  console.log("1 after push, %d", winnerId);
+
+                winnerId++;
             }
         }
+    } else {
+        for (uint i = 0; i < tiers.length; i++) {
+            uint256 rand = randomWords[i];
+            address[] memory lotteryMembers = tiers[i].members;
+            uint memberCount = lotteryMembers.length;
 
-        emit WinnersPicked(requestId,pid, lotteryWinners);
-        return lotteryWinners;
+            for (uint j = 0; j < tiers[i].count; j++) {
+                winners[winnerId] = lotteryMembers[rand % memberCount];
+                rand = uint256(keccak256(abi.encodePacked(rand, block.prevrandao, block.chainid, i)));
+                winnerId++;
+            }
+        }
     }
+    console.log("winners count %d  => %d",winners.length, gasleft());
+    emit WinnersPicked( pid, winners);
+    console.log("gasleft %d", gasleft());
+
+    return winners;
+}
+
 
     // /** Getter Functions */
     // function getRaffleState(pid) public view returns (RaffleState) {

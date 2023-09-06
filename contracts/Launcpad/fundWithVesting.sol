@@ -144,6 +144,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         address indexed recipient,
         uint256 amount
     );
+    event LotteryRefunded(address indexed user, uint256 indexed pid, uint256 amount);
+
 
     /// @param _stakingToken Address of the staking token for all pools
     /// @param _investingToken Address of the staking token for all pools
@@ -196,7 +198,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
         uint256 _maxPledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
-        uint256 _tokenAllocationPerBlock, // the amount of token will be released to lottary winners per month
+        uint256 _tokenAllocationPerBlock, // the amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationPerShare, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
@@ -385,6 +387,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         emit DrawInitiated(_pid,requestId);
     }
 
+
+
     /**
      * @dev This is the function that Chainlink VRF node
      * calls to send the money to the random winner.
@@ -393,18 +397,32 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
-        console.log("called fulfillment");
-        address[] memory winners=_fulfillRandomWords(requestId,randomWords);
-        uint pid=requestIdToPoolId[requestId];
+        console.log("called fulfillment %d", gasleft());
+        uint pid = requestIdToPoolId[requestId];
+        address[] memory winners=_fulfillRandomWords(pid,randomWords);
+        console.log("gas %d", gasleft());
         console.log("picked winners");
-
-        // fundUserPledge(pid,winners);
-        postLottary(pid,winners);
+        // uint256 pid=requestIdToPoolId[requestId];
+        postLottery(pid,winners);
     }
 
-    function postLottary(uint256 pid, address[] memory winners) internal{
+    function postLottery(uint256 pid,address[] memory winners) internal{
         // todo return lossers pledges;
+        address[] memory losers = userInfo[pid].keys;
+        console.log("losers %d winners %d",losers.length,winners.length);
+        losers=Utils.excludeAddresses(losers,winners);
+        console.log("losers %d",losers.length);
+        for (uint i = 0; i < losers.length; i++) {
+            BionicStructs.UserInfo storage u=userInfo[pid].get(losers[i]);
+            console.log("losers owes %d  ,%d",u.amount,gasleft());
+            uint256 refund=u.amount;
+            u.amount=0;
+            treasury.withdrawTo(investingToken,losers[i],refund);
+            emit LotteryRefunded(losers[i],pid,refund);
+            userInfo[pid].set(losers[i], u);
+        }
     }
+
 
     // // step 2
     // function fundPledge(uint256 _pid) external payable nonReentrant {
