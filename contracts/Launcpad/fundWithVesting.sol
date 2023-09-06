@@ -20,6 +20,7 @@ import {Treasury} from "./Treasury.sol";
 import {Raffle} from "./Raffle.sol";
 import "hardhat/console.sol";
 
+
 /* Errors */
 error LPFRWV__NotDefinedError();
 error LPFRWV__InvalidPool();
@@ -37,11 +38,13 @@ error LPFRWV__TiersHaveNotBeenInitialized();
 // ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
 // ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
+
 /// @title Fund raising platform facilitated by launch pool
 /// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
 contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessControl {
+
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -63,9 +66,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     /// @notice Container for holding all rewards
     Treasury public treasury;
 
+
     /// @notice List of pools that users can stake into
     BionicStructs.PoolInfo[] public poolInfo;
-
 
     // Pool to accumulated share counters
     mapping(uint256 => uint256) public poolIdToAccPercentagePerShare;
@@ -120,6 +123,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
 
     event ContractDeployed(address indexed treasury);
+
     event PoolAdded(uint256 indexed pid);
     event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
     event DrawInitiated(uint256 indexed pid, uint256 requestId);
@@ -159,6 +163,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint32 callbackGasLimit,
         bool requestVRFPerWinner
     ) Raffle(vrfCoordinatorV2,gasLane,subscriptionId,callbackGasLimit,requestVRFPerWinner) {
+
         require(
             address(_stakingToken) != address(0),
             "constructor: _stakingToken must not be zero address"
@@ -178,12 +183,14 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         treasury = new Treasury(address(this));
 
 
+
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(BROKER_ROLE, _msgSender());
         _grantRole(TREASURY_ROLE, _msgSender());
         _grantRole(SORTER_ROLE, _msgSender());
 
         emit ContractDeployed(address(treasury));
+
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -203,6 +210,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 _tokenAllocationPerShare, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
         uint32[] calldata _tiers,
+
         bool _withUpdate
     ) public onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
@@ -218,6 +226,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             _pledgingStartTime < _pledgingEndTime,
             "add: _pledgingStartTime should be before _pledgingEndTime"
         );
+
         require(_targetRaise > 0, "add: Invalid raise amount");
 
         if (_withUpdate) {
@@ -253,6 +262,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         pid=poolInfo.length.sub(1);
 
         poolIdToTiers[pid]=tiers;
+
 
 
 
@@ -363,6 +373,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             // tiers[tiers.length-1].members=lastTierMembers;
         }
         console.log("last tier has %d members",tiers[tiers.length-1].members.length);
+
     }
 
     /**
@@ -384,10 +395,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         requestId = _draw(_pid,pool.winnersCount);
 
 
+
         emit DrawInitiated(_pid,requestId);
     }
-
-
 
     /**
      * @dev This is the function that Chainlink VRF node
@@ -422,6 +432,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             userInfo[pid].set(losers[i], u);
         }
     }
+
 
 
     // // step 2
@@ -779,6 +790,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     }
 
 
+
     /// @dev invest on the pool via already pledged amount of investing token provided by user.
     /// @dev todo maybe instead of reverting on onunsuccessfull transfer emit an event?
     function fundUserPledge(
@@ -806,6 +818,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
                             emit PledgeFunded(userAddress, _pid, user.amount);
                         else 
                             revert LPFRWV__FundingPledgeFailed(userAddress,_pid);
+
                     } catch (bytes memory reason) {
                         if (reason.length == 0) {
                             revert ICurrencyPermit__NoReason();
@@ -829,6 +842,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 _from,
         uint256 _to
     ) private pure returns (uint256) {
+
         return _to.sub(_from);
     }
 
@@ -866,7 +880,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
                 }
             }
         }
-
 
         _;
     }
