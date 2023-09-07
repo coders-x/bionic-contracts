@@ -5,27 +5,30 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-
+import "forge-std/console.sol";
 
 
 error ErrInvalidProject();  //"Project token not registered. Contact admin to add project tokens"
+error ErrClaimingIsNotAllowedYet(uint startAfter);//"not in the time window for claiming rewards"
 error ErrNothingToClaim();
+error ErrNotEligible(); //"User is not assigned claims for this project."
 error ErrNotEnoughTokenLeft(address token); //"Not enough tokens available for claiming. Please try Again"
 
 contract ClaimingContract is Ownable {
     using SafeMath for uint256;
 
-    uint256 private constant MONTH_IN_SECONDS = 2629746; // Approx 1 month 
+    uint256 public constant MONTH_IN_SECONDS = 2629746;// Approx 1 month (assuming 15 seconds per block)
 
     struct UserClaim {
-        uint256 lastClaimMonth; // Month when the user last claimed tokens
+        uint256 lastClaim; // Month when the user last claimed tokens
         uint256 totalTokensClaimed; // Total tokens claimed by the user
     }
+
     struct ProjectToken {
         IERC20 token; // The token that users can claim
         uint256 monthlyAmount; // Amount of tokens users can claim per month
         uint256 startMonth; // firstMonth token is claimable
-        uint256 totalMonths; // number of months allocation will go on
+        uint256 endMonth; // number of months allocation will go on
     }
 
     // User's claim history for each project token useraddress => tokenAddress => UserClaim
@@ -33,14 +36,11 @@ contract ClaimingContract is Ownable {
     // Add more project tokens here
     mapping(address => ProjectToken) public s_projectTokens; //solhint-disable-line var-name-mixedcase
 
-
     event ProjectAdded(IERC20 token, uint256 monthlyAmount, uint256 startMonth, uint256 endMonth);
     event TokensClaimed(address indexed user, address indexed projectToken, uint256 month, uint256 amount);
 
-
-
     modifier projectExists(address projectToken) {
-        if(s_projectTokens[projectToken].monthlyAmount == 0){
+        if (s_projectTokens[projectToken].monthlyAmount == 0) {
             revert ErrInvalidProject();
         }
         _;
@@ -55,63 +55,69 @@ contract ClaimingContract is Ownable {
         uint256 startMonth,
         uint256 totalMonths
     ) external onlyOwner {
-        s_projectTokens[projectTokenAddress] = ProjectToken(IERC20(projectTokenAddress), claimAmount, startMonth,totalMonths);
+        s_projectTokens[projectTokenAddress] = ProjectToken(IERC20(projectTokenAddress), claimAmount, startMonth,startMonth.add(totalMonths.mul(MONTH_IN_SECONDS)));
         emit ProjectAdded(IERC20(projectTokenAddress), claimAmount, startMonth,totalMonths);
     }
 
     //TODO change this to batch add the lottery winners
-    function signUpForProject(address projectToken) external projectExists(projectToken) {
-        require(s_userClaims[_msgSender()][projectToken].lastClaimMonth == 0, "User is already signed up for this project.");
-        s_userClaims[_msgSender()][projectToken] = UserClaim(1, 0); // Start from month 1
+    function AddWinningInvestors(address projectToken,address[] calldata investors) external onlyOwner {
+        for (uint i = 0; i < investors.length; i++) {
+            s_userClaims[investors[i]][projectToken] = UserClaim(block.timestamp, 0); // solhint-disable-line not-rely-on-time
+        }
+
     }
 
     // Users can claim tokens for the current month for a specific project token
     function claimTokens(address projectToken) external projectExists(projectToken) {
         UserClaim storage userClaim = s_userClaims[_msgSender()][projectToken];
-        if(userClaim.lastClaimMonth == 0){
-            revert ErrNothingToClaim();
-            // require(userClaim.lastClaimMonth > 0, "User is not signed up for this project.");
+        ProjectToken memory project=s_projectTokens[projectToken];
+        if(userClaim.lastClaim == 0){
+            revert ErrNotEligible();
         }
-        if(userClaim.lastClaimMonth > s_projectTokens[projectToken].totalMonths){
-            revert ErrNothingToClaim();
-            // require(userClaim.lastClaimMonth <= s_projectTokens[projectToken].totalMonths, "Claiming period has ended.");
+        if(project.startMonth > block.timestamp){
+            revert ErrClaimingIsNotAllowedYet(project.startMonth);
         }
-        if(userClaim.totalTokensClaimed.add(s_projectTokens[projectToken].monthlyAmount) >
-            s_projectTokens[projectToken].totalMonths.mul(s_projectTokens[projectToken].monthlyAmount)){
-            revert ErrNothingToClaim();
-            // require(
-            //     userClaim.totalTokensClaimed.add(s_projectTokens[projectToken].monthlyAmount) <=
-            //         s_projectTokens[projectToken].totalMonths.mul(s_projectTokens[projectToken].monthlyAmount),
-            //     "Tokens already claimed for all months."
-            // );
-        }
-
+        // if(userClaim.lastClaimMonth > (project.startMonth.add(project.totalMonths.mul(MONTH_IN_SECONDS))) 
+        //     || userClaim.totalTokensClaimed.add(project.monthlyAmount) >
+        //     project.totalMonths.mul(project.monthlyAmount)){
+        //     revert ErrNothingToClaim();
+        // }
         
+        console.log("user's last claim %d",userClaim.lastClaim);
 
         // Calculate the amount to claim for the current month
-        uint256 currentMonth = getClaimableMonthsCount(s_projectTokens[projectToken].startMonth,userClaim.lastClaimMonth);
-        uint256 tokensToClaim = s_projectTokens[projectToken].monthlyAmount*currentMonth;
-
+        uint256 claimableMonthCount = getClaimableMonthsCount(userClaim.lastClaim,project.endMonth);
+        if(claimableMonthCount==0){
+            revert ErrNothingToClaim();
+        }
+        uint256 tokensToClaim = project.monthlyAmount.mul(claimableMonthCount);
+        console.log("claiming $%d for %d months",tokensToClaim,claimableMonthCount);
         // Ensure we have enough tokens available for claiming
-        if(s_projectTokens[projectToken].token.balanceOf(address(this)) < tokensToClaim){
+        if(project.token.balanceOf(address(this)) < tokensToClaim){
             revert ErrNotEnoughTokenLeft(projectToken);
             // require(
-            //     s_projectTokens[projectToken].token.balanceOf(address(this)) >= tokensToClaim,
+            //     project.token.balanceOf(address(this)) >= tokensToClaim,
             //     "Not enough tokens available for claiming. Please try Again"
             // );
         }
+        console.log("has addiquate balance");
 
         // Update user's claim data
-        userClaim.lastClaimMonth++;
-        userClaim.totalTokensClaimed.add(tokensToClaim);
+
+        userClaim.lastClaim=userClaim.lastClaim.add(MONTH_IN_SECONDS.mul(claimableMonthCount));
+        userClaim.totalTokensClaimed=userClaim.totalTokensClaimed.add(tokensToClaim);
+
+        console.log("lastClaimMonth: %d  totaltokens:%d, +%d",userClaim.lastClaim,userClaim.totalTokensClaimed,tokensToClaim);
+
 
         // Transfer tokens to the user
-        s_projectTokens[projectToken].token.transfer(_msgSender(), tokensToClaim);
+        project.token.transfer(_msgSender(), tokensToClaim);
 
-        emit TokensClaimed(_msgSender(), projectToken, currentMonth, tokensToClaim);
+        emit TokensClaimed(_msgSender(), projectToken, claimableMonthCount, tokensToClaim);
     }
 
     function batchClaim() external {
+
         //todo
         // Project[] storage projects = s_userProjects[msg.sender];
         // uint256 currentMonth = getCurrentMonth();
@@ -141,11 +147,15 @@ contract ClaimingContract is Ownable {
 
 
 
-    function getClaimableMonthsCount(uint256 startMonth, uint256 lastClaimedMonth) internal view returns (uint256) {
-        return ((block.timestamp-startMonth) / MONTH_IN_SECONDS)-lastClaimedMonth; // solhint-disable-line not-rely-on-time
+    function getClaimableMonthsCount(uint256 lastClaimedMonth,uint256 endMonth) public view returns (uint256) {
+        if (endMonth>block.timestamp){
+            console.log("block: %d-%d/%d",block.timestamp,lastClaimedMonth,MONTH_IN_SECONDS);
+            return ((block.timestamp.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)); // solhint-disable-line not-rely-on-time
+        }else{
+            console.log("endmo: %d-%d/%d",endMonth,lastClaimedMonth,MONTH_IN_SECONDS);
+            return ((endMonth.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)); // solhint-disable-line not-rely-on-time
+        }
+
     }
 
-    function getCurrentMonth() internal view returns (uint256) {
-        return block.timestamp / MONTH_IN_SECONDS; // solhint-disable-line not-rely-on-time
-    }
 }

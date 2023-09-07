@@ -73,7 +73,7 @@ contract TestIterableMap {
     using IterableMapping for BionicStructs.Map;
 
     BionicStructs.Map private map;
-    address[] private MemberAddresses;
+    address[] private memberAddresses;
 
     function testIterableMap() public {
         map.set(
@@ -136,10 +136,10 @@ contract TestIterableMap {
         assert(map.getKeyAtIndex(1) == address(3));
         assert(map.getKeyAtIndex(2) == address(2));
         
-        MemberAddresses.push(address(0));
-        MemberAddresses.push(address(2));
-        assert(map.contains(MemberAddresses)==true);
-        MemberAddresses.push(address(1));
-        assert(map.contains(MemberAddresses)==false);
+        memberAddresses.push(address(0));
+        memberAddresses.push(address(2));
+        assert(map.contains(memberAddresses)==true);
+        memberAddresses.push(address(1));
+        assert(map.contains(memberAddresses)==false);
     }
 }
