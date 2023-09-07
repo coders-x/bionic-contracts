@@ -55,7 +55,7 @@ contract ClaimingContractTest is DSTest,Test {
 
 
     //add winners and send transactions as winner0
-    claimingContract.AddWinningInvestors(address(rewardToken),winners);
+    claimingContract.addWinningInvestors(address(rewardToken),winners);
     vm.startPrank(winners[0]);
 
     //nothing to claim not in the window
