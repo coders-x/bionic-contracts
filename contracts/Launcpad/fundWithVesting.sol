@@ -409,7 +409,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     ) internal override {
         console.log("called fulfillment %d", gasleft());
         uint pid = requestIdToPoolId[requestId];
-        address[] memory winners=_fulfillRandomWords(pid,randomWords);
+        address[] memory winners=pickWinners(pid,randomWords);
         console.log("gas %d", gasleft());
         console.log("picked winners");
         // uint256 pid=requestIdToPoolId[requestId];

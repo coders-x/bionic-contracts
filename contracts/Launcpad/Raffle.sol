@@ -105,7 +105,7 @@ abstract contract Raffle is VRFConsumerBaseV2 {
      * @dev This is the function that Chainlink VRF node
      * calls to send the money to the random winner.
      */
-    function _fulfillRandomWords(uint256 pid, uint256[] memory randomWords) internal returns (address[] memory winners) {
+    function pickWinners(uint256 pid, uint256[] memory randomWords) internal returns (address[] memory winners) {
         BionicStructs.Tier[] memory tiers = poolIdToTiers[pid];
         uint totalWinners = getRaffleTotalWinners(pid);
         winners = new address[](totalWinners);
