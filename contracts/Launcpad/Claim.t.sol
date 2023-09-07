@@ -12,12 +12,14 @@ contract ClaimingContractTest is DSTest,Test {
 
   ClaimingContract private claimingContract; 
   ERC20Mock private rewardToken; 
+  ERC20Mock private rewardToken2; 
   address private owner=address(this);
   address[] private  winners=[address(1),address(2),address(3)];
 
   function setUp() public {
     claimingContract = new ClaimingContract();
-    rewardToken = new ERC20Mock();
+    rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
+    rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
   }
 
   function registerProject() public {
@@ -134,13 +136,58 @@ contract ClaimingContractTest is DSTest,Test {
     vm.expectRevert(ErrNothingToClaim.selector);
     claimingContract.claimTokens(address(rewardToken));
   }
+
+  function testBatchClaim() public {
+    // vm.warp(100);
+    claimingContract.registerProjectToken(
+      address(rewardToken), 
+      10, 
+      200,
+      12 // a year
+    );
+    claimingContract.registerProjectToken(
+      address(rewardToken2), 
+      20, 
+      400,
+      6 //6 month
+    );
+    //Fund The Claiming Contract
+    uint totalBalance=10000;
+    rewardToken.mint(address(claimingContract), totalBalance);
+    rewardToken2.mint(address(claimingContract), totalBalance);
+    
+    //add winners and send transactions as winner0
+    claimingContract.addWinningInvestors(address(rewardToken),winners);
+    claimingContract.addWinningInvestors(address(rewardToken2),winners);
+    vm.startPrank(winners[0]);
+
+
+
+    vm.expectRevert(abi.encodePacked(ErrClaimingIsNotAllowedYet.selector, uint(200)));
+    claimingContract.batchClaim();
+
+
+    uint256 time=MONTH_IN_SECONDS*3;
+    vm.warp(time);
+
+
+    // vm.expectRevert(ErrNothingToClaim.selector);
+    claimingContract.batchClaim();
+
+
+    assertEq(rewardToken.balanceOf(address(claimingContract)), totalBalance-10*2);
+    assertEq(rewardToken.balanceOf(address(winners[0])), 10*2);
+    assertEq(rewardToken2.balanceOf(address(claimingContract)), totalBalance-20*2);
+    assertEq(rewardToken2.balanceOf(address(winners[0])), 20*2);
+
+  }
 }
 
 
 
 
 contract ERC20Mock is ERC20 {
-    constructor() ERC20("REWARD TOKEN", "RWRD") {}
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
     function mint(address account, uint256 amount) external {
         _mint(account, amount);
     }
