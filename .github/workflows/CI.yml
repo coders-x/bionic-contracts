@@ -28,7 +28,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-      - run: forge update
+      - run: git submodule update
       - run: npm install
       - run: npm test
       - name: Run snapshot

@@ -25,7 +25,7 @@
     "release": "npx thirdweb@latest release",
     "compile": "npx hardhat typechain",
     "test:hardhat": "hardhat test",
-    "test:forge": "forge test --via-ir --mc ClaimingContractTest -vv",
+    "test:forge": "forge test --via-ir -vv",
     "test": "npm run test:hardhat && npm run test:forge",
     "dev": "ts-node scripts/index.ts"
   }
