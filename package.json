@@ -24,7 +24,7 @@
     "deploy": "npx thirdweb@latest deploy",
     "release": "npx thirdweb@latest release",
     "compile": "npx hardhat typechain",
-    "test": "hardhat test",
+    "test": "hardhat test && forge test --via-ir --mc ClaimingContractTest -vv",
     "dev": "ts-node scripts/index.ts"
   }
 }

@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
-import "forge-std/console.sol";
 
 
 error ErrInvalidProject();  //"Project token not registered. Contact admin to add project tokens"
@@ -77,13 +76,6 @@ contract ClaimingContract is Ownable {
         if(project.startMonth > block.timestamp){
             revert ErrClaimingIsNotAllowedYet(project.startMonth);
         }
-        // if(userClaim.lastClaimMonth > (project.startMonth.add(project.totalMonths.mul(MONTH_IN_SECONDS))) 
-        //     || userClaim.totalTokensClaimed.add(project.monthlyAmount) >
-        //     project.totalMonths.mul(project.monthlyAmount)){
-        //     revert ErrNothingToClaim();
-        // }
-        
-        console.log("user's last claim %d",userClaim.lastClaim);
 
         // Calculate the amount to claim for the current month
         uint256 claimableMonthCount = getClaimableMonthsCount(userClaim.lastClaim,project.endMonth);
@@ -91,24 +83,14 @@ contract ClaimingContract is Ownable {
             revert ErrNothingToClaim();
         }
         uint256 tokensToClaim = project.monthlyAmount.mul(claimableMonthCount);
-        console.log("claiming $%d for %d months",tokensToClaim,claimableMonthCount);
         // Ensure we have enough tokens available for claiming
         if(project.token.balanceOf(address(this)) < tokensToClaim){
             revert ErrNotEnoughTokenLeft(projectToken);
-            // require(
-            //     project.token.balanceOf(address(this)) >= tokensToClaim,
-            //     "Not enough tokens available for claiming. Please try Again"
-            // );
         }
-        console.log("has addiquate balance");
 
         // Update user's claim data
-
         userClaim.lastClaim=userClaim.lastClaim.add(MONTH_IN_SECONDS.mul(claimableMonthCount));
         userClaim.totalTokensClaimed=userClaim.totalTokensClaimed.add(tokensToClaim);
-
-        console.log("lastClaimMonth: %d  totaltokens:%d, +%d",userClaim.lastClaim,userClaim.totalTokensClaimed,tokensToClaim);
-
 
         // Transfer tokens to the user
         project.token.transfer(_msgSender(), tokensToClaim);
@@ -149,10 +131,8 @@ contract ClaimingContract is Ownable {
 
     function getClaimableMonthsCount(uint256 lastClaimedMonth,uint256 endMonth) public view returns (uint256) {
         if (endMonth>block.timestamp){
-            console.log("block: %d-%d/%d",block.timestamp,lastClaimedMonth,MONTH_IN_SECONDS);
             return ((block.timestamp.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)); // solhint-disable-line not-rely-on-time
         }else{
-            console.log("endmo: %d-%d/%d",endMonth,lastClaimedMonth,MONTH_IN_SECONDS);
             return ((endMonth.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)); // solhint-disable-line not-rely-on-time
         }
 

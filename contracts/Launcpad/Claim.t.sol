@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import "forge-std/console.sol";
 import "./Claim.sol";
 
 contract ClaimingContractTest is DSTest,Test {
@@ -35,7 +34,6 @@ contract ClaimingContractTest is DSTest,Test {
     registerProject();
 
     (IERC20 token,uint256 amount,uint256 start,uint256 end) = claimingContract.s_projectTokens(address(rewardToken));
-    console.log("start:%d end:%d now:%d",start,end, block.timestamp);
     assertEq(address(token),address(rewardToken));
     assertEq(amount, 10);
     assertEq(start, 100);
@@ -132,6 +130,9 @@ contract ClaimingContractTest is DSTest,Test {
     assertEq(totalTokenClaimed, 120);
     assertEq(rewardToken.balanceOf(address(claimingContract)), totalBalance-=80);
     assertEq(rewardToken.balanceOf(address(winners[1])), 120);
+
+    vm.expectRevert(ErrNothingToClaim.selector);
+    claimingContract.claimTokens(address(rewardToken));
   }
 }
 
