@@ -1,22 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@thirdweb-dev/contracts/smart-wallet/non-upgradeable/Account.sol";
-import "@thirdweb-dev/contracts/eip/interface/IERC721.sol";
-import "@thirdweb-dev/contracts/eip/interface/IERC20.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/Context.sol";
-import "./reference/src/lib/ERC6551AccountLib.sol";
-import "./reference/src/interfaces/IERC6551Account.sol";
-import "./libs/ICurrencyPermit.sol";
+import {IERC721,IERC165} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
+import {ERC6551AccountLib} from "./reference/src/lib/ERC6551AccountLib.sol";
+import {IERC6551Account} from "./reference/src/interfaces/IERC6551Account.sol";
+import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
+import {Account,IEntryPoint,Ownable,ECDSA} from "./libs/Account.sol";
 
-import "hardhat/console.sol";
-
+// ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
+// ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
+// ┃╰╯╰╮┃┃┃┃╱┃┃╭╮╰╯┃┃┃┃┃╱╰╯
+// ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
+// ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
+// ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
+/// @title ERC6551Account Contract 
+/// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
+/// @notice Fork of TokenBoundAccount.sol from Thirdweb
+/// @dev TokenBoundAccount that gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
 contract TokenBoundAccount is
     ICurrencyPermit,
     IERC6551Account,
     IERC165,
-    Context,
     Account
 {
     /*///////////////////////////////////////////////////////////////
@@ -58,77 +64,9 @@ contract TokenBoundAccount is
     constructor(
         IEntryPoint _entrypoint,
         address _factory
-    ) Account(_entrypoint, _factory) {
-        _disableInitializers();
-    }
+    ) Account(_entrypoint, _factory,"BionicAccount","1") {} //solhint-disable-line no-empty-blocks
 
-    receive() external payable virtual override(Account, IERC6551Account) {}
-
-    /// @notice Returns whether a signer is authorized to perform transactions using the wallet.
-    function isValidSigner(
-        address _signer,
-        UserOperation calldata _userOp
-    ) public view virtual override returns (bool) {
-        AccountPermissionsStorage.Data storage data = AccountPermissionsStorage
-            .accountPermissionsStorage();
-
-        // First, check if the signer is the owner.
-        if (_signer == owner()) {
-            return true;
-        } else {
-            // If not an admin, check restrictions for the role held by the signer.
-            bytes32 role = data.roleOfAccount[_signer];
-            RoleStatic memory restrictions = data.roleRestrictions[role];
-
-            // // Check if the role is active. If the signer has no role, this condition will revert because both start and end timestamps are `0`.
-            // require(
-            //     restrictions.startTimestamp <= block.timestamp && block.timestamp < restrictions.endTimestamp,
-            //     "Account: role not active."
-            // );
-
-            // Extract the function signature from the userOp calldata and check whether the signer is attempting to call `execute` or `executeBatch`.
-            bytes4 sig = getFunctionSignature(_userOp.callData);
-
-            if (sig == this.execute.selector) {
-                // Extract the `target` and `value` arguments from the calldata for `execute`.
-                (
-                    address target,
-                    uint256 value
-                ) = decodeExecuteCalldata(_userOp.callData);
-
-                if (_allowances[target][_signer] > 0) {
-                    return true;
-                }
-                // if(IEIP165(target).supportsInterface(type(IERC20).interfaceId)){
-                //         IERC20.transfer.selector
-                // };
-
-                // Check if the value is within the allowed range and if the target is approved.
-                // require(restrictions.maxValuePerTransaction >= value, "Account: value too high.");
-                // require(data.approvedTargets[role].contains(target), "Account: target not approved.");
-            } else if (sig == this.executeBatch.selector) {
-                // Extract the `target` and `value` array arguments from the calldata for `executeBatch`.
-                (
-                    address[] memory targets,
-                    uint256[] memory values,
-
-                ) = decodeExecuteBatchCalldata(_userOp.callData);
-
-                // For each target+value pair, check if the value is within the allowed range and if the target is approved.
-                for (uint256 i = 0; i < targets.length; i++) {
-                    if (_allowances[targets[i]][_signer] > 0) {
-                        return true;
-                    }
-                    // require(data.approvedTargets[role].contains(targets[i]), "Account: target not approved.");
-                    // require(restrictions.maxValuePerTransaction >= values[i], "Account: value too high.");
-                }
-            } else {
-                revert("Account: calling invalid fn.");
-            }
-
-            return true;
-        }
-    }
+    receive() external payable virtual override(Account, IERC6551Account) {} //solhint-disable-line no-empty-blocks
 
     /**
      * @dev See {ICurrencyPermit-permit}.
@@ -171,6 +109,12 @@ contract TokenBoundAccount is
         _approve(currency, spender, value);
     }
 
+    /// @notice will transfer Currency approved to the caller
+    /// @dev transferCurrency will allow spender(msg.sender) to transfer the amount of money they already permited to move.
+    /// @param currency the erc20 contract address to spend the amount if it's 0xeeee.eeee it will try transfering native token
+    /// @param to the address amount will be sent
+    /// @param amount the amount of currency wished to be spent
+    /// @return bool if transaction was successfull it will return a boolian value of true if it's native value it might fail with revert
     function transferCurrency(
         address currency,
         address to,
@@ -178,7 +122,11 @@ contract TokenBoundAccount is
     ) public virtual returns (bool) {
         address spender = _msgSender();
         _spendAllowance(currency, spender, amount);
-        IERC20(currency).transfer(to, amount);
+        if (currency==address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)){
+            _call(to, amount, "");
+        }else{
+            return IERC20(currency).transfer(to, amount);
+        }
         return true;
     }
 
@@ -209,7 +157,7 @@ contract TokenBoundAccount is
         return _allowances[currency][spender];
     }
 
-    function owner() public view returns (address) {
+    function owner() public view override (IERC6551Account,Ownable) returns (address) {
         (
             uint256 chainId,
             address tokenContract,
@@ -344,14 +292,6 @@ contract TokenBoundAccount is
     /*///////////////////////////////////////////////////////////////
                             Modifiers
     //////////////////////////////////////////////////////////////*/
-
-    modifier onlyAdminOrEntrypoint() override {
-        require(
-            _msgSender() == address(entryPoint()) || _msgSender() == owner(),
-            "Account: not admin or EntryPoint."
-        );
-        _;
-    }
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new

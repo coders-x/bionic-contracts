@@ -1,22 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
-import "../reference/src/interfaces/IERC6551Account.sol";
+import {SafeERC20,IERC20,Address} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import {AccessControl,IERC165} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import {IERC6551Account} from "../reference/src/interfaces/IERC6551Account.sol";
 
 
-import "hardhat/console.sol";
-import "../libs/IterableMapping.sol";
-import "../libs/ICurrencyPermit.sol";
-import "../libs/BionicStructs.sol";
+import {IterableMapping} from  "../libs/IterableMapping.sol";
+import {ICurrencyPermit,ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
+import {BionicStructs} from "../libs/BionicStructs.sol";
+import {Utils} from "../libs/Utils.sol";
 import {TokenBoundAccount} from "../TBA.sol";
 
-import {FundRaisingGuild} from "./FundRaisingGuild.sol";
+import {Treasury} from "./Treasury.sol";
+import {Raffle} from "./Raffle.sol";
+import "hardhat/console.sol";
 
 
 /* Errors */
@@ -25,12 +27,24 @@ error LPFRWV__InvalidPool();
 error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
 error LPFRWV__NotEnoughRandomWordsForLottery();
+error LPFRWV__FundingPledgeFailed(address user, uint pid);
+error LPFRWV__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
+error LPFRWV__TiersHaveNotBeenInitialized();
+
+
+// ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
+// ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
+// ┃╰╯╰╮┃┃┃┃╱┃┃╭╮╰╯┃┃┃┃┃╱╰╯
+// ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
+// ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
+// ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
 
 /// @title Fund raising platform facilitated by launch pool
 /// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
-contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, AccessControl {
+contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessControl {
+
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -40,13 +54,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
 
-    // Chainlink VRF Variables
-    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
-    uint64 private immutable i_subscriptionId;
-    bytes32 private immutable i_gasLane;
-    uint32 private immutable i_callbackGasLimit;
-    bool private immutable i_requestVRFPerWinner; // whether should request diffrent random number per winner or just one and calculate all winners off of it.
-    uint16 private constant REQUEST_CONFIRMATIONS = 3;
 
 
     /// @notice staking token is fixed for all pools
@@ -57,7 +64,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     address public bionicInvestorPass;
 
     /// @notice Container for holding all rewards
-    FundRaisingGuild public rewardGuildBank;
+    Treasury public treasury;
+
 
     /// @notice List of pools that users can stake into
     BionicStructs.PoolInfo[] public poolInfo;
@@ -109,14 +117,13 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
 
-    ///@notice requestId of vrf request on the pool
-    mapping(uint256 => uint256) public poolIdToRequestId;
-    mapping(uint256 => uint256) public requestIdToPoolId;
+
 
     // Available before staking ends for any given project. Essentitally 100% to 18 dp
     uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
 
-    event ContractDeployed(address indexed guildBank);
+    event ContractDeployed(address indexed treasury);
+
     event PoolAdded(uint256 indexed pid);
     event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
     event DrawInitiated(uint256 indexed pid, uint256 requestId);
@@ -141,6 +148,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         address indexed recipient,
         uint256 amount
     );
+    event LotteryRefunded(address indexed user, uint256 indexed pid, uint256 amount);
+
 
     /// @param _stakingToken Address of the staking token for all pools
     /// @param _investingToken Address of the staking token for all pools
@@ -153,7 +162,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         uint64 subscriptionId,
         uint32 callbackGasLimit,
         bool requestVRFPerWinner
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) {
+    ) Raffle(vrfCoordinatorV2,gasLane,subscriptionId,callbackGasLimit,requestVRFPerWinner) {
+
         require(
             address(_stakingToken) != address(0),
             "constructor: _stakingToken must not be zero address"
@@ -170,13 +180,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
         investingToken = _investingToken;
-        rewardGuildBank = new FundRaisingGuild(address(this));
+        treasury = new Treasury(address(this));
 
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
-        i_gasLane = gasLane;
-        i_subscriptionId = subscriptionId;
-        i_callbackGasLimit = callbackGasLimit;
-        i_requestVRFPerWinner = requestVRFPerWinner;
 
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
@@ -184,7 +189,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         _grantRole(TREASURY_ROLE, _msgSender());
         _grantRole(SORTER_ROLE, _msgSender());
 
-        emit ContractDeployed(address(rewardGuildBank));
+        emit ContractDeployed(address(treasury));
+
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -195,12 +201,16 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
 
     /// @dev Can only be called by the contract owner
     function add(
-        IERC20 _rewardToken,
-        uint256 _tokenAllocationStartTime,
-        uint256 _pledgeingEndTime,
-        uint256 _targetRaise,
-        uint256 _maxPledgingAmountPerUser,
-        uint32 _winnersCount,
+        IERC20 _rewardToken, // Address of the reward token contract.
+        uint256 _pledgingStartTime, // Pledging will be permitted since this date
+        uint256 _pledgingEndTime, // Before this Time pledge is permitted
+        uint256 _maxPledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
+        uint256 _tokenAllocationPerBlock, // the amount of token will be released to lottery winners per month
+        uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
+        uint256 _tokenAllocationPerShare, // amount of token will be allocated per investers share(usdt) per month.
+        uint256 _targetRaise, // Amount that the project wishes to raise
+        uint32[] calldata _tiers,
+
         bool _withUpdate
     ) public onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
@@ -209,27 +219,53 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
             "add: _rewardToken is zero address"
         );
         require(
-            _tokenAllocationStartTime < _pledgeingEndTime,
+            _tokenAllocationStartTime < _pledgingEndTime,
             "add: _tokenAllocationStartTime must be before pledging end"
         );
+        require(
+            _pledgingStartTime < _pledgingEndTime,
+            "add: _pledgingStartTime should be before _pledgingEndTime"
+        );
+
         require(_targetRaise > 0, "add: Invalid raise amount");
 
         if (_withUpdate) {
             massUpdatePools();
         }
 
+        uint32 winnersCount=0;
+        BionicStructs.Tier[] memory tiers=new BionicStructs.Tier[](_tiers.length);
+        for (uint i=0;i<_tiers.length;i++){
+            tiers[i]=BionicStructs.Tier({
+                count:_tiers[i],
+                members: new address[](0)
+            });
+            winnersCount+=_tiers[i];
+        }
+
         poolInfo.push(
             BionicStructs.PoolInfo({
                 rewardToken: _rewardToken,
-                tokenAllocationStartTime: _tokenAllocationStartTime,
-                pledgingEndTime: _pledgeingEndTime,
-                targetRaise: _targetRaise,
+                pledgingStartTime: _pledgingStartTime,
+                pledgingEndTime: _pledgingEndTime,
                 maxPledgingAmountPerUser: _maxPledgingAmountPerUser,
-                winnersCount:_winnersCount
+                tokenAllocationPerBlock: _tokenAllocationPerBlock,
+                tokenAllocationStartTime: _tokenAllocationStartTime,
+                tokenAllocationPerShare: _tokenAllocationPerShare,
+                targetRaise: _targetRaise,
+                winnersCount: winnersCount
             })
         );
 
+
+
         pid=poolInfo.length.sub(1);
+
+        poolIdToTiers[pid]=tiers;
+
+
+
+
         poolIdToLastPercentageAllocTime[
             pid
         ] = _tokenAllocationStartTime;
@@ -283,7 +319,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
             ICurrencyPermit(_msgSender()).permit(
                 address(investingToken),
                 address(this),
-                userTotalPledge[_msgSender()],
+                _amount,
                 deadline,
                 v,
                 r,
@@ -302,30 +338,42 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
                 }
             }
         }
-        // stakingToken.safeTransferFrom(address(_msgSender()), address(this), _amount);
+        stackPledge(_msgSender(),_pid,_amount);
     }
 
-    function getPledgeFundingAmount(
-        uint256 _pid
-    ) public view returns (uint256) {
-        require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
-        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
-        BionicStructs.UserInfo memory user = userInfo[_pid].get(_msgSender());
+    /// @notice Add user members to Lottery Tiers
+    /// @dev Will need to happen before initiating the raffle it self
+    /// @param pid the poolId of the tier
+    /// @param tierId tierId of the poolId needs to be updated
+    /// @param members members for this tier to be considered in raffle
+    function addToTier(uint256 pid,uint256 tierId, address[] memory members) external nonReentrant onlyRole(SORTER_ROLE){
+        if (!userInfo[pid].contains(members)){
+            revert LPFRWV__TierMembersShouldHaveAlreadyPledged(pid,tierId);
+        }
+        _addToTier(pid, tierId, members);
+    }
 
-        (
-            uint256 accPercentPerShare,
+    /**
+     * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
+     */
+    function preDraw(uint256 _pid) internal{
+        //check all tiers except last(all other users) has members
+        BionicStructs.Tier[] storage tiers=poolIdToTiers[_pid];
+        address[] memory lastTierMembers = userInfo[_pid].keys;
+        for (uint k = 0; k < tiers.length-1; k++) {
+            console.log("tier %d has %d members remainig %d",k,tiers[k].members.length,lastTierMembers.length);
+            if(tiers[k].members.length<1){
+                revert LPFRWV__TiersHaveNotBeenInitialized();
+            }
+            lastTierMembers=Utils.excludeAddresses(lastTierMembers,tiers[k].members);
+        }
+        //check if last tier is empty add rest of people pledged to the tier
+        if(tiers[tiers.length-1].members.length<1){
+            _addToTier(_pid, tiers.length-1, lastTierMembers);
+            // tiers[tiers.length-1].members=lastTierMembers;
+        }
+        console.log("last tier has %d members",tiers[tiers.length-1].members.length);
 
-        ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-
-        uint256 userPercentageAllocated = user
-            .amount
-            .mul(accPercentPerShare)
-            .div(1e18)
-            .sub(user.tokenAllocDebt);
-        return
-            userPercentageAllocated.mul(pool.targetRaise).div(
-                TOTAL_TOKEN_ALLOCATION_POINTS
-            );
     }
 
     /**
@@ -337,20 +385,16 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         if(_pid >= poolInfo.length)
             revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[_pid];
-        if(pool.tokenAllocationStartTime > block.timestamp) 
-            revert LPFRWV__PoolIsOnPledgingPhase(pool.tokenAllocationStartTime);
+        if(pool.pledgingEndTime > block.timestamp) //solhint-disable-line not-rely-on-time
+            revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
         if(poolIdToRequestId[_pid]!=0)
             revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
+            
+        preDraw(_pid);
 
-        requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
-            i_requestVRFPerWinner ? pool.winnersCount : 1
-        );
-        poolIdToRequestId[_pid]=requestId;
-        requestIdToPoolId[requestId]=_pid;
+        requestId = _draw(_pid,pool.winnersCount);
+
+
 
         emit DrawInitiated(_pid,requestId);
     }
@@ -363,32 +407,33 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
-        uint pid=requestIdToPoolId[requestId];
-
-        BionicStructs.PoolInfo memory pool = poolInfo[pid];
-        address[] memory winners;
-
-        if(pool.winnersCount>=userInfo[pid].size()){
-            winners=userInfo[pid].keys;
-        }else{
-            if(i_requestVRFPerWinner){
-                if (randomWords.length!=pool.winnersCount) 
-                    revert LPFRWV__NotEnoughRandomWordsForLottery();
-                
-                for (uint i=0;i<pool.winnersCount;i++){
-                    winners[i]=userInfo[pid].getKeyAtIndex(randomWords[i] % userInfo[pid].size());
-                }
-            }else{ //just get one word and calculate other random values off of it
-                uint256 rand=randomWords[0];
-                for (uint32 i=0;i<pool.winnersCount;i++){
-                    winners[i]=userInfo[pid].getKeyAtIndex(rand % userInfo[pid].size());
-                    rand=uint256(keccak256(abi.encodePacked(rand,block.prevrandao,block.chainid,i)));
-                }
-            }
-        }
-
-        fundUserPledge(pid,winners);
+        console.log("called fulfillment %d", gasleft());
+        uint pid = requestIdToPoolId[requestId];
+        address[] memory winners=pickWinners(pid,randomWords);
+        console.log("gas %d", gasleft());
+        console.log("picked winners");
+        // uint256 pid=requestIdToPoolId[requestId];
+        postLottery(pid,winners);
     }
+
+    function postLottery(uint256 pid,address[] memory winners) internal{
+        // todo return lossers pledges;
+        address[] memory losers = userInfo[pid].keys;
+        console.log("losers %d winners %d",losers.length,winners.length);
+        losers=Utils.excludeAddresses(losers,winners);
+        console.log("losers %d",losers.length);
+        for (uint i = 0; i < losers.length; i++) {
+            BionicStructs.UserInfo storage u=userInfo[pid].get(losers[i]);
+            console.log("losers owes %d  ,%d",u.amount,gasleft());
+            uint256 refund=u.amount;
+            u.amount=0;
+            treasury.withdrawTo(investingToken,losers[i],refund);
+            emit LotteryRefunded(losers[i],pid,refund);
+            userInfo[pid].set(losers[i], u);
+        }
+    }
+
+
 
     // // step 2
     // function fundPledge(uint256 _pid) external payable nonReentrant {
@@ -713,13 +758,39 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
         address _to,
         uint256 _amount
     ) private {
-        uint256 bal = rewardGuildBank.tokenBalance(_rewardToken);
+        uint256 bal = treasury.tokenBalance(_rewardToken);
         if (_amount > bal) {
-            rewardGuildBank.withdrawTo(_rewardToken, _to, bal);
+            treasury.withdrawTo(_rewardToken, _to, bal);
         } else {
-            rewardGuildBank.withdrawTo(_rewardToken, _to, _amount);
+            treasury.withdrawTo(_rewardToken, _to, _amount);
         }
     }
+    function stackPledge(address account,uint256 pid,uint256 _amount) private {
+        try
+            TokenBoundAccount(payable(account)).transferCurrency(
+                address(investingToken),
+                address(treasury),
+                _amount) 
+                returns (bool res)
+            {
+                if(res)
+                    emit PledgeFunded(account, pid, _amount);
+                else 
+                    revert LPFRWV__FundingPledgeFailed(account,pid);
+            } catch (bytes memory reason) {
+                if (reason.length == 0) {
+                    revert ICurrencyPermit__NoReason();
+                } else {
+                    /// @solidity memory-safe-assembly
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                }
+            }
+    }
+
+
+
     /// @dev invest on the pool via already pledged amount of investing token provided by user.
     /// @dev todo maybe instead of reverting on onunsuccessfull transfer emit an event?
     function fundUserPledge(
@@ -741,9 +812,13 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
                         address(investingToken),
                         address(this),
                         user.amount) 
-                        returns (bool /* res */)
+                        returns (bool res)
                     {
-                        emit PledgeFunded(userAddress, _pid, user.amount);
+                        if(res)
+                            emit PledgeFunded(userAddress, _pid, user.amount);
+                        else 
+                            revert LPFRWV__FundingPledgeFailed(userAddress,_pid);
+
                     } catch (bytes memory reason) {
                         if (reason.length == 0) {
                             revert ICurrencyPermit__NoReason();
@@ -766,7 +841,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
     function getMultiplier(
         uint256 _from,
         uint256 _to
-    ) private view returns (uint256) {
+    ) private pure returns (uint256) {
+
         return _to.sub(_from);
     }
 
@@ -804,9 +880,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,VRFConsumerBaseV2, 
                 }
             }
         }
-
-        (, address tokenContract, ) = TokenBoundAccount(payable(_msgSender()))
-            .token();
 
         _;
     }
