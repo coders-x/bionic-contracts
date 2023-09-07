@@ -15,7 +15,7 @@ error ErrNotEnoughTokenLeft(address token); //"Not enough tokens available for c
 contract ClaimingContract is Ownable {
     using SafeMath for uint256;
 
-    uint256 constant MONTH_IN_SECONDS = 2629746; // Approx 1 month 
+    uint256 private constant MONTH_IN_SECONDS = 2629746; // Approx 1 month 
 
     struct UserClaim {
         uint256 lastClaimMonth; // Month when the user last claimed tokens
@@ -29,9 +29,9 @@ contract ClaimingContract is Ownable {
     }
 
     // User's claim history for each project token useraddress => tokenAddress => UserClaim
-    mapping(address => mapping(address => UserClaim)) public s_userClaims;
+    mapping(address => mapping(address => UserClaim)) public s_userClaims; //solhint-disable-line var-name-mixedcase
     // Add more project tokens here
-    mapping(address => ProjectToken) public s_projectTokens;
+    mapping(address => ProjectToken) public s_projectTokens; //solhint-disable-line var-name-mixedcase
 
 
     event ProjectAdded(IERC20 token, uint256 monthlyAmount, uint256 startMonth, uint256 endMonth);
@@ -142,10 +142,10 @@ contract ClaimingContract is Ownable {
 
 
     function getClaimableMonthsCount(uint256 startMonth, uint256 lastClaimedMonth) internal view returns (uint256) {
-        return ((block.timestamp-startMonth) / MONTH_IN_SECONDS)-lastClaimedMonth; 
+        return ((block.timestamp-startMonth) / MONTH_IN_SECONDS)-lastClaimedMonth; // solhint-disable-line not-rely-on-time
     }
 
     function getCurrentMonth() internal view returns (uint256) {
-        return block.timestamp / MONTH_IN_SECONDS; 
+        return block.timestamp / MONTH_IN_SECONDS; // solhint-disable-line not-rely-on-time
     }
 }
