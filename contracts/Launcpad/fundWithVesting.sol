@@ -17,6 +17,7 @@ import {Utils} from "../libs/Utils.sol";
 import {TokenBoundAccount} from "../TBA.sol";
 
 import {Treasury} from "./Treasury.sol";
+import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
 import "hardhat/console.sol";
 
@@ -65,6 +66,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
 
     /// @notice Container for holding all rewards
     Treasury public treasury;
+
+    /// @notice Container for holding all rewards
+    ClaimFunding public claimFund;
 
 
     /// @notice List of pools that users can stake into
@@ -181,6 +185,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         stakingToken = _stakingToken;
         investingToken = _investingToken;
         treasury = new Treasury(address(this));
+        claimFund = new ClaimFunding();
 
 
 
@@ -205,27 +210,28 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
         uint256 _maxPledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
-        uint256 _tokenAllocationPerBlock, // the amount of token will be released to lottery winners per month
+        uint256 _tokenAllocationPerMonth, // the amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
-        uint256 _tokenAllocationPerShare, // amount of token will be allocated per investers share(usdt) per month.
+        uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
         uint32[] calldata _tiers,
 
         bool _withUpdate
-    ) public onlyRole(BROKER_ROLE) returns (uint256 pid) {
+    ) external onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
         require(
             rewardTokenAddress != address(0),
             "add: _rewardToken is zero address"
         );
         require(
-            _tokenAllocationStartTime < _pledgingEndTime,
-            "add: _tokenAllocationStartTime must be before pledging end"
-        );
-        require(
             _pledgingStartTime < _pledgingEndTime,
             "add: _pledgingStartTime should be before _pledgingEndTime"
         );
+        require(
+            _tokenAllocationStartTime > _pledgingEndTime,
+            "add: _tokenAllocationStartTime must be after pledging end"
+        );
+
 
         require(_targetRaise > 0, "add: Invalid raise amount");
 
@@ -249,9 +255,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
                 pledgingStartTime: _pledgingStartTime,
                 pledgingEndTime: _pledgingEndTime,
                 maxPledgingAmountPerUser: _maxPledgingAmountPerUser,
-                tokenAllocationPerBlock: _tokenAllocationPerBlock,
+                tokenAllocationPerMonth: _tokenAllocationPerMonth,
                 tokenAllocationStartTime: _tokenAllocationStartTime,
-                tokenAllocationPerShare: _tokenAllocationPerShare,
+                tokenAllocationMonthCount: _tokenAllocationMonthCount,
                 targetRaise: _targetRaise,
                 winnersCount: winnersCount
             })
@@ -269,6 +275,14 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         poolIdToLastPercentageAllocTime[
             pid
         ] = _tokenAllocationStartTime;
+
+        try claimFund.registerProjectToken(address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
+        }catch (bytes memory reason) {
+            /// @solidity memory-safe-assembly
+            assembly {
+                revert(add(32, reason), mload(reason))
+            }
+        }
 
         emit PoolAdded(pid);
     }

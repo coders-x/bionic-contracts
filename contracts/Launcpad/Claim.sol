@@ -15,7 +15,7 @@ error ErrNothingToClaim();
 error ErrNotEligible(); //"User is not assigned claims for this project."
 error ErrNotEnoughTokenLeft(address token); //"Not enough tokens available for claiming. Please try Again"
 
-contract ClaimingContract is Ownable {
+contract ClaimFunding is Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
 

@@ -10,14 +10,14 @@ import "./Claim.sol";
 contract ClaimingContractTest is DSTest,Test {
   uint256 public constant MONTH_IN_SECONDS = 2629746;// Approx 1 month (assuming 15 seconds per block)
 
-  ClaimingContract private claimingContract; 
+  ClaimFunding private claimingContract; 
   ERC20Mock private rewardToken; 
   ERC20Mock private rewardToken2; 
   address private owner=address(this);
   address[] private  winners=[address(1),address(2),address(3)];
 
   function setUp() public {
-    claimingContract = new ClaimingContract();
+    claimingContract = new ClaimFunding();
     rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
     rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
   }
