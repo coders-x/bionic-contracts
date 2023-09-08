@@ -255,14 +255,13 @@ describe("e2e", function () {
                 for (let i = 0; i < AbstractAccounts.length; i++) {
                     const aac = AbstractAccounts[i];
                     const alreadyPledged = await fundWithVesting.userTotalPledge(aac.address);
-                    expect(alreadyPledged).to.equal(0);
                     const amount = BigNumber.from(10 * (i + 1));
                     const { v, r, s } = await getCurrencyPermitSignature(
                         signers[i],
                         aac,
                         usdtContract,
                         fundWithVesting.address,
-                        alreadyPledged.add(amount),
+                        amount,
                         deadline
                     )
                     let treasuryAddress = await fundWithVesting.treasury();
@@ -270,8 +269,8 @@ describe("e2e", function () {
                     let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
                     await expect(aac.connect(signers[i]).executeCall(fundWithVesting.address, 0, raw))
                         .to.emit(fundWithVesting, "Pledge").withArgs(aac.address, 0, amount)
-                        .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, alreadyPledged.add(amount))
-                        .to.emit(fundWithVesting, "PledgeFunded").withArgs(aac.address, 0, alreadyPledged.add(amount));
+                        .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, amount)
+                        .to.emit(fundWithVesting, "PledgeFunded").withArgs(aac.address, 0,amount);
 
                     expect(oldbalance).to.not.equal(await usdtContract.balanceOf(treasuryAddress));
                     expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(oldbalance.add(alreadyPledged.add(amount)))

@@ -235,9 +235,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
 
         require(_targetRaise > 0, "add: Invalid raise amount");
 
-        if (_withUpdate) {
-            massUpdatePools();
-        }
 
         uint32 winnersCount=0;
         BionicStructs.Tier[] memory tiers=new BionicStructs.Tier[](_tiers.length);
@@ -298,9 +295,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         bytes32 s
     ) external nonReentrant onlyBionicAccount {
         require(_pid < poolInfo.length, "pledge: Invalid PID");
-
-
-
         BionicStructs.PoolInfo storage pool = poolInfo[_pid];
         BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
 
@@ -316,7 +310,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             "pledge: time window of pledging for this pool has passed"
         );
 
-        updatePool(_pid);
 
         user.amount = user.amount.add(_amount);
         userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(
