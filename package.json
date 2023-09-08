@@ -2,6 +2,7 @@
   "name": "hardhat-project",
   "devDependencies": {
     "@chainlink/contracts": "^0.6.1",
+    "@foundry-rs/hardhat-forge": "^0.1.17",
     "@nomicfoundation/hardhat-foundry": "^1.0.2",
     "@nomicfoundation/hardhat-toolbox": "^2.0.2",
     "@nomiclabs/hardhat-ethers": "^2.2.2",

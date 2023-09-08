@@ -4,8 +4,8 @@ pragma solidity >=0.7.0 <0.9.0;
 import {IERC721,IERC165} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
-import {ERC6551AccountLib} from "./reference/src/lib/ERC6551AccountLib.sol";
-import {IERC6551Account} from "./reference/src/interfaces/IERC6551Account.sol";
+import {ERC6551AccountLib} from "erc6551/src/lib/ERC6551AccountLib.sol";
+import {IERC6551Account} from "erc6551/src/interfaces/IERC6551Account.sol";
 import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 import {Account,IEntryPoint,Ownable,ECDSA} from "./libs/Account.sol";
 
@@ -19,7 +19,7 @@ import {Account,IEntryPoint,Ownable,ECDSA} from "./libs/Account.sol";
 /// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
 /// @notice Fork of TokenBoundAccount.sol from Thirdweb
 /// @dev TokenBoundAccount that gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
-contract TokenBoundAccount is
+abstract contract TokenBoundAccount is
     ICurrencyPermit,
     IERC6551Account,
     IERC165,
@@ -157,7 +157,7 @@ contract TokenBoundAccount is
         return _allowances[currency][spender];
     }
 
-    function owner() public view override (IERC6551Account,Ownable) returns (address) {
+    function owner() public view override (Ownable) returns (address) {
         (
             uint256 chainId,
             address tokenContract,
