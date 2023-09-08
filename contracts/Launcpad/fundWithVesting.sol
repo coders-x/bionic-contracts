@@ -294,7 +294,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         bytes32 r,
         bytes32 s
     ) external nonReentrant onlyBionicAccount {
-        require(_pid < poolInfo.length, "pledge: Invalid PID");
+        if(_pid >= poolInfo.length){
+            revert LPFRWV__InvalidPool();
+        }
         BionicStructs.PoolInfo storage pool = poolInfo[_pid];
         BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
 

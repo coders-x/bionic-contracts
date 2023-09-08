@@ -2,7 +2,8 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20Upgradeable, TokenBoundAccount, BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding }
+import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20Upgradeable, TokenBoundAccount, 
+    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding }
     from "../typechain-types";
 import { BytesLike } from "ethers";
 
@@ -227,7 +228,7 @@ describe("e2e", function () {
             it("Should fail if Pool doesn't Exist", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [10000, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
-                    .to.be.revertedWith("pledge: Invalid PID")//("pledge: Invalid PID");
+                    .to.be.revertedWithCustomError(fundWithVesting,"LPFRWV__InvalidPool")//("pledge: Invalid PID");
             });
             it("Should fail if not enough amount pledged", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 0, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
