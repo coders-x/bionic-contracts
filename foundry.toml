@@ -4,3 +4,11 @@ out = 'out'
 libs = ['node_modules', 'lib']
 test = 'test'
 cache_path = 'cache_forge'
+solc_version = "0.8.20"
+optimizer = true
+optimizer_runs = 1000
+
+remappings = [
+    "@openzeppelin/=node_modules/@openzeppelin/",
+    "lib/erc6551:@openzeppelin/=node_modules/@openzeppelin/",
+]

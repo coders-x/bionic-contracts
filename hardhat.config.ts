@@ -4,7 +4,6 @@ import "@nomiclabs/hardhat-ethers";
 import "@openzeppelin/hardhat-upgrades";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomicfoundation/hardhat-foundry";
-import "@foundry-rs/hardhat-forge";
 import dotenv from "dotenv";
 dotenv.config()
 
@@ -12,7 +11,7 @@ dotenv.config()
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.18",
+    version: "0.8.20",
     settings: {
       viaIR: true,
       optimizer: {

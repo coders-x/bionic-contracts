@@ -19,7 +19,7 @@ import {Account,IEntryPoint,Ownable,ECDSA} from "./libs/Account.sol";
 /// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
 /// @notice Fork of TokenBoundAccount.sol from Thirdweb
 /// @dev TokenBoundAccount that gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
-abstract contract TokenBoundAccount is
+contract TokenBoundAccount is
     ICurrencyPermit,
     IERC6551Account,
     IERC165,
@@ -29,6 +29,7 @@ abstract contract TokenBoundAccount is
                             States
     //////////////////////////////////////////////////////////////*/
     using Counters for Counters.Counter;
+    uint256 public state;
 
     mapping(address => Counters.Counter) private _nonces;
     /**
@@ -202,6 +203,14 @@ abstract contract TokenBoundAccount is
         return interfaceId == type(IERC6551Account).interfaceId || super.supportsInterface(interfaceId);
     }
 
+    function isValidSigner(address signer, bytes calldata) external view returns (bytes4) {
+        if (signer == owner()) {
+            return IERC6551Account.isValidSigner.selector;
+        }
+        return bytes4(0);
+    }
+
+
     /*///////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
@@ -210,6 +219,7 @@ abstract contract TokenBoundAccount is
         uint256 value,
         bytes memory _calldata
     ) internal virtual override returns (bytes memory result) {
+        state++;
         bool success;
         (success, result) = _target.call{value: value}(_calldata);
         if (!success) {
@@ -218,7 +228,6 @@ abstract contract TokenBoundAccount is
             }
         }
     }
-
     /**
      * @dev Updates `owner` s allowance for `spender` based on spent `amount`.
      *
