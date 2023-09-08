@@ -24,10 +24,10 @@ const NETWORK_CONFIG = {
 };
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-    ERC6551_REGISTERY_ADDR = "0x02101dfB77FDE026414827Fdc604ddAF224F0921",
+    ERC6551_REGISTERY_ADDR = "0x953cbf74fD8736C97c61fc1c0f2b8A2959e5A328",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
-    ACCOUNT_ADDRESS = "0x6e9f8116F6a82C6039D4C905C00166C04579221f",
+    ACCOUNT_ADDRESS = "0x953cbf74fD8736C97c61fc1c0f2b8A2959e5A328",
     CALLBACK_GAS_LIMIT = 300000,
     WINNERS_COUNT = 5,
     PLEDGING_START_TIME = 20000000,
@@ -47,7 +47,8 @@ describe("e2e", function () {
         client = signers[0];
         bionicContract = await deployBionic();
         bipContract = await deployBIP();
-        tokenBoundContractRegistry = await ethers.getContractAt("ERC6551Registry", ERC6551_REGISTERY_ADDR);
+        let TokenBoundContractRegistryFacory = await ethers.getContractFactory("ERC6551Registry");
+        tokenBoundContractRegistry=await TokenBoundContractRegistryFacory.deploy();
         usdtContract = await ethers.getContractAt("ERC20Upgradeable", USDT_ADDR);
         tokenBoundImpContract = await deployTBA();
         bionicDecimals = await bionicContract.decimals();
@@ -66,7 +67,6 @@ describe("e2e", function () {
         await usdtContract.connect(whale).transfer(abstractedAccount.address, HUNDRED_THOUSAND);
         whaleBal = await usdtContract.balanceOf(USDT_WHALE);
         tokenBoundAccBal = await usdtContract.balanceOf(abstractedAccount.address);
-
         AbstractAccounts = [abstractedAccount];
         for (let i = 0; i < 10; i++) {
             //mint BIP 
@@ -78,7 +78,7 @@ describe("e2e", function () {
             res = await tokenBoundContractRegistry.createAccount(tokenBoundImpContract.address,
                 network.config.chainId as number, bipContract.address,
                 i, "0", []);
-            let newAcc = await res.wait();
+            let newAcc = await res.wait(1);
             let acc = await ethers.getContractAt("TokenBoundAccount", newAcc?.events[0]?.args?.account);
             await usdtContract.connect(whale).transfer(acc.address, HUNDRED_THOUSAND);
             AbstractAccounts.push(acc);
@@ -196,12 +196,12 @@ describe("e2e", function () {
             const maxPledgingAmountPerUser=1000,tokenAllocationPerMonth=100,tokenAllocationStartTime=PLEDGING_END_TIME + 1000,tokenAllocationMonthCount=10,targetRaise=maxPledgingAmountPerUser*maxPledgingAmountPerUser
             it("Should fail if the not BROKER", async function () {
                 await expect(fundWithVesting.connect(client)
-                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, maxPledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION, false))
+                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, maxPledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await fundWithVesting.hasRole(await fundWithVesting.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(fundWithVesting.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, maxPledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION, false))
+                await expect(fundWithVesting.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, maxPledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION))
                     .to.emit(fundWithVesting, "PoolAdded").withArgs(0)
                     .to.emit(claimContract,"ProjectAdded").withArgs(bionicContract.address,tokenAllocationPerMonth,tokenAllocationStartTime,tokenAllocationMonthCount);
             });
@@ -355,12 +355,12 @@ describe("e2e", function () {
 
             it("Should Receive Random words and chose winners", async () => {
                 const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
-                const winners = ["0x1E78A4a08e885dbd42B981C054a9Cf71f7230afD",
-                    "0xc5C7dBdF73B06fc60BE777A59605dA28A064fdb6",
-                    "0xcBe55885F8C8d48dD729c336dba3f29a15d5F436",
-                    "0x744326EcB8EA6CE498c750315B5bBC5AA7c0C436",
-                    "0x83A898b99ecC709267Dfe4970B20b35F85e347D9",
-                    "0x9Edd13C0F16D3E522A2b789dBf5ffD331ED56e96",]
+                const winners = ["0xbE62883bBb6472E48D7119E0fd37652856787eFd",
+                    "0x27aA667A47222Fc59D354fd32044b23bd2a0A34E",
+                    "0x24B559cC9940Da75D1760E00D9d2377A00e1c713",
+                    "0xAF916484351A093C7508153f27ED9141d18910BA",
+                    "0xC29578ABA49a18c319751025B04249a476998286",
+                    "0xa77009A01c1E25c1b6d9e9B779cFB6Da16C0D38D",]
                 expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
                 expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(30));
                 // simulate callback from the oracle network
