@@ -25,6 +25,14 @@ import "hardhat/console.sol";
 /* Errors */
 error LPFRWV__NotDefinedError();
 error LPFRWV__InvalidPool();
+error LPFRWV__ExceededMaximumPledge(uint amount);
+error LPFRWV__InvalidRewardToken();//"constructor: _stakingToken must not be zero address"
+error LPFRWV__InvalidStackingToken();//"constructor: _investingToken must not be zero address"
+error LPFRWV__InvalidInvestingToken();//"constructor: _investingToken must not be zero address"
+error LPFRWV__PledgeStartAndPledgeEndNotValid();//"add: _pledgingStartTime should be before _pledgingEndTime"
+error LPFRWV__AllocationShouldBeAfterPledgingEnd();//"add: _tokenAllocationStartTime must be after pledging end"
+error LPFRWV__TargetToBeRaisedMustBeMoreThanZero();
+error LPFRWV__PledgingHasClosed();
 error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
 error LPFRWV__NotEnoughRandomWordsForLottery();
@@ -167,19 +175,16 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint32 callbackGasLimit,
         bool requestVRFPerWinner
     ) Raffle(vrfCoordinatorV2,gasLane,subscriptionId,callbackGasLimit,requestVRFPerWinner) {
+        if(address(_stakingToken)==address(0)){
+            revert LPFRWV__InvalidRewardToken();
+        }
+        if(address(_investingToken)==address(0)){
+            revert LPFRWV__InvalidStackingToken();
+        }
+        if(address(_bionicInvestorPass)==address(0)){
+            revert LPFRWV__InvalidInvestingToken();
+        }
 
-        require(
-            address(_stakingToken) != address(0),
-            "constructor: _stakingToken must not be zero address"
-        );
-        require(
-            address(_investingToken) != address(0),
-            "constructor: _investingToken must not be zero address"
-        );
-        require(
-            _bionicInvestorPass != address(0),
-            "constructor: _investingToken must not be zero address"
-        );
 
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
@@ -218,21 +223,20 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
 
     ) external onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
-        require(
-            rewardTokenAddress != address(0),
-            "add: _rewardToken is zero address"
-        );
-        require(
-            _pledgingStartTime < _pledgingEndTime,
-            "add: _pledgingStartTime should be before _pledgingEndTime"
-        );
-        require(
-            _tokenAllocationStartTime > _pledgingEndTime,
-            "add: _tokenAllocationStartTime must be after pledging end"
-        );
+        if(rewardTokenAddress==address(0)){
+            revert LPFRWV__InvalidRewardToken();
+        }
+        if(_pledgingStartTime>=_pledgingEndTime){
+            revert LPFRWV__PledgeStartAndPledgeEndNotValid();
+        }
+        if(_tokenAllocationStartTime <= _pledgingEndTime){
+            revert LPFRWV__AllocationShouldBeAfterPledgingEnd();
+        }
 
+        if(_targetRaise==0){
+            revert LPFRWV__TargetToBeRaisedMustBeMoreThanZero();
+        }
 
-        require(_targetRaise > 0, "add: Invalid raise amount");
 
 
         uint32 winnersCount=0;
@@ -271,8 +275,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         poolIdToLastPercentageAllocTime[
             pid
         ] = _tokenAllocationStartTime;
-
-        try claimFund.registerProjectToken(address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
+            try claimFund.registerProjectToken(address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
         }catch (bytes memory reason) {
             /// @solidity memory-safe-assembly
             assembly {
@@ -299,18 +302,13 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         BionicStructs.PoolInfo storage pool = poolInfo[_pid];
         BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
 
-        require(_amount > 0, "pledge: No pledge specified");
-
-        require(
-            user.amount.add(_amount) <= pool.maxPledgingAmountPerUser,
-            "pledge: can not exceed max staking amount per user"
-        );
-        
-        require(
-            block.timestamp >= pool.pledgingEndTime,   // solhint-disable-line not-rely-on-time
-            "pledge: time window of pledging for this pool has passed"
-        );
-
+        require(_amount > 0, "pledge: No pledge specified"); //todo turn it into todo
+        if(user.amount.add(_amount) > pool.maxPledgingAmountPerUser){
+            revert LPFRWV__ExceededMaximumPledge(pool.maxPledgingAmountPerUser);
+        }
+        if(block.timestamp < pool.pledgingEndTime){// solhint-disable-line not-rely-on-time
+            revert LPFRWV__PledgingHasClosed();
+        }
 
         user.amount = user.amount.add(_amount);
         userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(

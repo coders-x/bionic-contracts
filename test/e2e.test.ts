@@ -239,7 +239,7 @@ describe("e2e", function () {
             it("Should fail if pledge exceeds the max user share", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 1001, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
-                    .to.be.revertedWith("pledge: can not exceed max staking amount per user");
+                    .to.be.revertedWithCustomError(fundWithVesting,"LPFRWV__ExceededMaximumPledge").withArgs(1000);
             });
             it("Should fail if expired deadline", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
