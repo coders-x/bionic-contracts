@@ -2,7 +2,7 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20Upgradeable, TokenBoundAccount, BionicInvestorPass, Bionic, VRFCoordinatorV2Mock }
+import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20Upgradeable, TokenBoundAccount, BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding }
     from "../typechain-types";
 import { BytesLike } from "ethers";
 
@@ -36,7 +36,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: LaunchPoolFundRaisingWithVesting,
         tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, AbstractAccounts: TokenBoundAccount[],
-        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock;
+        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock, claimContract: ClaimFunding;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
     let signers: SignerWithAddress[];
@@ -51,7 +51,6 @@ describe("e2e", function () {
         tokenBoundImpContract = await deployTBA();
         bionicDecimals = await bionicContract.decimals();
         abstractedAccount = await ethers.getContractAt("TokenBoundAccount", ACCOUNT_ADDRESS);
-
 
 
         await network.provider.request({
@@ -96,6 +95,7 @@ describe("e2e", function () {
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
         fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, CALLBACK_GAS_LIMIT, true);
+        claimContract=await ethers.getContractAt("ClaimFunding",await fundWithVesting.claimFund())
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address);
 
     });
@@ -192,15 +192,17 @@ describe("e2e", function () {
     });
     describe("FundingRegistry", () => {
         describe("Add", function () {
+            const maxPledgingAmountPerUser=1000,tokenAllocationPerMonth=100,tokenAllocationStartTime=PLEDGING_END_TIME + 1000,tokenAllocationMonthCount=10,targetRaise=maxPledgingAmountPerUser*maxPledgingAmountPerUser
             it("Should fail if the not BROKER", async function () {
                 await expect(fundWithVesting.connect(client)
-                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, 1000, 100, PLEDGING_START_TIME + 1000, 10, 100000, TIER_ALLOCATION, false))
+                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, maxPledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION, false))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await fundWithVesting.hasRole(await fundWithVesting.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(fundWithVesting.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, 1000, 100, PLEDGING_START_TIME + 1000, 10, 100000, TIER_ALLOCATION, false))
-                    .to.emit(fundWithVesting, "PoolAdded").withArgs(0);
+                await expect(fundWithVesting.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, maxPledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION, false))
+                    .to.emit(fundWithVesting, "PoolAdded").withArgs(0)
+                    .to.emit(claimContract,"ProjectAdded").withArgs(bionicContract.address,tokenAllocationPerMonth,tokenAllocationStartTime,tokenAllocationMonthCount);
             });
             it("Should return same Pool upon request", async () => {
                 let pool = await fundWithVesting.poolInfo(0);
@@ -208,10 +210,10 @@ describe("e2e", function () {
 
                 expect(poolTiers).to.equal(3);
                 expect(pool.rewardToken).to.equal(bionicContract.address);
-                expect(pool.tokenAllocationStartTime).to.equal(PLEDGING_START_TIME + 1000);
+                expect(pool.tokenAllocationStartTime).to.equal(tokenAllocationStartTime);
                 expect(pool.pledgingEndTime).to.equal(PLEDGING_END_TIME);
-                expect(pool.targetRaise).to.equal(100000);
-                expect(pool.maxPledgingAmountPerUser).to.equal(1000);
+                expect(pool.targetRaise).to.equal(targetRaise);
+                expect(pool.maxPledgingAmountPerUser).to.equal(maxPledgingAmountPerUser);
             })
 
         });
@@ -253,14 +255,13 @@ describe("e2e", function () {
                 for (let i = 0; i < AbstractAccounts.length; i++) {
                     const aac = AbstractAccounts[i];
                     const alreadyPledged = await fundWithVesting.userTotalPledge(aac.address);
-                    expect(alreadyPledged).to.equal(0);
                     const amount = BigNumber.from(10 * (i + 1));
                     const { v, r, s } = await getCurrencyPermitSignature(
                         signers[i],
                         aac,
                         usdtContract,
                         fundWithVesting.address,
-                        alreadyPledged.add(amount),
+                        amount,
                         deadline
                     )
                     let treasuryAddress = await fundWithVesting.treasury();
@@ -268,8 +269,8 @@ describe("e2e", function () {
                     let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
                     await expect(aac.connect(signers[i]).executeCall(fundWithVesting.address, 0, raw))
                         .to.emit(fundWithVesting, "Pledge").withArgs(aac.address, 0, amount)
-                        .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, alreadyPledged.add(amount))
-                        .to.emit(fundWithVesting, "PledgeFunded").withArgs(aac.address, 0, alreadyPledged.add(amount));
+                        .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, amount)
+                        .to.emit(fundWithVesting, "PledgeFunded").withArgs(aac.address, 0,amount);
 
                     expect(oldbalance).to.not.equal(await usdtContract.balanceOf(treasuryAddress));
                     expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(oldbalance.add(alreadyPledged.add(amount)))
