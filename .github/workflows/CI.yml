@@ -31,5 +31,3 @@ jobs:
       - run: forge install
       - run: npm install
       - run: npm test
-      - name: Run snapshot
-        run: forge snapshot
