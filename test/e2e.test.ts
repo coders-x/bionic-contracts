@@ -28,8 +28,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
     ACCOUNT_ADDRESS = "0x953cbf74fD8736C97c61fc1c0f2b8A2959e5A328",
-    CALLBACK_GAS_LIMIT = 300000,
-    WINNERS_COUNT = 5,
+    CALLBACK_GAS_LIMIT_PER_USER = 45000,
     PLEDGING_START_TIME = 20000000,
     PLEDGING_END_TIME = 40000000,
     TIER_ALLOCATION = [3, 2, 1];
@@ -90,12 +89,11 @@ describe("e2e", function () {
         let { VRFCoordinatorV2MockContract, subscriptionId } = await deployVRFCoordinatorV2Mock();
 
         const keyHash =
-            NETWORK_CONFIG["keyHash"] ||
-            "0xd89b2bf150e3b9e13446986e571fb9cab24b13cea0a43ea20a6049a85cc807cc"
+            NETWORK_CONFIG["keyHash"]
 
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
-        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, CALLBACK_GAS_LIMIT, true);
+        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, CALLBACK_GAS_LIMIT_PER_USER, true);
         claimContract=await ethers.getContractAt("ClaimFunding",await fundWithVesting.claimFund())
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address);
 
