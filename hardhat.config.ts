@@ -13,6 +13,7 @@ const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.20",
     settings: {
+      evmVersion: 'paris', //mumbai doesn't support PUSH0 0.8.20>  https://stackoverflow.com/a/76332341
       viaIR: true,
       optimizer: {
         enabled: true,
@@ -27,10 +28,10 @@ const config: HardhatUserConfig = {
         blockNumber: 38395581
       }
     },
-    // goerli: {
-    //   url: process.env.RPC_URL,
-    //   accounts: [process.env.PRIVATE_KEY || ""],
-    // },
+    goerli: {
+      url: process.env.RPC_URL,
+      accounts: [process.env.PRIVATE_KEY || ""],
+    },
     mumbai: {
       url: process.env.MUMBAI_RPC,
       accounts: [process.env.PRIVATE_KEY || ""],

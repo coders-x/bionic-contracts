@@ -280,15 +280,15 @@ contract VRFCoordinatorV2Mock is VRFCoordinatorV2Interface {
     return 4000000000000000; // 0.004 Ether
   }
 
-  function requestSubscriptionOwnerTransfer(uint64 _subId, address _newOwner) external pure override {
+  function requestSubscriptionOwnerTransfer(uint64 /* _subId */, address /* _newOwner */) external pure override {
     revert("not implemented");
   }
 
-  function acceptSubscriptionOwnerTransfer(uint64 _subId) external pure override {
+  function acceptSubscriptionOwnerTransfer(uint64 /* _subId */) external pure override {
     revert("not implemented");
   }
 
-  function pendingRequestExists(uint64 subId) public view override returns (bool) {
+  function pendingRequestExists(uint64 /* subId */) public view override returns (bool) {
     revert("not implemented");
   }
 }
