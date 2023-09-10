@@ -2,7 +2,7 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20Permit, ERC6551Registry, LaunchPoolFundRaisingWithVesting, ERC20Upgradeable, TokenBoundAccount, 
+import { IERC20Permit, ERC6551Registry, BionicFundRasing, ERC20Upgradeable, TokenBoundAccount, 
     BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding }
     from "../typechain-types";
 import { BytesLike } from "ethers";
@@ -35,7 +35,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     TIER_ALLOCATION = [3, 2, 1];
 
 describe("e2e", function () {
-    let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: LaunchPoolFundRaisingWithVesting,
+    let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: BionicFundRasing,
         tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, AbstractAccounts: TokenBoundAccount[],
         usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock, claimContract: ClaimFunding;
     let owner: SignerWithAddress;
@@ -529,13 +529,13 @@ async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: 
     const UtilsLib = await ethers.getContractFactory("Utils");
     const utils = await UtilsLib.deploy();
     await utils.deployed();
-    const FundWithVestingContract = await ethers.getContractFactory("LaunchPoolFundRaisingWithVesting", {
+    const FundWithVestingContract = await ethers.getContractFactory("BionicFundRasing", {
         libraries: {
             IterableMapping: lib.address,
             Utils: utils.address
         }
     });
-    console.log(`Deploying LaunchPoolFundRaisingWithVesting contract...`);
+    console.log(`Deploying BionicFundRasing contract...`);
     return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass, vrfCoordinatorV2, gaslane, subId, cbGasLimit, reqVRFPerWinner);
 }
 async function deployTBA() {

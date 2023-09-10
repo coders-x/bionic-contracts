@@ -4,7 +4,6 @@ pragma solidity >=0.7.0 <0.9.0;
 import { VRFCoordinatorV2Interface } from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import { VRFConsumerBaseV2 } from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import { BionicStructs } from "../libs/BionicStructs.sol";
-import "hardhat/console.sol";
 
 /* Errors */
 error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);

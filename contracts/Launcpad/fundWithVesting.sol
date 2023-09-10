@@ -19,7 +19,6 @@ import {TokenBoundAccount} from "../TBA.sol";
 import {Treasury} from "./Treasury.sol";
 import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
-import "hardhat/console.sol";
 
 
 /* Errors */
@@ -52,7 +51,7 @@ error LPFRWV__TiersHaveNotBeenInitialized();
 /// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
-contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessControl {
+contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -318,7 +317,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         BionicStructs.Tier[] storage tiers=poolIdToTiers[_pid];
         address[] memory lastTierMembers = userInfo[_pid].keys;
         for (uint k = 0; k < tiers.length-1; k++) {
-            console.log("tier %d has %d members remainig %d",k,tiers[k].members.length,lastTierMembers.length);
             if(tiers[k].members.length<1){
                 revert LPFRWV__TiersHaveNotBeenInitialized();
             }
@@ -329,7 +327,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             _addToTier(_pid, tiers.length-1, lastTierMembers);
             // tiers[tiers.length-1].members=lastTierMembers;
         }
-        console.log("last tier has %d members",tiers[tiers.length-1].members.length);
 
     }
 
@@ -364,11 +361,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
-        console.log("called fulfillment %d", gasleft());
         uint pid = requestIdToPoolId[requestId];
         address[] memory winners=pickWinners(pid,randomWords);
-        console.log("gas %d", gasleft());
-        console.log("picked winners");
         // uint256 pid=requestIdToPoolId[requestId];
         postLottery(pid,winners);
     }
@@ -376,12 +370,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     function postLottery(uint256 pid,address[] memory winners) internal{
         // todo return lossers pledges;
         address[] memory losers = userInfo[pid].keys;
-        console.log("losers %d winners %d",losers.length,winners.length);
         losers=Utils.excludeAddresses(losers,winners);
-        console.log("losers %d",losers.length);
         for (uint i = 0; i < losers.length; i++) {
             BionicStructs.UserInfo storage u=userInfo[pid].get(losers[i]);
-            console.log("losers owes %d  ,%d",u.amount,gasleft());
             uint256 refund=u.amount;
             u.amount=0;
             treasury.withdrawTo(investingToken,losers[i],refund);
