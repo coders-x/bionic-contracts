@@ -3,8 +3,8 @@ pragma solidity >=0.7.0 <0.9.0;
 
 import { VRFCoordinatorV2Interface } from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 import { VRFConsumerBaseV2 } from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import { BionicStructs } from "../libs/BionicStructs.sol";
-import "hardhat/console.sol";
 
 /* Errors */
 error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
@@ -21,6 +21,7 @@ error Raffle__MembersOnlyPermittedInOneTier(address member, uint256 existingTier
  *  @dev This contract implements Chainlink VRF Version 2.
  */
 abstract contract Raffle is VRFConsumerBaseV2 {
+    using SafeMath for uint256;
     enum RaffleState {
         OPEN,
         CALCULATING
@@ -31,7 +32,7 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     uint64 private immutable i_subscriptionId;
     bytes32 private immutable i_gasLane;
-    uint32 private immutable i_callbackGasLimit;
+    uint32 private immutable i_callbackGasPerWinner;
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
 
     // Lottery Variables
@@ -64,7 +65,7 @@ abstract contract Raffle is VRFConsumerBaseV2 {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_gasLane = gasLane;
         i_subscriptionId = subscriptionId;
-        i_callbackGasLimit = callbackGasLimit;
+        i_callbackGasPerWinner = callbackGasLimit;
         i_requestVRFPerWinner = requestVRFPerWinner;
     }
 
@@ -93,7 +94,7 @@ abstract contract Raffle is VRFConsumerBaseV2 {
             i_gasLane,
             i_subscriptionId,
             REQUEST_CONFIRMATIONS,
-            i_callbackGasLimit,
+            i_callbackGasPerWinner*winnersCount,
             i_requestVRFPerWinner ? winnersCount : uint32(poolIdToTiers[pid].length)
         );
 
@@ -149,4 +150,5 @@ abstract contract Raffle is VRFConsumerBaseV2 {
             totalWinners += tiers[i].count;
         }
     }
+
 }

@@ -79,46 +79,33 @@ contract TestIterableMap {
         map.set(
             address(0),
             BionicStructs.UserInfo({
-                amount: 0,
-                pledgeFundingAmount: 0,
-                rewardDebtRewards: 0,
-                tokenAllocDebt: 0
+                amount: 0
             })
         );
         map.set(
             address(1),
             BionicStructs.UserInfo({
-                amount: 100,
-                pledgeFundingAmount: 0,
-                rewardDebtRewards: 0,
-                tokenAllocDebt: 0
+                amount: 100
             })
         );
         map.set(
             address(2),
             BionicStructs.UserInfo({
-                amount: 200,
-                pledgeFundingAmount: 0,
-                rewardDebtRewards: 0,
-                tokenAllocDebt: 0
+                amount: 200
             })
         ); // insert
         map.set(
             address(2),
             BionicStructs.UserInfo({
-                amount: 200,
-                pledgeFundingAmount: 0,
-                rewardDebtRewards: 0,
-                tokenAllocDebt: 0
+                amount: 200
+
             })
         ); // update
         map.set(
             address(3),
             BionicStructs.UserInfo({
-                amount: 300,
-                pledgeFundingAmount: 0,
-                rewardDebtRewards: 0,
-                tokenAllocDebt: 0
+                amount: 300
+
             })
         );
 

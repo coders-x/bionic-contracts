@@ -6,7 +6,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import "forge-std/console.sol";
 
 
 error ErrInvalidProject();  //"Project token not registered. Contact admin to add project tokens"
@@ -67,7 +66,6 @@ contract ClaimFunding is Ownable {
     // Owner can add winning investors
     function addWinningInvestors(address projectToken, address[] calldata investors) external onlyOwner {
         for (uint i = 0; i < investors.length; i++) {
-            console.log("investor added on %d for project %s for user %s",block.timestamp,projectToken,investors[i]);
             s_userProjects[investors[i]].add(projectToken);
             s_userClaims[investors[i]][projectToken] = UserClaim(block.timestamp, 0); // solhint-disable-line not-rely-on-time
         }
@@ -102,7 +100,6 @@ contract ClaimFunding is Ownable {
         UserClaim storage userClaim = s_userClaims[_msgSender()][projectToken];
         ProjectToken memory project = s_projectTokens[projectToken];
         if (userClaim.lastClaim == 0 || userClaim.lastClaim >= project.endMonth) {
-            console.log("last Claim(%s): %d endMonth: %d",_msgSender(),userClaim.lastClaim, project.endMonth);
             s_userProjects[_msgSender()].remove(projectToken);
             revert ErrNotEligible();
         }

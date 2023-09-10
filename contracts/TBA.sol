@@ -4,8 +4,8 @@ pragma solidity >=0.7.0 <0.9.0;
 import {IERC721,IERC165} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Counters} from "@openzeppelin/contracts/utils/Counters.sol";
-import {ERC6551AccountLib} from "./reference/src/lib/ERC6551AccountLib.sol";
-import {IERC6551Account} from "./reference/src/interfaces/IERC6551Account.sol";
+import {ERC6551AccountLib} from "erc6551/src/lib/ERC6551AccountLib.sol";
+import {IERC6551Account} from "erc6551/src/interfaces/IERC6551Account.sol";
 import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 import {Account,IEntryPoint,Ownable,ECDSA} from "./libs/Account.sol";
 
@@ -29,6 +29,7 @@ contract TokenBoundAccount is
                             States
     //////////////////////////////////////////////////////////////*/
     using Counters for Counters.Counter;
+    uint256 public state;
 
     mapping(address => Counters.Counter) private _nonces;
     /**
@@ -157,7 +158,7 @@ contract TokenBoundAccount is
         return _allowances[currency][spender];
     }
 
-    function owner() public view override (IERC6551Account,Ownable) returns (address) {
+    function owner() public view override (Ownable) returns (address) {
         (
             uint256 chainId,
             address tokenContract,
@@ -202,6 +203,14 @@ contract TokenBoundAccount is
         return interfaceId == type(IERC6551Account).interfaceId || super.supportsInterface(interfaceId);
     }
 
+    function isValidSigner(address signer, bytes calldata) external view returns (bytes4) {
+        if (signer == owner()) {
+            return IERC6551Account.isValidSigner.selector;
+        }
+        return bytes4(0);
+    }
+
+
     /*///////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
@@ -210,6 +219,7 @@ contract TokenBoundAccount is
         uint256 value,
         bytes memory _calldata
     ) internal virtual override returns (bytes memory result) {
+        state++;
         bool success;
         (success, result) = _target.call{value: value}(_calldata);
         if (!success) {
@@ -218,7 +228,6 @@ contract TokenBoundAccount is
             }
         }
     }
-
     /**
      * @dev Updates `owner` s allowance for `spender` based on spent `amount`.
      *

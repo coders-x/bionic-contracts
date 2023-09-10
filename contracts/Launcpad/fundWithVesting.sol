@@ -7,7 +7,7 @@ import {SafeERC20,IERC20,Address} from "@openzeppelin/contracts/token/ERC20/util
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {AccessControl,IERC165} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {IERC6551Account} from "../reference/src/interfaces/IERC6551Account.sol";
+import {IERC6551Account} from "erc6551/src/interfaces/IERC6551Account.sol";
 
 
 import {IterableMapping} from  "../libs/IterableMapping.sol";
@@ -19,18 +19,26 @@ import {TokenBoundAccount} from "../TBA.sol";
 import {Treasury} from "./Treasury.sol";
 import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
-import "hardhat/console.sol";
 
 
 /* Errors */
 error LPFRWV__NotDefinedError();
 error LPFRWV__InvalidPool();
+error LPFRWV__NotValidPledgeAmount(uint amount);
+error LPFRWV__InvalidRewardToken();//"constructor: _stakingToken must not be zero address"
+error LPFRWV__InvalidStackingToken();//"constructor: _investingToken must not be zero address"
+error LPFRWV__InvalidInvestingToken();//"constructor: _investingToken must not be zero address"
+error LPFRWV__PledgeStartAndPledgeEndNotValid();//"add: _pledgingStartTime should be before _pledgingEndTime"
+error LPFRWV__AllocationShouldBeAfterPledgingEnd();//"add: _tokenAllocationStartTime must be after pledging end"
+error LPFRWV__TargetToBeRaisedMustBeMoreThanZero();
+error LPFRWV__PledgingHasClosed();
 error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
 error LPFRWV__NotEnoughRandomWordsForLottery();
 error LPFRWV__FundingPledgeFailed(address user, uint pid);
 error LPFRWV__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
 error LPFRWV__TiersHaveNotBeenInitialized();
+error LPFRWV__AlreadyPledgedToThisPool();
 
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
@@ -44,7 +52,7 @@ error LPFRWV__TiersHaveNotBeenInitialized();
 /// @author Ali Mahdavi
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
-contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessControl {
+contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -78,53 +86,20 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     mapping(uint256 => uint256) public poolIdToAccPercentagePerShare;
     mapping(uint256 => uint256) public poolIdToLastPercentageAllocTime;
 
-    // Number of reward tokens distributed per block for this pool
-    mapping(uint256 => uint256) public poolIdToRewardPerBlock;
-
-    // Last block number that reward token distribution took place
-    mapping(uint256 => uint256) public poolIdToLastRewardBlock;
-
-    // Block number when rewards start
-    mapping(uint256 => uint256) public poolIdToRewardStartBlock;
-
-    // Block number when cliff ends
-    mapping(uint256 => uint256) public poolIdToRewardCliffEndBlock;
-
-    // Block number when rewards end
-    mapping(uint256 => uint256) public poolIdToRewardEndBlock;
-
-    // Per LPOOL token staked, how much reward token earned in pool that users will get
-    mapping(uint256 => uint256) public poolIdToAccRewardPerShareVesting;
-
-    // Total rewards being distributed up to rewardEndBlock
-    mapping(uint256 => uint256)
-        public poolIdToMaxRewardTokensAvailableForVesting;
 
     // Total amount staked into the pool
     mapping(uint256 => uint256) public poolIdToTotalStaked;
 
-    // Total amount of funding received by stakers after stakingEndBlock and before pledgeFundingEndBlock
-    mapping(uint256 => uint256) public poolIdToTotalRaised;
-
-    // For every staker that funded their pledge, the sum of all of their allocated percentages
-    mapping(uint256 => uint256)
-        public poolIdToTotalFundedPercentageOfTargetRaise;
-
-    // True when funds have been claimed
-    mapping(uint256 => bool) public poolIdToFundsClaimed;
 
     /// @notice Per pool, info of each user that stakes ERC20 tokens.
     /// @notice Pool ID => User Address => User Info
-    mapping(uint256 => BionicStructs.Map) public userInfo;
+    mapping(uint256 => BionicStructs.Map) public userInfo; //todo maybe optimize it more
     // mapping(uint256 => mapping(address => BionicStructs.UserInfo)) public userInfo;
 
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
 
 
-
-    // Available before staking ends for any given project. Essentitally 100% to 18 dp
-    uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
 
     event ContractDeployed(address indexed treasury);
 
@@ -134,22 +109,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     event PledgeFunded(
         address indexed user,
         uint256 indexed pid,
-        uint256 amount
-    );
-    event RewardsSetUp(
-        uint256 indexed pid,
-        uint256 amount,
-        uint256 rewardEndBlock
-    );
-    event RewardClaimed(
-        address indexed user,
-        uint256 indexed pid,
-        uint256 amount
-    );
-    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event FundRaisingClaimed(
-        uint256 indexed pid,
-        address indexed recipient,
         uint256 amount
     );
     event LotteryRefunded(address indexed user, uint256 indexed pid, uint256 amount);
@@ -167,19 +126,16 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint32 callbackGasLimit,
         bool requestVRFPerWinner
     ) Raffle(vrfCoordinatorV2,gasLane,subscriptionId,callbackGasLimit,requestVRFPerWinner) {
+        if(address(_stakingToken)==address(0)){
+            revert LPFRWV__InvalidRewardToken();
+        }
+        if(address(_investingToken)==address(0)){
+            revert LPFRWV__InvalidStackingToken();
+        }
+        if(address(_bionicInvestorPass)==address(0)){
+            revert LPFRWV__InvalidInvestingToken();
+        }
 
-        require(
-            address(_stakingToken) != address(0),
-            "constructor: _stakingToken must not be zero address"
-        );
-        require(
-            address(_investingToken) != address(0),
-            "constructor: _investingToken must not be zero address"
-        );
-        require(
-            _bionicInvestorPass != address(0),
-            "constructor: _investingToken must not be zero address"
-        );
 
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
@@ -209,31 +165,29 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         IERC20 _rewardToken, // Address of the reward token contract.
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
-        uint256 _maxPledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
+        uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
         uint256 _tokenAllocationPerMonth, // the amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
-        uint32[] calldata _tiers,
+        uint32[] calldata _tiers
 
-        bool _withUpdate
     ) external onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
-        require(
-            rewardTokenAddress != address(0),
-            "add: _rewardToken is zero address"
-        );
-        require(
-            _pledgingStartTime < _pledgingEndTime,
-            "add: _pledgingStartTime should be before _pledgingEndTime"
-        );
-        require(
-            _tokenAllocationStartTime > _pledgingEndTime,
-            "add: _tokenAllocationStartTime must be after pledging end"
-        );
+        if(rewardTokenAddress==address(0)){
+            revert LPFRWV__InvalidRewardToken();
+        }
+        if(_pledgingStartTime>=_pledgingEndTime){
+            revert LPFRWV__PledgeStartAndPledgeEndNotValid();
+        }
+        if(_tokenAllocationStartTime <= _pledgingEndTime){
+            revert LPFRWV__AllocationShouldBeAfterPledgingEnd();
+        }
 
+        if(_targetRaise==0){
+            revert LPFRWV__TargetToBeRaisedMustBeMoreThanZero();
+        }
 
-        require(_targetRaise > 0, "add: Invalid raise amount");
 
 
         uint32 winnersCount=0;
@@ -251,7 +205,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
                 rewardToken: _rewardToken,
                 pledgingStartTime: _pledgingStartTime,
                 pledgingEndTime: _pledgingEndTime,
-                maxPledgingAmountPerUser: _maxPledgingAmountPerUser,
+                pledgingAmountPerUser: _pledgingAmountPerUser,
                 tokenAllocationPerMonth: _tokenAllocationPerMonth,
                 tokenAllocationStartTime: _tokenAllocationStartTime,
                 tokenAllocationMonthCount: _tokenAllocationMonthCount,
@@ -272,8 +226,7 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         poolIdToLastPercentageAllocTime[
             pid
         ] = _tokenAllocationStartTime;
-
-        try claimFund.registerProjectToken(address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
+            try claimFund.registerProjectToken(address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
         }catch (bytes memory reason) {
             /// @solidity memory-safe-assembly
             assembly {
@@ -294,30 +247,27 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         bytes32 r,
         bytes32 s
     ) external nonReentrant onlyBionicAccount {
-        require(_pid < poolInfo.length, "pledge: Invalid PID");
+        if(_pid >= poolInfo.length){
+            revert LPFRWV__InvalidPool();
+        }
         BionicStructs.PoolInfo storage pool = poolInfo[_pid];
         BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
 
-        require(_amount > 0, "pledge: No pledge specified");
-
-        require(
-            user.amount.add(_amount) <= pool.maxPledgingAmountPerUser,
-            "pledge: can not exceed max staking amount per user"
-        );
-        
-        require(
-            block.timestamp >= pool.pledgingEndTime,   // solhint-disable-line not-rely-on-time
-            "pledge: time window of pledging for this pool has passed"
-        );
-
+        if(user.amount!=0){
+            revert LPFRWV__AlreadyPledgedToThisPool();
+        }
+        if(user.amount.add(_amount) != pool.pledgingAmountPerUser){
+            revert LPFRWV__NotValidPledgeAmount(pool.pledgingAmountPerUser);
+        }
+        if(block.timestamp < pool.pledgingEndTime){// solhint-disable-line not-rely-on-time
+            revert LPFRWV__PledgingHasClosed();
+        }
 
         user.amount = user.amount.add(_amount);
         userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(
             _amount
         );
-        user.tokenAllocDebt = user.tokenAllocDebt.add(
-            _amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18)
-        );
+
 
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
 
@@ -368,7 +318,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         BionicStructs.Tier[] storage tiers=poolIdToTiers[_pid];
         address[] memory lastTierMembers = userInfo[_pid].keys;
         for (uint k = 0; k < tiers.length-1; k++) {
-            console.log("tier %d has %d members remainig %d",k,tiers[k].members.length,lastTierMembers.length);
             if(tiers[k].members.length<1){
                 revert LPFRWV__TiersHaveNotBeenInitialized();
             }
@@ -379,7 +328,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             _addToTier(_pid, tiers.length-1, lastTierMembers);
             // tiers[tiers.length-1].members=lastTierMembers;
         }
-        console.log("last tier has %d members",tiers[tiers.length-1].members.length);
 
     }
 
@@ -414,11 +362,8 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
         uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
-        console.log("called fulfillment %d", gasleft());
         uint pid = requestIdToPoolId[requestId];
         address[] memory winners=pickWinners(pid,randomWords);
-        console.log("gas %d", gasleft());
-        console.log("picked winners");
         // uint256 pid=requestIdToPoolId[requestId];
         postLottery(pid,winners);
     }
@@ -426,12 +371,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
     function postLottery(uint256 pid,address[] memory winners) internal{
         // todo return lossers pledges;
         address[] memory losers = userInfo[pid].keys;
-        console.log("losers %d winners %d",losers.length,winners.length);
         losers=Utils.excludeAddresses(losers,winners);
-        console.log("losers %d",losers.length);
         for (uint i = 0; i < losers.length; i++) {
             BionicStructs.UserInfo storage u=userInfo[pid].get(losers[i]);
-            console.log("losers owes %d  ,%d",u.amount,gasleft());
             uint256 refund=u.amount;
             u.amount=0;
             treasury.withdrawTo(investingToken,losers[i],refund);
@@ -439,339 +381,9 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
             userInfo[pid].set(losers[i], u);
         }
     }
-
-
-
-    // // step 2
-    // function fundPledge(uint256 _pid) external payable nonReentrant {
-    //     require(_pid < poolInfo.length, "fundPledge: Invalid PID");
-
-    //     updatePool(_pid);
-
-    //     BionicStructs.PoolInfo storage pool = poolInfo[_pid];
-    //     BionicStructs.UserInfo storage user = userInfo[_pid][_msgSender()];
-
-    //     require(user.pledgeFundingAmount == 0, "fundPledge: Pledge has already been funded");
-
-    //     require(block.number > pool.stakingEndBlock, "fundPledge: Staking is still taking place");
-    //     require(block.number <= pool.pledgeFundingEndBlock, "fundPledge: Deadline has passed to fund your pledge");
-
-    //     require(user.amount > 0, "fundPledge: Must have staked");
-
-    //     require(getPledgeFundingAmount(_pid) > 0, "fundPledge: must have positive pledge amount");
-    //     require(msg.value == getPledgeFundingAmount(_pid), "fundPledge: Required ETH amount not satisfied");
-
-    //     poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(msg.value);
-
-    //     (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-    //     uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
-    //     poolIdToTotalFundedPercentageOfTargetRaise[_pid] = poolIdToTotalFundedPercentageOfTargetRaise[_pid].add(userPercentageAllocated);
-
-    //     user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
-
-    //     stakingToken.safeTransfer(address(_msgSender()), user.amount);
-
-    //     emit PledgeFunded(_msgSender(), _pid, msg.value);
-    // }
-
-    // // pre-step 3 for project
-    // function getTotalRaisedVsTarget(uint256 _pid) external view returns (uint256 raised, uint256 target) {
-    //     return (poolIdToTotalRaised[_pid], poolInfo[_pid].targetRaise);
-    // }
-
-    // // step 3
-    // function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardCliffEndBlock, uint256 _rewardEndBlock)
-    // external nonReentrant onlyOwner {
-    //     require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
-    //     require(_rewardStartBlock > block.number, "setupVestingRewards: start block in the past");
-    //     require(_rewardCliffEndBlock >= _rewardStartBlock, "setupVestingRewards: Cliff must be after or equal to start block");
-    //     require(_rewardEndBlock > _rewardCliffEndBlock, "setupVestingRewards: end block must be after cliff block");
-
-    //     BionicStructs.PoolInfo storage pool = poolInfo[_pid];
-
-    //     require(block.number > pool.pledgeFundingEndBlock, "setupVestingRewards: Stakers are still pledging");
-
-    //     uint256 vestingLength = _rewardEndBlock.sub(_rewardStartBlock);
-
-    //     poolIdToMaxRewardTokensAvailableForVesting[_pid] = _rewardAmount;
-    //     poolIdToRewardPerBlock[_pid] = _rewardAmount.div(vestingLength);
-
-    //     poolIdToRewardStartBlock[_pid] = _rewardStartBlock;
-    //     poolIdToLastRewardBlock[_pid] = _rewardStartBlock;
-
-    //     poolIdToRewardCliffEndBlock[_pid] = _rewardCliffEndBlock;
-
-    //     poolIdToRewardEndBlock[_pid] = _rewardEndBlock;
-
-    //     pool.rewardToken.safeTransferFrom(_msgSender(), address(rewardGuildBank), _rewardAmount);
-
-    //     emit RewardsSetUp(_pid, _rewardAmount, _rewardEndBlock);
-    // }
-
-    function pendingRewards(
-        uint256 _pid,
-        address _user
-    ) external view returns (uint256) {
-        require(_pid < poolInfo.length, "pendingRewards: invalid _pid");
-
-        BionicStructs.UserInfo memory user = userInfo[_pid].get(_user);
-
-        // If they have staked but have not funded their pledge, they are not entitled to rewards
-        if (user.pledgeFundingAmount == 0) {
-            return 0;
-        }
-
-        uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
-        uint256 rewardEndBlock = poolIdToRewardEndBlock[_pid];
-        uint256 lastRewardBlock = poolIdToLastRewardBlock[_pid];
-        uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
-        if (
-            block.number > lastRewardBlock &&
-            rewardEndBlock != 0 &&
-            poolIdToTotalStaked[_pid] != 0
-        ) {
-            uint256 maxEndBlock = block.number <= rewardEndBlock
-                ? block.number
-                : rewardEndBlock;
-            uint256 multiplier = getMultiplier(lastRewardBlock, maxEndBlock);
-            uint256 reward = multiplier.mul(rewardPerBlock);
-            accRewardPerShare = accRewardPerShare.add(
-                reward.mul(1e18).div(
-                    poolIdToTotalFundedPercentageOfTargetRaise[_pid]
-                )
-            );
-        }
-
-        (
-            uint256 accPercentPerShare,
-
-        ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-        uint256 userPercentageAllocated = user
-            .amount
-            .mul(accPercentPerShare)
-            .div(1e18)
-            .sub(user.tokenAllocDebt);
-        return
-            userPercentageAllocated.mul(accRewardPerShare).div(1e18).sub(
-                user.rewardDebtRewards
-            );
-    }
-
-    function massUpdatePools() public {
-        for (uint256 pid = 0; pid < poolInfo.length; pid++) {
-            updatePool(pid);
-        }
-    }
-
-    function updatePool(uint256 _pid) public {
-        require(_pid < poolInfo.length, "updatePool: invalid _pid");
-
-        // staking not started
-        // solhint-disable-next-line not-rely-on-time
-        if (block.timestamp < poolInfo[_pid].tokenAllocationStartTime) {
-            return;
-        }
-
-        // if no one staked, nothing to do
-        if (poolIdToTotalStaked[_pid] == 0) {
-            poolIdToLastPercentageAllocTime[_pid] = block.number;
-            return;
-        }
-
-        // token allocation not finished
-        uint256 maxEndBlockForPercentAlloc = block.number <=
-            poolInfo[_pid].pledgingEndTime
-            ? block.timestamp // solhint-disable-line not-rely-on-time
-            : poolInfo[_pid].pledgingEndTime;
-        uint256 blocksSinceLastPercentAlloc = getMultiplier(
-            poolIdToLastPercentageAllocTime[_pid],
-            maxEndBlockForPercentAlloc
-        );
-
-        if (
-            poolIdToRewardEndBlock[_pid] == 0 && blocksSinceLastPercentAlloc > 0
-        ) {
-            (
-                uint256 accPercentPerShare,
-                uint256 lastAllocBlock
-            ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-            poolIdToAccPercentagePerShare[_pid] = accPercentPerShare;
-            poolIdToLastPercentageAllocTime[_pid] = lastAllocBlock;
-        }
-
-        // project has not sent rewards
-        if (poolIdToRewardEndBlock[_pid] == 0) {
-            return;
-        }
-
-        // cliff has not passed for pool
-        if (block.number < poolIdToRewardCliffEndBlock[_pid]) {
-            return;
-        }
-
-        uint256 rewardEndBlock = poolIdToRewardEndBlock[_pid];
-        uint256 lastRewardBlock = poolIdToLastRewardBlock[_pid];
-        uint256 maxEndBlock = block.number <= rewardEndBlock
-            ? block.number
-            : rewardEndBlock;
-        uint256 multiplier = getMultiplier(lastRewardBlock, maxEndBlock);
-
-        // No point in doing any more logic as the rewards have ended
-        if (multiplier == 0) {
-            return;
-        }
-
-        uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
-        uint256 reward = multiplier.mul(rewardPerBlock);
-
-        poolIdToAccRewardPerShareVesting[
-            _pid
-        ] = poolIdToAccRewardPerShareVesting[_pid].add(
-            reward.mul(1e18).div(
-                poolIdToTotalFundedPercentageOfTargetRaise[_pid]
-            )
-        );
-        poolIdToLastRewardBlock[_pid] = maxEndBlock;
-    }
-
-    function getAccPercentagePerShareAndLastAllocBlock(
-        uint256 _pid
-    )
-        internal
-        view
-        returns (uint256 accPercentPerShare, uint256 lastAllocBlock)
-    {
-        uint256 tokenAllocationPeriodInBlocks = poolInfo[_pid]
-            .pledgingEndTime
-            .sub(poolInfo[_pid].tokenAllocationStartTime);
-
-        uint256 allocationAvailablePerBlock = TOTAL_TOKEN_ALLOCATION_POINTS.div(
-            tokenAllocationPeriodInBlocks
-        );
-
-        uint256 maxEndBlockForPercentAlloc = block.number <=
-            poolInfo[_pid].pledgingEndTime
-            ? block.number
-            : poolInfo[_pid].pledgingEndTime;
-        uint256 multiplier = getMultiplier(
-            poolIdToLastPercentageAllocTime[_pid],
-            maxEndBlockForPercentAlloc
-        );
-        uint256 totalPercentageUnlocked = multiplier.mul(
-            allocationAvailablePerBlock
-        );
-
-        return (
-            poolIdToAccPercentagePerShare[_pid].add(
-                totalPercentageUnlocked.mul(1e18).div(poolIdToTotalStaked[_pid])
-            ),
-            maxEndBlockForPercentAlloc
-        );
-    }
-
-    function claimReward(uint256 _pid) public nonReentrant {
-        updatePool(_pid);
-
-        require(
-            block.number >= poolIdToRewardCliffEndBlock[_pid],
-            "claimReward: Not past cliff"
-        );
-
-        BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
-        require(user.pledgeFundingAmount > 0, "claimReward: Nice try pal");
-
-        BionicStructs.PoolInfo storage pool = poolInfo[_pid];
-
-        uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
-
-        (
-            uint256 accPercentPerShare,
-
-        ) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-        uint256 userPercentageAllocated = user
-            .amount
-            .mul(accPercentPerShare)
-            .div(1e18)
-            .sub(user.tokenAllocDebt);
-        uint256 pending = userPercentageAllocated
-            .mul(accRewardPerShare)
-            .div(1e18)
-            .sub(user.rewardDebtRewards);
-
-        if (pending > 0) {
-            user.rewardDebtRewards = userPercentageAllocated
-                .mul(accRewardPerShare)
-                .div(1e18);
-            safeRewardTransfer(pool.rewardToken, _msgSender(), pending);
-
-            emit RewardClaimed(_msgSender(), _pid, pending);
-        }
-    }
-
-    // withdraw only permitted post `pledgeFundingEndBlock` and you can only take out full amount if you did not fund the pledge
-    // functions like the old emergency withdraw as it does not concern itself with claiming rewards
-    function withdraw(uint256 _pid) external nonReentrant {
-        require(_pid < poolInfo.length, "withdraw: invalid _pid");
-
-        BionicStructs.PoolInfo storage pool = poolInfo[_pid];
-        BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
-
-        require(user.amount > 0, "withdraw: No stake to withdraw");
-        require(
-            user.pledgeFundingAmount == 0,
-            "withdraw: Only allow non-funders to withdraw"
-        );
-        require(
-            block.number > pool.pledgingEndTime,
-            "withdraw: Not yet permitted"
-        );
-
-        uint256 withdrawAmount = user.amount;
-
-        // remove the record for this user
-        userInfo[_pid].remove(_msgSender());
-
-        stakingToken.safeTransfer(_msgSender(), withdrawAmount);
-
-        emit Withdraw(_msgSender(), _pid, withdrawAmount);
-    }
-
-    function claimFundRaising(
-        uint256 _pid
-    ) external nonReentrant onlyRole("TREASURY_ROLE") {
-        require(_pid < poolInfo.length, "claimFundRaising: invalid _pid");
-
-        uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
-        require(rewardPerBlock != 0, "claimFundRaising: rewards not yet sent");
-        require(
-            poolIdToFundsClaimed[_pid] == false,
-            "claimFundRaising: Already claimed funds"
-        );
-
-        poolIdToFundsClaimed[_pid] = true;
-        address payable msgSender = payable(_msgSender());
-        if (!msgSender.send(poolIdToTotalRaised[_pid])) revert();
-
-        emit FundRaisingClaimed(_pid, msgSender, poolIdToTotalRaised[_pid]);
-    }
-
     ////////////
     // Private /
     ////////////
-
-    /// @dev Safe reward transfer function, just in case if rounding error causes pool to not have enough rewards.
-    function safeRewardTransfer(
-        IERC20 _rewardToken,
-        address _to,
-        uint256 _amount
-    ) private {
-        uint256 bal = treasury.tokenBalance(_rewardToken);
-        if (_amount > bal) {
-            treasury.withdrawTo(_rewardToken, _to, bal);
-        } else {
-            treasury.withdrawTo(_rewardToken, _to, _amount);
-        }
-    }
     function stackPledge(address account,uint256 pid,uint256 _amount) private {
         try
             TokenBoundAccount(payable(account)).transferCurrency(
@@ -795,65 +407,6 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
                 }
             }
     }
-
-
-
-    /// @dev invest on the pool via already pledged amount of investing token provided by user.
-    /// @dev todo maybe instead of reverting on onunsuccessfull transfer emit an event?
-    function fundUserPledge(
-        uint256 _pid,
-        address[] memory winners
-    ) private {
-        for (uint256 i = 0; i < winners.length; i++) {
-            address payable userAddress = payable(
-                winners[i]
-            );
-            TokenBoundAccount userAccount = TokenBoundAccount(userAddress);
-            BionicStructs.UserInfo memory user = userInfo[_pid].get(
-                userAddress
-            );
-
-            if (user.pledgeFundingAmount == 0 && user.amount > 0) {
-                try
-                    userAccount.transferCurrency(
-                        address(investingToken),
-                        address(this),
-                        user.amount) 
-                        returns (bool res)
-                    {
-                        if(res)
-                            emit PledgeFunded(userAddress, _pid, user.amount);
-                        else 
-                            revert LPFRWV__FundingPledgeFailed(userAddress,_pid);
-
-                    } catch (bytes memory reason) {
-                        if (reason.length == 0) {
-                            revert ICurrencyPermit__NoReason();
-                        } else {
-                            /// @solidity memory-safe-assembly
-                            assembly {
-                                revert(add(32, reason), mload(reason))
-                            }
-                        }
-                    }
-            }
-        }
-
-    }
-
-    /// @notice Return reward multiplier over the given _from to _to block.
-    /// @param _from Block number
-    /// @param _to Block number
-    /// @return Number of blocks that have passed
-    function getMultiplier(
-        uint256 _from,
-        uint256 _to
-    ) private pure returns (uint256) {
-
-        return _to.sub(_from);
-    }
-
-
     /*///////////////////////////////////////////////////////////////
                             Modifiers
     //////////////////////////////////////////////////////////////*/
@@ -890,4 +443,5 @@ contract LaunchPoolFundRaisingWithVesting is ReentrancyGuard,Raffle, AccessContr
 
         _;
     }
+
 }
