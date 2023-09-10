@@ -7,9 +7,9 @@ library BionicStructs {
     /// @dev Details about each user in a pool
     struct UserInfo {
         uint256 amount; // How many tokens are staked in a pool
-        uint256 pledgeFundingAmount; // Based on staked tokens, the funding that has come from the user (or not if they choose to pull out)
-        uint256 rewardDebtRewards; // Reward debt. See explanation below.
-        uint256 tokenAllocDebt;
+        // uint256 pledgeFundingAmount; // Based on staked tokens, the funding that has come from the user (or not if they choose to pull out)
+        // uint256 rewardDebtRewards; // Reward debt. See explanation below.
+        // uint256 tokenAllocDebt;
         //
         // We do some fancy math here. Basically, once vesting has started in a pool (if they have deposited), the amount of reward tokens
         // entitled to a user but is pending to be distributed is:
@@ -24,7 +24,7 @@ library BionicStructs {
         IERC20 rewardToken; // Address of the reward token contract.
         uint256 pledgingStartTime; // Pledging will be permitted since this date
         uint256 pledgingEndTime; // Before this Time pledge is permitted
-        uint256 maxPledgingAmountPerUser; // Max. amount of tokens that can be staked per account/user
+        uint256 pledgingAmountPerUser; // amount of tokens that can be staked per account/user
         uint256 tokenAllocationPerMonth; // the amount of token will be released to lottery winners per month
         uint256 tokenAllocationStartTime; // when users can start claiming their first reward
         uint256 tokenAllocationMonthCount; // number of months tokens will be allocated

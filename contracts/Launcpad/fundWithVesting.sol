@@ -24,7 +24,7 @@ import {Raffle} from "./Raffle.sol";
 /* Errors */
 error LPFRWV__NotDefinedError();
 error LPFRWV__InvalidPool();
-error LPFRWV__ExceededMaximumPledge(uint amount);
+error LPFRWV__NotValidPledgeAmount(uint amount);
 error LPFRWV__InvalidRewardToken();//"constructor: _stakingToken must not be zero address"
 error LPFRWV__InvalidStackingToken();//"constructor: _investingToken must not be zero address"
 error LPFRWV__InvalidInvestingToken();//"constructor: _investingToken must not be zero address"
@@ -38,6 +38,7 @@ error LPFRWV__NotEnoughRandomWordsForLottery();
 error LPFRWV__FundingPledgeFailed(address user, uint pid);
 error LPFRWV__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
 error LPFRWV__TiersHaveNotBeenInitialized();
+error LPFRWV__AlreadyPledgedToThisPool();
 
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
@@ -92,7 +93,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     /// @notice Per pool, info of each user that stakes ERC20 tokens.
     /// @notice Pool ID => User Address => User Info
-    mapping(uint256 => BionicStructs.Map) public userInfo;
+    mapping(uint256 => BionicStructs.Map) public userInfo; //todo maybe optimize it more
     // mapping(uint256 => mapping(address => BionicStructs.UserInfo)) public userInfo;
 
     ///@notice user's total pledge accross diffrent pools and programs.
@@ -164,7 +165,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         IERC20 _rewardToken, // Address of the reward token contract.
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
-        uint256 _maxPledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
+        uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
         uint256 _tokenAllocationPerMonth, // the amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
@@ -204,7 +205,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
                 rewardToken: _rewardToken,
                 pledgingStartTime: _pledgingStartTime,
                 pledgingEndTime: _pledgingEndTime,
-                maxPledgingAmountPerUser: _maxPledgingAmountPerUser,
+                pledgingAmountPerUser: _pledgingAmountPerUser,
                 tokenAllocationPerMonth: _tokenAllocationPerMonth,
                 tokenAllocationStartTime: _tokenAllocationStartTime,
                 tokenAllocationMonthCount: _tokenAllocationMonthCount,
@@ -252,9 +253,11 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         BionicStructs.PoolInfo storage pool = poolInfo[_pid];
         BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
 
-        require(_amount > 0, "pledge: No pledge specified"); //todo turn it into todo
-        if(user.amount.add(_amount) > pool.maxPledgingAmountPerUser){
-            revert LPFRWV__ExceededMaximumPledge(pool.maxPledgingAmountPerUser);
+        if(user.amount!=0){
+            revert LPFRWV__AlreadyPledgedToThisPool();
+        }
+        if(user.amount.add(_amount) != pool.pledgingAmountPerUser){
+            revert LPFRWV__NotValidPledgeAmount(pool.pledgingAmountPerUser);
         }
         if(block.timestamp < pool.pledgingEndTime){// solhint-disable-line not-rely-on-time
             revert LPFRWV__PledgingHasClosed();
@@ -264,9 +267,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(
             _amount
         );
-        user.tokenAllocDebt = user.tokenAllocDebt.add(
-            _amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18)
-        );
+
 
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
 
