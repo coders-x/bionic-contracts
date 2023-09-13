@@ -260,7 +260,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         if(pledged.add(_amount) != pool.pledgingAmountPerUser){
             revert LPFRWV__NotValidPledgeAmount(pool.pledgingAmountPerUser);
         }
-        if(block.timestamp < pool.pledgingEndTime){// solhint-disable-line not-rely-on-time
+        if(block.timestamp > pool.pledgingEndTime){// solhint-disable-line not-rely-on-time
             revert LPFRWV__PledgingHasClosed();
         }
 
