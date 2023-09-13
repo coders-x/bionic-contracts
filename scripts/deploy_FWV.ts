@@ -10,64 +10,68 @@ const CONFIG = {
     vrfCoordinator: "0x7a1bac17ccc5b313516c5e16fb24f7659aa5ebed",
     tokenAddress:"0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F",
     usdtAddress:"0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848",
-    bionicInvsestorPass:"0xfFD890eBB19277f59f9d0810D464Efd2775df08E",
+    bionicInvestorPass:"0xfFD890eBB19277f59f9d0810D464Efd2775df08E",
     subId:5682,
     cbGasLimit:50000,
     reqVRFPerWinner:false,
 };
 
 async function main() {
-
-    // const IterableMappingLib = await ethers.getContractFactory("IterableMapping");
-    // const lib = await IterableMappingLib.deploy();
-    // await lib.deployed();
-    // const UtilsLib = await ethers.getContractFactory("Utils");
-    // const utils = await UtilsLib.deploy();
-    // await utils.deployed();
-
-    // let contract=deployContract({
-    //     libraries: {
-    //         IterableMapping: "0x8Fca87f23B586b8264722e88c7858F8c096039a4",//lib.address,
-    //         Utils: "0xE1fec8E94AeEF98Ba54fac5e3CcEe9a3dEF27350"//utils.address
-    //     }
-    // })
-
-
-
-      await verifyContract("0x651984DAbe103Fbede438BD7bD6787bCB0629B1e","0x8Fca87f23B586b8264722e88c7858F8c096039a4","0xE1fec8E94AeEF98Ba54fac5e3CcEe9a3dEF27350",[
-        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvsestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash, 
+    const UtilsLib = await ethers.getContractFactory("Utils");
+    const utils = await UtilsLib.deploy();
+    await utils.deployed();
+    console.log(`deployed utils at ${utils.address}`)
+    let contract=await deployContract({
+        libraries: {
+            Utils: utils.address,//"0x32a507b82822c194aB25931bE5d72772aA4F9F3b"
+        }
+    })
+    console.log(`deployed fwv at ${contract.address}`)
+    await verifyContract(contract.address, utils.address,[
+        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash, 
         CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner
-        ]);
+    ]);
+
+
+    // await verifyContract("0xf6e470B6A6433880a97f80e7a841644237518259","0x8956E81d76FDdAbF0de54D8Da0d06c2474DeA340",[
+    //     CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash, 
+    //     CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner
+    // ]);
 }
 
 
 async function deployContract(opt:FactoryOptions){
 
-  
-    console.log(`Deploying BionicFundRasing contract...`);
+      console.log(`Deploying BionicFundRasing contract...`);
 
 
     const FundWithVestingContract = await ethers.getContractFactory("BionicFundRasing", opt);
 
-    let funding=await FundWithVestingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvsestorPass, 
+    let funding=await FundWithVestingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, 
         CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner);
 
     return await funding.deployed();
 }
 
-async function verifyContract(contractAddress:string,iterableMappingAddress:string, utilsAddress:string,args:any){
-    console.log(`Verifying Contract at ${}`);
-    let res= await hre.run("verify:verify", {
+async function verifyContract(contractAddress:string, utilsAddress:string,args:any){
+    let res;
+    
+    console.log(`Verifying Utils Contract at ${utilsAddress}`);
+     res= await hre.run("verify:verify", {
+        address: utilsAddress,//funding.address,
+    });
+
+    console.log(`Verifying FWV Contract at ${contractAddress}`);
+    res= await hre.run("verify:verify", {
         address: contractAddress,//funding.address,
         constructorArguments: args,
         libraries: {
-            IterableMapping: iterableMappingAddress,//lib.address,
             Utils: utilsAddress//utils.address
         }
       });
-    console.log("Verified: ",res)
+    console.log("Verified: ",res);
     return res;
 }
 
-main().then(console.log).catch(console.error)
+main().then(console.log).catch(console.error);
 

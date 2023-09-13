@@ -22,7 +22,7 @@ list of contracts deployed so fat
 | --------------------------------------------- | ------------------------------------------ | ------------------------------------------ | -------------------------------------------------------------------------------------- |
 | BionicInvestorPass                            | 0xfFD890eBB19277f59f9d0810D464Efd2775df08E | 0x26C1FC685E9A39D00A34e731CAf1BEBA71C4EE61 | https://mumbai.polygonscan.com/address/0x26C1FC685E9A39D00A34e731CAf1BEBA71C4EE61#code |
 | Bionic Token                                  | 0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F | 0xcc25bbC5B66F5379eEdD804D7a2efa647B8a008F | https://mumbai.polygonscan.com/address/0xcc25bbC5B66F5379eEdD804D7a2efa647B8a008F#code |
-| Token Bound Account                           | -                                          | 0x34278B198852CCCD6Bd535eb08E45620dcf9ca3b | https://mumbai.polygonscan.com/address/0x34278B198852CCCD6Bd535eb08E45620dcf9ca3b#code |
+| Token Bound Account                           | -                                          | 0x55FcaE61dF06858DC8115bDDd21B622F0634d8Ac | https://mumbai.polygonscan.com/address/0x55FcaE61dF06858DC8115bDDd21B622F0634d8Ac#code |
 | Token Bound Account Factory (ERC6551Registry) | -                                          | 0x02101dfB77FDE026414827Fdc604ddAF224F0921 | https://mumbai.polygonscan.com/address/0x02101dfB77FDE026414827Fdc604ddAF224F0921#code |
 | Bionic LaunchPad                              | -                                          | 0x486E0938DE02A54BbCcE7B867e449c9f9bd2fd10 | https://mumbai.polygonscan.com/address/0x486E0938DE02A54BbCcE7B867e449c9f9bd2fd10#code |
 

@@ -6,8 +6,8 @@ pragma solidity >=0.7.0 <0.9.0;
 /* solhint-disable reason-string */
 
 // Base
-import {BaseAccount,IEntryPoint,UserOperation} from "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccount.sol";
-import {BaseAccountFactory} from "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccountFactory.sol";
+import {BaseAccount, IEntryPoint, UserOperation} from "@thirdweb-dev/contracts/smart-wallet/utils/BaseAccount.sol";
+import {BaseAccountFactory} from "./BaseAccountFactory.sol";
 
 // Extensions
 import {Multicall} from "@thirdweb-dev/contracts/extension/Multicall.sol";

@@ -8,9 +8,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {AccessControl,IERC165} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {IERC6551Account} from "erc6551/src/interfaces/IERC6551Account.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 
-import {IterableMapping} from  "../libs/IterableMapping.sol";
 import {ICurrencyPermit,ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
 import {Utils} from "../libs/Utils.sol";
@@ -19,7 +19,6 @@ import {TokenBoundAccount} from "../TBA.sol";
 import {Treasury} from "./Treasury.sol";
 import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
-
 
 /* Errors */
 error LPFRWV__NotDefinedError();
@@ -57,7 +56,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
-    using IterableMapping for BionicStructs.Map;
+    using EnumerableMap for EnumerableMap.AddressToUintMap;
 
     bytes32 public constant BROKER_ROLE = keccak256("BROKER_ROLE");
     bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
@@ -93,8 +92,10 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     /// @notice Per pool, info of each user that stakes ERC20 tokens.
     /// @notice Pool ID => User Address => User Info
-    mapping(uint256 => BionicStructs.Map) public userInfo; //todo maybe optimize it more
-    // mapping(uint256 => mapping(address => BionicStructs.UserInfo)) public userInfo;
+    mapping(uint256=> EnumerableMap.AddressToUintMap) internal userPledge; //todo maybe optimize it more
+    // EnumerableMap.UintToAddressMap public pledgeAmount;
+    // EnumerableMap.AddressToUintMap public UserParticipation;
+    // mapping(uint256 => mapping(address => uint256)) public userPledge;
 
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
@@ -251,19 +252,18 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
             revert LPFRWV__InvalidPool();
         }
         BionicStructs.PoolInfo storage pool = poolInfo[_pid];
-        BionicStructs.UserInfo storage user = userInfo[_pid].get(_msgSender());
-
-        if(user.amount!=0){
+        (,uint256 pledged) = userPledge[_pid].tryGet(_msgSender());
+        if(pledged!=0){
             revert LPFRWV__AlreadyPledgedToThisPool();
         }
-        if(user.amount.add(_amount) != pool.pledgingAmountPerUser){
+        if(pledged.add(_amount) != pool.pledgingAmountPerUser){
             revert LPFRWV__NotValidPledgeAmount(pool.pledgingAmountPerUser);
         }
         if(block.timestamp < pool.pledgingEndTime){// solhint-disable-line not-rely-on-time
             revert LPFRWV__PledgingHasClosed();
         }
 
-        user.amount = user.amount.add(_amount);
+        userPledge[_pid].set(_msgSender(),pledged.add(_amount));
         userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(
             _amount
         );
@@ -283,7 +283,6 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
                 s
             )
         {
-            userInfo[_pid].set(_msgSender(), user);
             emit Pledge(_msgSender(), _pid, _amount);
         } catch (bytes memory reason) {
             if (reason.length == 0) {
@@ -304,9 +303,12 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     /// @param tierId tierId of the poolId needs to be updated
     /// @param members members for this tier to be considered in raffle
     function addToTier(uint256 pid,uint256 tierId, address[] memory members) external nonReentrant onlyRole(SORTER_ROLE){
-        if (!userInfo[pid].contains(members)){
-            revert LPFRWV__TierMembersShouldHaveAlreadyPledged(pid,tierId);
+        for (uint i = 0; i < members.length; i++) {
+            if (!userPledge[pid].contains(members[i])){
+                revert LPFRWV__TierMembersShouldHaveAlreadyPledged(pid,tierId);
+            }
         }
+
         _addToTier(pid, tierId, members);
     }
 
@@ -316,7 +318,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     function preDraw(uint256 _pid) internal{
         //check all tiers except last(all other users) has members
         BionicStructs.Tier[] storage tiers=poolIdToTiers[_pid];
-        address[] memory lastTierMembers = userInfo[_pid].keys;
+        address[] memory lastTierMembers = userPledge[_pid].keys();
         for (uint k = 0; k < tiers.length-1; k++) {
             if(tiers[k].members.length<1){
                 revert LPFRWV__TiersHaveNotBeenInitialized();
@@ -370,15 +372,13 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     function postLottery(uint256 pid,address[] memory winners) internal{
         // todo return lossers pledges;
-        address[] memory losers = userInfo[pid].keys;
+        address[] memory losers = userPledge[pid].keys();
         losers=Utils.excludeAddresses(losers,winners);
         for (uint i = 0; i < losers.length; i++) {
-            BionicStructs.UserInfo storage u=userInfo[pid].get(losers[i]);
-            uint256 refund=u.amount;
-            u.amount=0;
+            uint256 refund=userPledge[pid].get(losers[i]);
             treasury.withdrawTo(investingToken,losers[i],refund);
             emit LotteryRefunded(losers[i],pid,refund);
-            userInfo[pid].set(losers[i], u);
+            userPledge[pid].set(losers[i], 0);
         }
     }
     ////////////
@@ -429,7 +429,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
             require(
                 tokenContract == bionicInvestorPass,
                 "onlyBionicAccount: Invalid Bionic TokenBoundAccount."
-            );
+            );//check user realy ownes the bionic pass check we have minted and created account
         } catch (bytes memory reason) {
             if (reason.length == 0) {
                 revert LPFRWV__NotDefinedError();
