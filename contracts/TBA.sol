@@ -50,7 +50,7 @@ contract TokenBoundAccount is
     //////////////////////////////////////////////////////////////*/
 
     event TokenBoundAccountCreated(address indexed account, bytes indexed data);
-
+    event CalledContract(address indexed account,bytes indexed message);
     /*///////////////////////////////////////////////////////////////
                             Constructor
     //////////////////////////////////////////////////////////////*/
@@ -223,6 +223,7 @@ contract TokenBoundAccount is
         bool success;
         (success, result) = _target.call{value: value}(_calldata);
         if (!success) {
+            emit CalledContract(_target,result);
             assembly {
                 revert(add(result, 32), mload(result))
             }

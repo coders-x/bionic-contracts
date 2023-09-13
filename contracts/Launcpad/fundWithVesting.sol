@@ -19,6 +19,7 @@ import {TokenBoundAccount} from "../TBA.sol";
 import {Treasury} from "./Treasury.sol";
 import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
+import "hardhat/console.sol";
 
 /* Errors */
 error LPFRWV__NotDefinedError();
@@ -339,6 +340,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     function draw(
         uint256 _pid
     ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
+        console.log("%s>=%s",_pid,poolInfo.length);
         if(_pid >= poolInfo.length)
             revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[_pid];

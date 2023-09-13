@@ -16,6 +16,7 @@ const BIP_CONTRACT="0xfFD890eBB19277f59f9d0810D464Efd2775df08E",ERC6551_REGISTRY
     TOKEN_BOUND_IMP_ADDR="0x55FcaE61dF06858DC8115bDDd21B622F0634d8Ac",BIONIC_LAUNCH_ADDR="0x0321a0e7f15577e6edc817f7c82aea17371573c1",
     BIONIC_TOKEN_ADDR="0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F", USDT_ADDR="0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848";
 
+const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
 // //goerli
 // const BIP_CONTRACT="0xBE88D48C48946bE76337c26b7E2B6b37cfa17d34",ERC6551_REGISTRY_ADDR="0x02101dfB77FDE026414827Fdc604ddAF224F0921",
 //     TOKEN_BOUND_IMP_ADDR="0x0Cf53c3cD24E536d5621d7E91d930CcFdfb5852A",BIONIC_LAUNCH_ADDR="0x73685c956Fdb9f2094E91462a00eBBeeA55cF4F1",
@@ -33,10 +34,15 @@ async function main(level:number) {
     5. draw for the lottery
     6. go claim 
     */
-    let users:User[]=getSigners(3);
+    let chainId=network.config.chainId||80001;
+    let users:User[]=getSigners(1);
     let fundingContract = await ethers.getContractAt("BionicFundRasing",BIONIC_LAUNCH_ADDR);
     let usdtContract=await ethers.getContractAt("ERC20",USDT_ADDR);
     let bionicContract=await ethers.getContractAt("ERC20",BIONIC_TOKEN_ADDR);
+    const TBAContract = await ethers.getContractFactory("TokenBoundAccount");
+    let tokenBoundImpContract=await TBAContract.deploy(ENTRY_POINT, ERC6551_REGISTRY_ADDR);
+    await tokenBoundImpContract.deployed();
+    console.log(`tokenBoundAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
     let abstractAccounts:TokenBoundAccount[]=[];
     const aa_addresses=[
         "0x33bfdB8C1ce6113BCD2A23262D74FA8Ba7508b8B",
@@ -71,24 +77,22 @@ async function main(level:number) {
        level++;
        let bipContract=await ethers.getContractAt("BionicInvestorPass",BIP_CONTRACT);
        let tokenBoundContractRegistry = await ethers.getContractAt("ERC6551Registry",ERC6551_REGISTRY_ADDR);
-       let tokenBoundImpContract=await ethers.getContractAt("TokenBoundAccount",TOKEN_BOUND_IMP_ADDR)
+    //    let tokenBoundImpContract=await ethers.getContractAt("TokenBoundAccount",tba.address)
         for (let i=0;i<users.length;i++) {
             const u=users[i];
             if ((await bipContract.balanceOf(u.getAddress())).lte(0)){
                 //mint NFT
                 let res=await (await bipContract.connect(owner).safeMint(await u.getAddress(),"https://SomeWHEREWithMETADATA")).wait(1);
-                u.tokenId=res.events[0]?.args?.tokenId;
-
-            
+                u.tokenId=res.events[0]?.args?.tokenId
             }else{
                 u.tokenId=i+47
             }
             //create abstracted accounts
             let r = await(await tokenBoundContractRegistry.createAccount(tokenBoundImpContract.address,
-                network.config.chainId as number, bipContract.address,
+                chainId as number, bipContract.address,
                 u.tokenId, "0", [])).wait(1);
             let aa_addr = (await tokenBoundContractRegistry.account(tokenBoundImpContract.address,
-                network.config.chainId as number, bipContract.address,
+                chainId as number, bipContract.address,
                 u.tokenId, "0"));     
                 console.log(`Minted ${u.tokenId} for address ${await u.getAddress()} and assigned ${aa_addr}`);
             let acc = await ethers.getContractAt("TokenBoundAccount", aa_addr);
@@ -131,10 +135,10 @@ async function main(level:number) {
     /*** Fund */
     if(level==2){
         level++;
-        for (let i=0;i<aa_addresses.length;i++) {
-            let res=await (await bionicContract.connect(owner).transfer(aa_addresses[i],50000)).wait(1);
-            res=await (await usdtContract.connect(owner).transfer(aa_addresses[i],5000)).wait(1);
-            await (await owner.sendTransaction({value:80000000000000,to:users[i].getAddress()})).wait(1)
+        for (let i=0;i<abstractAccounts.length;i++) {
+            let res=await (await bionicContract.connect(owner).transfer(abstractAccounts[i].address,50000)).wait();
+            res=await (await usdtContract.connect(owner).transfer(abstractAccounts[i].address,5000)).wait();
+            await (await owner.sendTransaction({value:80000000000000,to:users[i].getAddress()})).wait()
             console.log(`Transferred ${res.events[0]?.args.amount}USDT+${80000000000000}wei to ${res.events[0]?.args.to}`,res.events[0]?.args.from);
         }
     }
@@ -143,7 +147,7 @@ async function main(level:number) {
     
 
    /*** Add Project */
-   let pid=3,pledgeAmount=1000;
+   let pid=4,pledgeAmount=1000;
    if(level==3){
     level++;
     let pledgeEnding=new Date();
@@ -206,7 +210,7 @@ const getSigners = (amount: number): Signer[] => {
 
 async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
-        account.connect(owner).getNonce(),
+        account.nonce(),
         "BionicAccount",
         "1",
         80001
@@ -257,4 +261,4 @@ async function getCurrencyPermitSignature(signer: SignerWithAddress, account: To
     )
 }
 
-main(4).then(console.log).catch(console.error)
+main(1).then(console.log).catch(console.error)

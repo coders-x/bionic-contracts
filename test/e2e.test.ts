@@ -224,7 +224,7 @@ describe("e2e", function () {
                     .to.be.revertedWith("Contract does not support TokenBoundAccount");
             });
             it("Should fail if Pool doesn't Exist", async function () {
-                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [10000, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                let raw = fundWithVesting.interface.encodeFunctionData("pledge", [10000, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
                     .to.be.revertedWithCustomError(fundWithVesting,"LPFRWV__InvalidPool")//("pledge: Invalid PID");
             });
