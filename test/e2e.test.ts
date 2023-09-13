@@ -5,8 +5,9 @@ import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { IERC20Permit, ERC6551Registry, BionicFundRasing, ERC20Upgradeable, TokenBoundAccount, 
     BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding }
     from "../typechain-types";
-import { BytesLike } from "ethers";
-
+    import { BytesLike } from "ethers";
+    
+const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 
 const NETWORK_CONFIG = {
@@ -30,7 +31,8 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ACCOUNT_ADDRESS = "0x44638181F7568Fc6Be91032bf3a848816B8e8583",
     CALLBACK_GAS_LIMIT_PER_USER = 45000,
     PLEDGING_START_TIME = 20000000,
-    PLEDGING_END_TIME = 40000000,
+    PLEDGING_END_TIME = 2694616991,
+    tokenAllocationStartTime=PLEDGING_END_TIME + 1000,
     TIER_ALLOCATION = [3, 2, 1];
 
 describe("e2e", function () {
@@ -191,7 +193,7 @@ describe("e2e", function () {
     });
     describe("FundingRegistry", () => {
         describe("Add", function () {
-            const pledgingAmountPerUser=1000,tokenAllocationPerMonth=100,tokenAllocationStartTime=PLEDGING_END_TIME + 1000,tokenAllocationMonthCount=10,targetRaise=pledgingAmountPerUser*pledgingAmountPerUser
+            const pledgingAmountPerUser=1000,tokenAllocationPerMonth=100,tokenAllocationMonthCount=10,targetRaise=pledgingAmountPerUser*pledgingAmountPerUser
             it("Should fail if the not BROKER", async function () {
                 await expect(fundWithVesting.connect(client)
                     .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, pledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION))
@@ -308,8 +310,8 @@ describe("e2e", function () {
                 await expect(fundWithVesting.connect(client).draw(0))
                     .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
             })
-
             it("Should fail to start if tiers haven't been added", async () => {
+                await helpers.time.increaseTo(tokenAllocationStartTime);
                 await expect(fundWithVesting.draw(0))
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__TiersHaveNotBeenInitialized");
             })
