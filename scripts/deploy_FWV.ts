@@ -10,6 +10,7 @@ const CONFIG = {
     tokenAddress:"0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F",
     usdtAddress:"0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848",
     bionicInvestorPass:"0xfFD890eBB19277f59f9d0810D464Efd2775df08E",
+    utilsAddress:"0x03A1726655bE74aD1430aa30e4A823E14428346c",
     subId:5682,
     cbGasLimit:50000,
     reqVRFPerWinner:false,
@@ -22,7 +23,8 @@ async function main() {
     console.log(`deployed utils at ${utils.address}`)
     let contract=await deployContract({
         libraries: {
-            Utils: utils.address,//"0x32a507b82822c194aB25931bE5d72772aA4F9F3b"
+            Utils: utils.address,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
+            // Utils: CONFIG.utilsAddress,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
         }
     })
     console.log(`deployed fwv at ${contract.address}`)
@@ -32,7 +34,7 @@ async function main() {
     ]);
 
 
-    // await verifyContract("0xf6e470B6A6433880a97f80e7a841644237518259","0x8956E81d76FDdAbF0de54D8Da0d06c2474DeA340",[
+    // await verifyContract("0xf6e470B6A6433880a97f80e7a841644237518259",CONFIG.utilsAddress,[
     //     CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash, 
     //     CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner
     // ]);

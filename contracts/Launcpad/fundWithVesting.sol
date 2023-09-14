@@ -413,13 +413,13 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     //////////////////////////////////////////////////////////////*/
 
     modifier onlyBionicAccount() virtual {
-        require(
-            _msgSender().isContract() &&
-            IERC165(_msgSender()).supportsInterface(
-               type(IERC6551Account).interfaceId
-            ),
-            "Contract does not support TokenBoundAccount"
-        );
+        // require(
+        //     _msgSender().isContract() &&
+        //     IERC165(_msgSender()).supportsInterface(
+        //        type(IERC6551Account).interfaceId
+        //     ),
+        //     "Contract does not support TokenBoundAccount"
+        // );
 
 
         try TokenBoundAccount(payable(_msgSender())).token() returns (
