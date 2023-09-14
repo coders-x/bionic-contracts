@@ -5,17 +5,20 @@ import {IERC6551Account} from "erc6551/interfaces/IERC6551Account.sol";
 import {ERC6551AccountLib} from "erc6551/lib/ERC6551AccountLib.sol";
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 import {BaseAccount as BaseERC4337Account, IEntryPoint, UserOperation} from "tokenbound/lib/account-abstraction/contracts/core/BaseAccount.sol";
-
 import {IAccountGuardian} from "tokenbound/src/interfaces/IAccountGuardian.sol";
+
+import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 
 error NotAuthorized();
 error InvalidInput();
@@ -35,8 +38,10 @@ error OwnershipCycle();
 /// @notice Fork of Account.sol from TokenBouand
 /// @dev TokenBoundAccount that gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
 contract TokenBoundAccount is
+    ICurrencyPermit,
     IERC165,
     IERC1271,
+    EIP712,
     IERC6551Account,
     IERC721Receiver,
     IERC1155Receiver,
@@ -45,19 +50,36 @@ contract TokenBoundAccount is
 {
     using ECDSA for bytes32;
 
+    /*///////////////////////////////////////////////////////////////
+                            States
+    //////////////////////////////////////////////////////////////*/
     /// @dev ERC-4337 entry point address
     address public immutable _entryPoint;
 
     /// @dev AccountGuardian contract address
     address public immutable guardian;
 
-
+    /**
+     * @notice Keeps the Allowance Per spender over currency
+     * @dev currency => spender +> allowed amount
+     *  if currency is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE the spender will have access to the native coin
+     */
+    mapping(address => mapping(address => uint256)) private _allowances;
     /// @dev mapping from owner => selector => implementation
     mapping(address => mapping(bytes4 => address)) public overrides;
 
     /// @dev mapping from owner => caller => has permissions
     mapping(address => mapping(address => bool)) public permissions;
 
+        // solhint-disable-next-line var-name-mixedcase
+    bytes32 private constant _CURRENCY_PERMIT_TYPEHASH =
+        keccak256(
+            "Permit(address currency,address spender,uint256 value,uint256 nonce,uint256 deadline)"
+        );
+
+    /*///////////////////////////////////////////////////////////////
+                            Events
+    //////////////////////////////////////////////////////////////*/
     event OverrideUpdated(
         address owner,
         bytes4 selector,
@@ -66,6 +88,10 @@ contract TokenBoundAccount is
 
     event PermissionUpdated(address owner, address caller, bool hasPermission);
 
+
+    /*///////////////////////////////////////////////////////////////
+                            modifiers
+    //////////////////////////////////////////////////////////////*/
     /// @dev reverts if caller is not the owner of the account
     modifier onlyOwner() {
         if (msg.sender != owner()) revert NotAuthorized();
@@ -78,8 +104,10 @@ contract TokenBoundAccount is
         _;
     }
 
-
-    constructor(address _guardian, address entryPoint_) {
+    /*///////////////////////////////////////////////////////////////
+                            Constructor
+    //////////////////////////////////////////////////////////////*/
+    constructor(address _guardian, address entryPoint_) EIP712("BionicAccount","1") {
         if (_guardian == address(0) || entryPoint_ == address(0))
             revert InvalidInput();
 
@@ -151,6 +179,69 @@ contract TokenBoundAccount is
     }
 
 
+    /**
+     * @dev See {ICurrencyPermit-permit}.
+     */
+    function permit(
+        address currency,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external  {
+
+        require(
+            block.timestamp <= deadline,        // solhint-disable-line not-rely-on-time
+            "CurrencyPermit: expired deadline"
+        );
+        address _signer = owner();
+        uint256 n = nonce();
+        bytes32 structHash = keccak256(
+            abi.encode(
+                _CURRENCY_PERMIT_TYPEHASH,
+                currency,
+                spender,
+                value,
+                n,
+                deadline
+            )
+        );
+
+
+        bytes32 hash = _hashTypedDataV4(structHash);
+
+        address signer = ECDSA.recover(hash, v, r, s);
+        require(
+            signer == _signer,
+            string(abi.encode(signer, "!=", _signer, hash))
+        );
+        _approve(currency, spender, value);
+    }
+
+    /// @notice will transfer Currency approved to the caller
+    /// @dev transferCurrency will allow spender(msg.sender) to transfer the amount of money they already permited to move.
+    /// @param currency the erc20 contract address to spend the amount if it's 0xeeee.eeee it will try transfering native token
+    /// @param to the address amount will be sent
+    /// @param amount the amount of currency wished to be spent
+    /// @return bool if transaction was successfull it will return a boolian value of true if it's native value it might fail with revert
+    function transferCurrency(
+        address currency,
+        address to,
+        uint256 amount
+    ) public virtual returns (bool) {
+        _spendAllowance(currency, msg.sender, amount);
+        if (currency==address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)){
+            _call(to, amount,msg.data);
+        }else{
+            return IERC20(currency).transfer(to, amount);
+        }
+        _incrementNonce();
+        return true;
+    }
+
+
 
 
     /// @dev EIP-1271 signature validation. By default, only the owner of the account is permissioned to sign.
@@ -190,7 +281,7 @@ contract TokenBoundAccount is
     }
 
     /// @dev Returns the current account nonce
-    function nonce() public view override returns (uint256) {
+    function nonce() public view override(ICurrencyPermit, IERC6551Account) returns (uint256) {
         return IEntryPoint(_entryPoint).getNonce(address(this), 0);
     }
 
@@ -203,6 +294,22 @@ contract TokenBoundAccount is
     /// @dev Return the ERC-4337 entry point address
     function entryPoint() public view override returns (IEntryPoint) {
         return IEntryPoint(_entryPoint);
+    }
+    /**
+     * @dev See {ICurrencyPermit-DOMAIN_SEPARATOR}.
+     */
+    // solhint-disable-next-line func-name-mixedcase
+    function DOMAIN_SEPARATOR() external view override returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+    /**
+     * @dev See {IERC20-allowance}.
+     */
+    function allowance(
+        address currency,
+        address spender
+    ) public view virtual returns (uint256) {
+        return _allowances[currency][spender];
     }
 
     /// @dev Returns the owner of the ERC-721 token which owns this account. By default, the owner
@@ -317,6 +424,10 @@ contract TokenBoundAccount is
         return this.onERC1155BatchReceived.selector;
     }
 
+
+    /*///////////////////////////////////////////////////////////////
+                            Internal Functions
+    //////////////////////////////////////////////////////////////*/
     /// @dev Contract upgrades can only be performed by the owner and the new implementation must
     /// be trusted
     function _authorizeUpgrade(address newImplementation)
@@ -402,5 +513,62 @@ contract TokenBoundAccount is
                 return(add(result, 32), mload(result))
             }
         }
+    }
+
+    /**
+     * @dev Updates `owner` s allowance for `spender` based on spent `amount`.
+     *
+     * Does not update the allowance amount in case of infinite allowance.
+     * Revert if not enough allowance is available.
+     *
+     * Might emit an {Approval} event.
+     */
+    function _spendAllowance(
+        address currency,
+        address spender,
+        uint256 amount
+    ) internal virtual {
+        uint256 currentAllowance = allowance(currency, spender);
+        if (currentAllowance != type(uint256).max) {
+            require(
+                currentAllowance >= amount,
+                "ERC20: insufficient allowance"
+            );
+            // unchecked {
+            _approve(currency, spender, currentAllowance - amount);
+            // }
+        }
+    }
+
+
+    // /**
+    //  * @dev Sets `amount` as the allowance of `spender` over the owner's `currency` tokens.
+    //  *
+    //  * This internal function is equivalent to `approve`, and can be used to
+    //  * e.g. set automatic allowances for certain subsystems, etc.
+    //  *
+    //  * Emits an {CurrencyApproval} event.
+    //  *
+    //  * Requirements:
+    //  *
+    //  * - `currency` cannot be the zero address. 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE will denote to native coin (eth,matic, and etc.)
+    //  * - `spender` cannot be the zero address.
+    //  */
+    function _approve(
+        address currency,
+        address spender,
+        uint256 amount
+    ) internal {
+        require(
+            currency != address(0),
+            "CurrencyPermit: approve currency of zero address"
+        );
+        require(
+            spender != address(0),
+            "CurrencyPermit: approve to the zero address"
+        );
+
+        _allowances[currency][spender] = amount;
+        emit CurrencyApproval(currency, spender, amount);
     }
 }
