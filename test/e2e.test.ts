@@ -51,8 +51,8 @@ describe("e2e", function () {
         bipContract = await deployBIP();
         let TokenBoundContractRegistryFacory = await ethers.getContractFactory("ERC6551Registry");
         tokenBoundContractRegistry=await TokenBoundContractRegistryFacory.deploy();
-        let MockEntryPointFacory = await ethers.getContractFactory("MockEntryPoint");
-        mockEntryPoint=await MockEntryPointFacory.deploy();
+        let MockEntryPointFactory = await ethers.getContractFactory("MockEntryPoint");
+        mockEntryPoint=await MockEntryPointFactory.deploy();
         tokenBoundContractRegistry=await TokenBoundContractRegistryFacory.deploy();
         usdtContract = await ethers.getContractAt("ERC20Upgradeable", USDT_ADDR);
         let AccountGuardianFactory = await ethers.getContractFactory("AccountGuardian");

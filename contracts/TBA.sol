@@ -135,8 +135,6 @@ contract TokenBoundAccount is
     ) external payable onlyAuthorized returns (bytes memory) {
         emit TransactionExecuted(to, value, data);
 
-        _incrementNonce();
-
         return _call(to, value, data);
     }
 
@@ -200,7 +198,7 @@ contract TokenBoundAccount is
             "CurrencyPermit: expired deadline"
         );
         address _signer = owner();
-        console.log("signer %s",_signer);
+        console.log("owner %s",_signer);
         uint256 n = nonce();
         console.log("nonce %s",n);
         bytes32 structHash = keccak256(
@@ -247,7 +245,6 @@ contract TokenBoundAccount is
         }else{
             return IERC20(currency).transfer(to, amount);
         }
-        _incrementNonce();
         return true;
     }
 
@@ -294,7 +291,7 @@ contract TokenBoundAccount is
     function nonce() public view override(ICurrencyPermit, IERC6551Account) returns (uint256) {
         console.log("trying to get nonce");
         try IEntryPoint(_entryPoint).getNonce(address(this), 0) returns (uint256 n) {
-            console.log("got nonce %s",n);
+            console.log("got nonce %s for %s from %s",n,msg.sender,_entryPoint);
             return n;
         } catch  (bytes memory reason){
             console.log("!!!Failed");
@@ -304,6 +301,7 @@ contract TokenBoundAccount is
 
     /// @dev Increments the account nonce if the caller is not the ERC-4337 entry point
     function _incrementNonce() internal {
+        console.log("increamenting Nonce for %s",address(this));
         if (msg.sender != _entryPoint)
             IEntryPoint(_entryPoint).incrementNonce(0);
     }
@@ -491,6 +489,7 @@ contract TokenBoundAccount is
                 revert(add(result, 32), mload(result))
             }
         }
+        _incrementNonce();
     }
 
     /// @dev Executes a low-level call to the implementation if an override is set
@@ -587,6 +586,7 @@ contract TokenBoundAccount is
         );
 
         allowances[currency][spender] = amount;
+        _incrementNonce();
         emit CurrencyApproval(currency, spender, amount);
     }
 }
