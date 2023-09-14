@@ -13,6 +13,7 @@ const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.20",
     settings: {
+      evmVersion: 'paris', //mumbai doesn't support PUSH0 0.8.20>  https://stackoverflow.com/a/76332341
       viaIR: true,
       optimizer: {
         enabled: true,
@@ -24,7 +25,7 @@ const config: HardhatUserConfig = {
     hardhat: {
       forking: {
         url: process.env.MUMBAI_RPC as string,
-        blockNumber: 38395581
+        blockNumber: 39990000
       }
     },
     // goerli: {
@@ -32,8 +33,9 @@ const config: HardhatUserConfig = {
     //   accounts: [process.env.PRIVATE_KEY || ""],
     // },
     mumbai: {
+      chainId:80001,
       url: process.env.MUMBAI_RPC,
-      accounts: [process.env.PRIVATE_KEY || ""],
+      accounts:[process.env.PRIVATE_KEY || ""],
     },
 
     // mainnet: {
@@ -52,8 +54,8 @@ const config: HardhatUserConfig = {
       goerli: process.env.ETHERSCAN_API_KEY || "",
       kovan: process.env.ETHERSCAN_API_KEY || "",
       //polygon
-      polygon: process.env.POLYGONSCAN_API_KEY || "",
-      polygonMumbai: process.env.POLYGONSCAN_API_KEY || ""
+      polygon: process.env.ETHERSCAN_API_KEY || "",
+      polygonMumbai: process.env.ETHERSCAN_API_KEY || ""
     }
   }
 };
