@@ -7,14 +7,13 @@ import {SafeERC20,IERC20,Address} from "@openzeppelin/contracts/token/ERC20/util
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {AccessControl,IERC165} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {IERC6551Account} from "erc6551/src/interfaces/IERC6551Account.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 
 import {ICurrencyPermit,ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
 import {Utils} from "../libs/Utils.sol";
-import {TokenBoundAccount} from "../TBA.sol";
+import {TokenBoundAccount,IERC6551Account} from "../TBA.sol";
 
 import {Treasury} from "./Treasury.sol";
 import {ClaimFunding} from "./Claim.sol";

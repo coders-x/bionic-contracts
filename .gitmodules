@@ -2,3 +2,6 @@
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
 
+[submodule "lib/tokenbound"]
+	path = lib/tokenbound
+	url = https://github.com/tokenbound/contracts
