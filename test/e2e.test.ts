@@ -2,7 +2,7 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20Permit, ERC6551Registry, BionicFundRasing, ERC20Upgradeable, TokenBoundAccount, 
+import { IERC20Permit, ERC6551Registry, BionicFundRasing, ERC20Upgradeable, TokenBoundAccount, MockEntryPoint,
     BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding }
     from "../typechain-types";
     import { BytesLike } from "ethers";
@@ -28,7 +28,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ERC6551_REGISTERY_ADDR = "0x953cbf74fD8736C97c61fc1c0f2b8A2959e5A328",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
-    ACCOUNT_ADDRESS = "0x44638181F7568Fc6Be91032bf3a848816B8e8583",
+    ACCOUNT_ADDRESS = "0x0a54aa8deB3536dD6E3B890C16C18d203e88C0d0",
     CALLBACK_GAS_LIMIT_PER_USER = 45000,
     PLEDGING_START_TIME = 20000000,
     PLEDGING_END_TIME = 2694616991,
@@ -38,7 +38,8 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: BionicFundRasing,
         tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, AbstractAccounts: TokenBoundAccount[],
-        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock, claimContract: ClaimFunding;
+        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock, 
+        claimContract: ClaimFunding, mockEntryPoint:MockEntryPoint;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
     let signers: SignerWithAddress[];
@@ -50,8 +51,13 @@ describe("e2e", function () {
         bipContract = await deployBIP();
         let TokenBoundContractRegistryFacory = await ethers.getContractFactory("ERC6551Registry");
         tokenBoundContractRegistry=await TokenBoundContractRegistryFacory.deploy();
+        let MockEntryPointFacory = await ethers.getContractFactory("MockEntryPoint");
+        mockEntryPoint=await MockEntryPointFacory.deploy();
+        tokenBoundContractRegistry=await TokenBoundContractRegistryFacory.deploy();
         usdtContract = await ethers.getContractAt("ERC20Upgradeable", USDT_ADDR);
-        tokenBoundImpContract = await deployTBA();
+        let AccountGuardianFactory = await ethers.getContractFactory("AccountGuardian");
+        let accountGuardian=await AccountGuardianFactory.deploy();
+        tokenBoundImpContract = await deployTBA(mockEntryPoint.address,accountGuardian.address);
         bionicDecimals = await bionicContract.decimals();
         abstractedAccount = await ethers.getContractAt("TokenBoundAccount", ACCOUNT_ADDRESS);
 
@@ -169,11 +175,14 @@ describe("e2e", function () {
                 network.config.chainId as number, bipContract.address,
                 "10", "0", []);
             let newAcc = await res.wait();
+
+
             expect(newAcc?.events[0]?.args?.account).to.equal(ACCOUNT_ADDRESS);
         })
         it("should permit fundingContract to transfer currencies out of users wallet", async () => {
             const deadline = ethers.constants.MaxUint256;
-            const alreadyPledged = await abstractedAccount.allowance(client.address, fundWithVesting.address);
+            const token=await abstractedAccount.token();
+            const alreadyPledged = await abstractedAccount.allowances(client.address, fundWithVesting.address);
             expect(alreadyPledged).to.equal(BigNumber.from(0));
             const amount = BigNumber.from(10);
             const { v, r, s } = await getCurrencyPermitSignature(
@@ -356,12 +365,12 @@ describe("e2e", function () {
 
             it("Should Receive Random words and chose winners", async () => {
                 const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
-                const winners = ["0x1A61A19Fc3B3e81F08383CCf3E26E62ab8671cC8",
-                    "0xd55f1de201c42CabF9301867C4f894CfdD2fE02A",
-                    "0x863c9125f0684F7EAc85F65d3EB102A157530eF1",
-                    "0x6Ac422f5DC0c75b337a610404C1126CA31B62D96",
-                    "0x0044E31061e01C0Ef45ab7fb1F0df1575993277D",
-                    "0xFa4f1ba15c27Fd0B6C8a30a01f1864771670f81A",]
+                const winners = ["0xD4048688ef20f099aF6410f4b7854C66EEaeD3dc",
+                    "0x456DBFaf1504b310dE66FC8c9104024cB88d7B99",
+                    "0xC888860fd040a139A8Ed3Ee51e6910c93e40a119",
+                    "0xb414EE9B78f5dDad334C5b39395Bb36147c95095",
+                    "0x8956039ECA16899Db65732c8175ffa440d481F64",
+                    "0x389B436278b6d136bA0996c3F4a0Afc680fD79ED",]
                 expect(await usdtContract.balanceOf(fundWithVesting.address)).to.be.equal(0);
                 expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(1000));
                 // simulate callback from the oracle network
@@ -454,7 +463,7 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
 }
 async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
-        account.nonces(signer.address),
+        account.nonce(),
         "BionicAccount",
         "1",
         signer.getChainId(),
@@ -538,11 +547,13 @@ async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: 
     console.log(`Deploying BionicFundRasing contract...`);
     return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass, vrfCoordinatorV2, gaslane, subId, cbGasLimit, reqVRFPerWinner);
 }
-async function deployTBA() {
-    const TBAContract = await ethers.getContractFactory("TokenBoundAccount");
-    console.log("Deploying TokenBoundAccount contract...");
+async function deployTBA(entryPoinAddress:string,guardianAddress:string) {
+    const TokenBoundAccountFactory = await ethers.getContractFactory("TokenBoundAccount");
+    let contract=await TokenBoundAccountFactory.deploy(guardianAddress,entryPoinAddress);
 
-    return await TBAContract.deploy(ENTRY_POINT, ERC6551_REGISTERY_ADDR);
+    console.log(`Deploying TBA contract...`);
+   
+    return contract;
 }
 async function deployVRFCoordinatorV2Mock() {
     const VRFCoordinatorV2MockFactory = await ethers.getContractFactory("VRFCoordinatorV2Mock");

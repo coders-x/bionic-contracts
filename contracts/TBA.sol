@@ -20,6 +20,8 @@ import {IAccountGuardian} from "tokenbound/src/interfaces/IAccountGuardian.sol";
 
 import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 
+import "hardhat/console.sol";
+
 error NotAuthorized();
 error InvalidInput();
 error AccountLocked();
@@ -64,7 +66,7 @@ contract TokenBoundAccount is
      * @dev currency => spender +> allowed amount
      *  if currency is 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE the spender will have access to the native coin
      */
-    mapping(address => mapping(address => uint256)) private _allowances;
+    mapping(address => mapping(address => uint256)) public allowances;
     /// @dev mapping from owner => selector => implementation
     mapping(address => mapping(bytes4 => address)) public overrides;
 
@@ -191,13 +193,16 @@ contract TokenBoundAccount is
         bytes32 r,
         bytes32 s
     ) external  {
+        console.log("block.timestamp <= deadline");
 
         require(
             block.timestamp <= deadline,        // solhint-disable-line not-rely-on-time
             "CurrencyPermit: expired deadline"
         );
         address _signer = owner();
+        console.log("signer %s",_signer);
         uint256 n = nonce();
+        console.log("nonce %s",n);
         bytes32 structHash = keccak256(
             abi.encode(
                 _CURRENCY_PERMIT_TYPEHASH,
@@ -208,15 +213,20 @@ contract TokenBoundAccount is
                 deadline
             )
         );
+        console.log("structHash");
+        console.logBytes32(structHash);
 
 
         bytes32 hash = _hashTypedDataV4(structHash);
-
+        console.log("hash");
+        console.logBytes32(hash);
         address signer = ECDSA.recover(hash, v, r, s);
+        console.log("signer %s",signer);
         require(
             signer == _signer,
             string(abi.encode(signer, "!=", _signer, hash))
         );
+        console.log("==> %s",string(abi.encode(signer, "!=", _signer, hash)));
         _approve(currency, spender, value);
     }
 
@@ -282,7 +292,14 @@ contract TokenBoundAccount is
 
     /// @dev Returns the current account nonce
     function nonce() public view override(ICurrencyPermit, IERC6551Account) returns (uint256) {
-        return IEntryPoint(_entryPoint).getNonce(address(this), 0);
+        console.log("trying to get nonce");
+        try IEntryPoint(_entryPoint).getNonce(address(this), 0) returns (uint256 n) {
+            console.log("got nonce %s",n);
+            return n;
+        } catch  (bytes memory reason){
+            console.log("!!!Failed");
+            console.logBytes(reason);
+        }
     }
 
     /// @dev Increments the account nonce if the caller is not the ERC-4337 entry point
@@ -309,7 +326,8 @@ contract TokenBoundAccount is
         address currency,
         address spender
     ) public view virtual returns (uint256) {
-        return _allowances[currency][spender];
+        console.log("checking allowence for %s on %s",spender,currency);
+        return allowances[currency][spender];
     }
 
     /// @dev Returns the owner of the ERC-721 token which owns this account. By default, the owner
@@ -568,7 +586,7 @@ contract TokenBoundAccount is
             "CurrencyPermit: approve to the zero address"
         );
 
-        _allowances[currency][spender] = amount;
+        allowances[currency][spender] = amount;
         emit CurrencyApproval(currency, spender, amount);
     }
 }

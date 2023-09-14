@@ -1,4 +1,3 @@
-import { verify } from '@thirdweb-dev/sdk';
 import dotenv from 'dotenv';
 import { ethers } from "hardhat";
 import hre from "hardhat";

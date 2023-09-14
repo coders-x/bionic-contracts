@@ -3,7 +3,7 @@ import { Mumbai } from '@thirdweb-dev/chains'
 import dotenv from 'dotenv';
 import { ethers, network } from "hardhat";
 import { getProviderFromRpcUrl } from "@thirdweb-dev/sdk";
-import { BigNumber, Signer } from "ethers";
+import { BigNumber, Contract, Signer } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { IERC20, TokenBoundAccount } from "../typechain-types";
 dotenv.config()
@@ -12,9 +12,9 @@ interface User extends Signer{
     tokenId?:any
 }
 // mumbai
-const BIP_CONTRACT="0xfFD890eBB19277f59f9d0810D464Efd2775df08E",ERC6551_REGISTRY_ADDR="0x02101dfB77FDE026414827Fdc604ddAF224F0921",
-    TOKEN_BOUND_IMP_ADDR="0x55FcaE61dF06858DC8115bDDd21B622F0634d8Ac",BIONIC_LAUNCH_ADDR="0x0321a0e7f15577e6edc817f7c82aea17371573c1",
-    BIONIC_TOKEN_ADDR="0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F", USDT_ADDR="0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848";
+const BIP_CONTRACT="0xA9652d7d33FacC265be044055B7392A261c3efD8",ERC6551_REGISTRY_ADDR="0x02101dfB77FDE026414827Fdc604ddAF224F0921",
+    TOKEN_BOUND_IMP_ADDR="0x55FcaE61dF06858DC8115bDDd21B622F0634d8Ac",BIONIC_LAUNCH_ADDR="0x96Ccc65AD06205d8Ce83368755190A69213f0B94",
+    BIONIC_TOKEN_ADDR="0x2111efE6FB546EDdF98A293BFEbEa50e594211Ef", USDT_ADDR="0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848";
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789";
 // //goerli
@@ -39,10 +39,10 @@ async function main(level:number) {
     let fundingContract = await ethers.getContractAt("BionicFundRasing",BIONIC_LAUNCH_ADDR);
     let usdtContract=await ethers.getContractAt("ERC20",USDT_ADDR);
     let bionicContract=await ethers.getContractAt("ERC20",BIONIC_TOKEN_ADDR);
-    const TBAContract = await ethers.getContractFactory("TokenBoundAccount");
-    let tokenBoundImpContract=await TBAContract.deploy(ENTRY_POINT, ERC6551_REGISTRY_ADDR);
-    await tokenBoundImpContract.deployed();
-    console.log(`tokenBoundAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
+    // const TBAContract = await ethers.getContractFactory("TokenBoundAccount");
+    // let tokenBoundImpContract=await TBAContract.deploy(ENTRY_POINT, ERC6551_REGISTRY_ADDR);
+    // await tokenBoundImpContract.deployed();
+    // console.log(`tokenBoundAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
     let abstractAccounts:TokenBoundAccount[]=[];
     const aa_addresses=[
         "0x33bfdB8C1ce6113BCD2A23262D74FA8Ba7508b8B",
@@ -155,9 +155,10 @@ async function main(level:number) {
     let tokenAllocationStartTime=new Date(pledgeEnding.getTime());
     tokenAllocationStartTime.setHours(tokenAllocationStartTime.getHours()+3);
     console.log(`now ${Date.now()/1000|0} and 3 hours later ${pledgeEnding.getTime()/1000|0} and token allocation ${tokenAllocationStartTime.getTime()/1000|0}`);
-    let r=await(await fundingContract.connect(owner).add(BIONIC_TOKEN_ADDR,Date.now()/1000|0,pledgeEnding.getTime()/1000|0,1000,10,tokenAllocationStartTime.getTime()/1000|0,10,1e10,[5,10,8])).wait(1);
-    pid=r?.events[1].args?.pid;
-    console.log(pid);
+    // let r=await(await fundingContract.connect(owner).add(BIONIC_TOKEN_ADDR,Date.now()/1000|0,pledgeEnding.getTime()/1000|0,1000,10,tokenAllocationStartTime.getTime()/1000|0,10,1e10,[5,10,8])).wait(1);
+    // pid=r?.events[1].args?.pid;
+    // console.log(pid);
+    level++;
    }
 
 
@@ -187,9 +188,22 @@ async function main(level:number) {
    }
 
 
+   /*** test */
+   if(level==5){
+    const deadline = ethers.constants.MaxUint256;
+    const { v, r, s } = await getCurrencyPermitSignature(
+        //@ts-ignore
+        owner,
+        await ethers.getContractAt("TokenBoundAccount","0x352789e2acef5E4BE270215Ee8b2855FD0d88fe6"),
+        bionicContract,
+        fundingContract.address,
+        BigNumber.from(pledgeAmount),
+        deadline
+    );
+    let raw = fundingContract.interface.encodeFunctionData("pledge", [0, BigNumber.from(pledgeAmount), deadline, v, r, s]);
 
-
-
+    console.log("raw:",raw)
+   }
 }
 
 
@@ -208,12 +222,12 @@ const getSigners = (amount: number): Signer[] => {
     return signers
 }
 
-async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
+async function getCurrencyPermitSignature(signer: SignerWithAddress, account: Contract, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
-        account.nonce(),
+        1,
         "BionicAccount",
         "1",
-        80001
+        1
     ])
 
 
@@ -261,4 +275,4 @@ async function getCurrencyPermitSignature(signer: SignerWithAddress, account: To
     )
 }
 
-main(1).then(console.log).catch(console.error)
+main(3).then(console.log).catch(console.error)
