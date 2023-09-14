@@ -28,10 +28,10 @@ const config: HardhatUserConfig = {
         blockNumber: 39990000
       }
     },
-    goerli: {
-      url: process.env.RPC_URL,
-      accounts: [process.env.PRIVATE_KEY || ""],
-    },
+    // goerli: {
+    //   url: process.env.RPC_URL,
+    //   accounts: [process.env.PRIVATE_KEY || ""],
+    // },
     mumbai: {
       chainId:80001,
       url: process.env.MUMBAI_RPC,
