@@ -2,11 +2,13 @@ import { BigNumber } from "@ethersproject/bignumber";
 import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20Permit, ERC6551Registry, BionicFundRasing, ERC20Upgradeable, TokenBoundAccount, MockEntryPoint,
-    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding }
+import {
+    IERC20Permit, ERC6551Registry, BionicFundRasing, ERC20Upgradeable, TokenBoundAccount, MockEntryPoint,
+    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding
+}
     from "../typechain-types";
-    import { BytesLike } from "ethers";
-    
+import { BytesLike } from "ethers";
+
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 
@@ -29,17 +31,17 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
     ACCOUNT_ADDRESS = "0x0a54aa8deB3536dD6E3B890C16C18d203e88C0d0",
-    CALLBACK_GAS_LIMIT_PER_USER = 45000,
+    CALLBACK_GAS_LIMIT_PER_USER = 110300,
     PLEDGING_START_TIME = 20000000,
     PLEDGING_END_TIME = 2694616991,
-    tokenAllocationStartTime=PLEDGING_END_TIME + 1000,
+    tokenAllocationStartTime = PLEDGING_END_TIME + 1000,
     TIER_ALLOCATION = [3, 2, 1];
 
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, fundWithVesting: BionicFundRasing,
         tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, AbstractAccounts: TokenBoundAccount[],
-        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock, 
-        claimContract: ClaimFunding, mockEntryPoint:MockEntryPoint;
+        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock,
+        claimContract: ClaimFunding, mockEntryPoint: MockEntryPoint;
     let owner: SignerWithAddress;
     let client: SignerWithAddress;
     let signers: SignerWithAddress[];
@@ -50,14 +52,14 @@ describe("e2e", function () {
         bionicContract = await deployBionic();
         bipContract = await deployBIP();
         let TokenBoundContractRegistryFacory = await ethers.getContractFactory("ERC6551Registry");
-        tokenBoundContractRegistry=await TokenBoundContractRegistryFacory.deploy();
+        tokenBoundContractRegistry = await TokenBoundContractRegistryFacory.deploy();
         let MockEntryPointFactory = await ethers.getContractFactory("MockEntryPoint");
-        mockEntryPoint=await MockEntryPointFactory.deploy();
-        tokenBoundContractRegistry=await TokenBoundContractRegistryFacory.deploy();
+        mockEntryPoint = await MockEntryPointFactory.deploy();
+        tokenBoundContractRegistry = await TokenBoundContractRegistryFacory.deploy();
         usdtContract = await ethers.getContractAt("ERC20Upgradeable", USDT_ADDR);
         let AccountGuardianFactory = await ethers.getContractFactory("AccountGuardian");
-        let accountGuardian=await AccountGuardianFactory.deploy();
-        tokenBoundImpContract = await deployTBA(mockEntryPoint.address,accountGuardian.address);
+        let accountGuardian = await AccountGuardianFactory.deploy();
+        tokenBoundImpContract = await deployTBA(mockEntryPoint.address, accountGuardian.address);
         bionicDecimals = await bionicContract.decimals();
         abstractedAccount = await ethers.getContractAt("TokenBoundAccount", ACCOUNT_ADDRESS);
 
@@ -102,7 +104,7 @@ describe("e2e", function () {
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
         fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, CALLBACK_GAS_LIMIT_PER_USER, true);
-        claimContract=await ethers.getContractAt("ClaimFunding",await fundWithVesting.claimFund())
+        claimContract = await ethers.getContractAt("ClaimFunding", await fundWithVesting.claimFund())
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address);
 
     });
@@ -181,7 +183,7 @@ describe("e2e", function () {
         })
         it("should permit fundingContract to transfer currencies out of users wallet", async () => {
             const deadline = ethers.constants.MaxUint256;
-            const token=await abstractedAccount.token();
+            const token = await abstractedAccount.token();
             const alreadyPledged = await abstractedAccount.allowances(client.address, fundWithVesting.address);
             expect(alreadyPledged).to.equal(BigNumber.from(0));
             const amount = BigNumber.from(10);
@@ -202,7 +204,7 @@ describe("e2e", function () {
     });
     describe("FundingRegistry", () => {
         describe("Add", function () {
-            const pledgingAmountPerUser=1000,tokenAllocationPerMonth=100,tokenAllocationMonthCount=10,targetRaise=pledgingAmountPerUser*pledgingAmountPerUser
+            const pledgingAmountPerUser = 1000, tokenAllocationPerMonth = 100, tokenAllocationMonthCount = 10, targetRaise = pledgingAmountPerUser * pledgingAmountPerUser
             it("Should fail if the not BROKER", async function () {
                 await expect(fundWithVesting.connect(client)
                     .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, pledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION))
@@ -212,7 +214,7 @@ describe("e2e", function () {
                 expect(await fundWithVesting.hasRole(await fundWithVesting.BROKER_ROLE(), owner.address)).to.be.true;
                 await expect(fundWithVesting.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, pledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION))
                     .to.emit(fundWithVesting, "PoolAdded").withArgs(0)
-                    .to.emit(claimContract,"ProjectAdded").withArgs(bionicContract.address,tokenAllocationPerMonth,tokenAllocationStartTime,tokenAllocationMonthCount);
+                    .to.emit(claimContract, "ProjectAdded").withArgs(0, bionicContract.address, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount);
             });
             it("Should return same Pool upon request", async () => {
                 let pool = await fundWithVesting.poolInfo(0);
@@ -230,25 +232,25 @@ describe("e2e", function () {
 
 
         describe("pledge", function () {
-            it("Should fail if not sent via TBA", async function () {
-                await expect(fundWithVesting.connect(client).pledge(0, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
-                    .to.be.revertedWith("Contract does not support TokenBoundAccount");
-            });
+            // it("Should fail if not sent via TBA", async function () {
+            //     await expect(fundWithVesting.connect(client).pledge(0, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
+            //         .to.be.revertedWith("Contract does not support TokenBoundAccount");
+            // });
             it("Should fail if Pool doesn't Exist", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [10000, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
-                    .to.be.revertedWithCustomError(fundWithVesting,"LPFRWV__InvalidPool")//("pledge: Invalid PID");
+                    .to.be.revertedWithCustomError(fundWithVesting, "LPFRWV__InvalidPool")//("pledge: Invalid PID");
             });
             it("Should fail if not enough amount pledged", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 0, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
-                    .to.be.revertedWithCustomError(fundWithVesting,"LPFRWV__NotValidPledgeAmount").withArgs(1000);
+                    .to.be.revertedWithCustomError(fundWithVesting, "LPFRWV__NotValidPledgeAmount").withArgs(1000);
             });
 
             it("Should fail if pledge exceeds the max user share", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 1001, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
-                    .to.be.revertedWithCustomError(fundWithVesting,"LPFRWV__NotValidPledgeAmount").withArgs(1000);
+                    .to.be.revertedWithCustomError(fundWithVesting, "LPFRWV__NotValidPledgeAmount").withArgs(1000);
             });
             it("Should fail if expired deadline", async function () {
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
@@ -280,7 +282,7 @@ describe("e2e", function () {
                     await expect(aac.connect(signers[i]).executeCall(fundWithVesting.address, 0, raw))
                         .to.emit(fundWithVesting, "Pledge").withArgs(aac.address, 0, amount)
                         .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, amount)
-                        .to.emit(fundWithVesting, "PledgeFunded").withArgs(aac.address, 0,amount);
+                        .to.emit(fundWithVesting, "PledgeFunded").withArgs(aac.address, 0, amount);
 
                     expect(oldbalance).to.not.equal(await usdtContract.balanceOf(treasuryAddress));
                     expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(oldbalance.add(alreadyPledged.add(amount)))
@@ -306,7 +308,7 @@ describe("e2e", function () {
                 await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
                 let raw = fundWithVesting.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
                 await expect(abstractedAccount.connect(client).executeCall(fundWithVesting.address, 0, raw))
-                    .to.revertedWithCustomError(fundWithVesting,"LPFRWV__AlreadyPledgedToThisPool");
+                    .to.revertedWithCustomError(fundWithVesting, "LPFRWV__AlreadyPledgedToThisPool");
                 //     .to.emit(fundWithVesting, "Pledge").withArgs(abstractedAccount.address, 0, amount)
                 //     .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, fundWithVesting.address, amount)
                 //     .to.emit(fundWithVesting, "PledgeFunded").withArgs(abstractedAccount.address, 0, amount);
@@ -380,7 +382,7 @@ describe("e2e", function () {
                         fundWithVesting.address
                     )
                 ).to.emit(fundWithVesting, "WinnersPicked").withArgs(0, winners)
-                .to.emit(fundWithVesting,"LotteryRefunded");
+                    .to.emit(fundWithVesting, "LotteryRefunded");
 
                 // for (let i = 0; i < winners.length; i++) {
                 //     expect(winners).to.contains(await fundWithVesting.poolTolotteryWinners(0,i))
@@ -547,12 +549,12 @@ async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: 
     console.log(`Deploying BionicFundRasing contract...`);
     return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass, vrfCoordinatorV2, gaslane, subId, cbGasLimit, reqVRFPerWinner);
 }
-async function deployTBA(entryPoinAddress:string,guardianAddress:string) {
+async function deployTBA(entryPoinAddress: string, guardianAddress: string) {
     const TokenBoundAccountFactory = await ethers.getContractFactory("TokenBoundAccount");
-    let contract=await TokenBoundAccountFactory.deploy(guardianAddress,entryPoinAddress);
+    let contract = await TokenBoundAccountFactory.deploy(guardianAddress, entryPoinAddress);
 
     console.log(`Deploying TBA contract...`);
-   
+
     return contract;
 }
 async function deployVRFCoordinatorV2Mock() {

@@ -2,34 +2,25 @@ import dotenv from 'dotenv';
 import { ethers } from "hardhat";
 import hre from "hardhat";
 import { FactoryOptions } from 'hardhat/types';
+import { goerli as config } from './config.json';
+import { BionicFundRasing } from '../typechain-types';
 dotenv.config()
-const CONFIG = {
-    name: "mumbai",
-    keyHash: "0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f",
-    vrfCoordinator: "0x7a1bac17ccc5b313516c5e16fb24f7659aa5ebed",
-    tokenAddress:"0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F",
-    usdtAddress:"0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848",
-    bionicInvestorPass:"0xfFD890eBB19277f59f9d0810D464Efd2775df08E",
-    utilsAddress:"0x03A1726655bE74aD1430aa30e4A823E14428346c",
-    subId:5682,
-    cbGasLimit:50000,
-    reqVRFPerWinner:false,
-};
+const CONFIG = config;
 
 async function main() {
     const UtilsLib = await ethers.getContractFactory("Utils");
     const utils = await UtilsLib.deploy();
     await utils.deployed();
     console.log(`deployed utils at ${utils.address}`)
-    let contract=await deployContract({
+    let contract = await deployContract({
         libraries: {
             Utils: utils.address,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
             // Utils: CONFIG.utilsAddress,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
         }
     })
     console.log(`deployed fwv at ${contract.address}`)
-    await verifyContract(contract.address, utils.address,[
-        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash, 
+    await verifyContract(contract, utils.address, [
+        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash,
         CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner
     ]);
 
@@ -41,36 +32,49 @@ async function main() {
 }
 
 
-async function deployContract(opt:FactoryOptions){
+async function deployContract(opt: FactoryOptions) {
 
-      console.log(`Deploying BionicFundRasing contract...`);
+    console.log(`Deploying BionicFundRasing contract...`);
 
 
     const FundWithVestingContract = await ethers.getContractFactory("BionicFundRasing", opt);
 
-    let funding=await FundWithVestingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, 
+    let funding = await FundWithVestingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
         CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner);
 
     return await funding.deployed();
 }
 
-async function verifyContract(contractAddress:string, utilsAddress:string,args:any){
+async function verifyContract(contract: BionicFundRasing, utilsAddress: string, args: any) {
     let res;
-    
+
     console.log(`Verifying Utils Contract at ${utilsAddress}`);
-     res= await hre.run("verify:verify", {
+    res = await hre.run("verify:verify", {
         address: utilsAddress,//funding.address,
     });
 
-    console.log(`Verifying FWV Contract at ${contractAddress}`);
-    res= await hre.run("verify:verify", {
-        address: contractAddress,//funding.address,
+    let treasuryAddress = await contract.treasury();
+    console.log(`Verifying Treasury Contract at ${treasuryAddress}`);
+    res = await hre.run("verify:verify", {
+        address: treasuryAddress,
+        args: [contract.address],//funding.address,
+    });
+
+    let claimAddress = await contract.claimFund();
+    console.log(`Verifying ClaimFund Contract at ${claimAddress}`);
+    res = await hre.run("verify:verify", {
+        address: claimAddress
+    });
+
+    console.log(`Verifying FWV Contract at ${contract.address}`);
+    res = await hre.run("verify:verify", {
+        address: contract.address,//funding.address,
         constructorArguments: args,
         libraries: {
             Utils: utilsAddress//utils.address
         }
-      });
-    console.log("Verified: ",res);
+    });
+    console.log("Verified: ", res);
     return res;
 }
 

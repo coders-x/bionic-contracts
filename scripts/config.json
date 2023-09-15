@@ -1,0 +1,21 @@
+{
+    "goerli":{
+        "name": "goerli",
+        "keyHash": "0x79d3d8832d904592c0bf9818b621522c988bb8b0c05cdc3b15aea1b6e8db0c15",
+        "vrfCoordinator": "0x2ca8e0c643bde4c2e08ab1fa0da3401adad7734d",
+        "tokenAddress":"0xbf97d8e33eC1e2a8c339E80334041e2809E0b874",
+        "usdtAddress":"0xe583769738b6dd4E7CAF8451050d1948BE717679",
+        "bionicInvestorPass":"0x0a705c9B51B4D6b48d59B5D80BB8Cc7151973a47",
+        "tbaImpl":"0x32a507b82822c194aB25931bE5d72772aA4F9F3b",
+        "tbaGuardian":"0x4712e03DE21b2d8dfEDc996D1D401328f4cD9342",
+        "bionicLaunchPad":"0x768E4828971e20DF74862aF873Ac5d319aA138Da",
+        "entryPoint":"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+        "erc6551Reg":"0x02101dfB77FDE026414827Fdc604ddAF224F0921",
+        "subId":14251,
+        "cbGasLimit":11200,
+        "reqVRFPerWinner":false
+    },
+    "mumbai":{
+
+    }
+}

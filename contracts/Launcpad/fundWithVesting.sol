@@ -227,7 +227,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         poolIdToLastPercentageAllocTime[
             pid
         ] = _tokenAllocationStartTime;
-            try claimFund.registerProjectToken(address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
+            try claimFund.registerProjectToken(pid,address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
         }catch (bytes memory reason) {
             /// @solidity memory-safe-assembly
             assembly {
@@ -367,7 +367,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     ) internal override {
         uint pid = requestIdToPoolId[requestId];
         address[] memory winners=pickWinners(pid,randomWords);
-        // uint256 pid=requestIdToPoolId[requestId];
+        claimFund.addWinningInvestors(pid, winners);
         postLottery(pid,winners);
     }
 
@@ -420,7 +420,6 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         //     ),
         //     "Contract does not support TokenBoundAccount"
         // );
-
 
         try TokenBoundAccount(payable(_msgSender())).token() returns (
             uint256,
