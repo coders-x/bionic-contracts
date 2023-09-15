@@ -103,7 +103,7 @@ describe("e2e", function () {
 
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
-        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, CALLBACK_GAS_LIMIT_PER_USER, true);
+        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, true);
         claimContract = await ethers.getContractAt("ClaimFunding", await fundWithVesting.claimFund())
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address);
 
@@ -318,12 +318,12 @@ describe("e2e", function () {
 
 
             it("Should fail to start lottery with non sorting account", async () => {
-                await expect(fundWithVesting.connect(client).draw(0))
+                await expect(fundWithVesting.connect(client).draw(0, CALLBACK_GAS_LIMIT_PER_USER))
                     .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
             })
             it("Should fail to start if tiers haven't been added", async () => {
                 await helpers.time.increaseTo(tokenAllocationStartTime);
-                await expect(fundWithVesting.draw(0))
+                await expect(fundWithVesting.draw(0, CALLBACK_GAS_LIMIT_PER_USER))
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__TiersHaveNotBeenInitialized");
             })
 
@@ -355,13 +355,13 @@ describe("e2e", function () {
             })
 
             it("Should request random numbers for the pool Winners Raffle", async () => {
-                await expect(fundWithVesting.draw(100000), "invalid poolId")
+                await expect(fundWithVesting.draw(100000, CALLBACK_GAS_LIMIT_PER_USER), "invalid poolId")
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__InvalidPool");
 
-                await expect(fundWithVesting.draw(0))
+                await expect(fundWithVesting.draw(0, CALLBACK_GAS_LIMIT_PER_USER))
                     .to.emit(fundWithVesting, "DrawInitiated").withArgs(0, 1);
 
-                await expect(fundWithVesting.draw(0), "invalid poolId")
+                await expect(fundWithVesting.draw(0, CALLBACK_GAS_LIMIT_PER_USER), "invalid poolId")
                     .to.revertedWithCustomError(fundWithVesting, "LPFRWV__DrawForThePoolHasAlreadyStarted");
             });
 
@@ -534,7 +534,7 @@ async function deployBIP() {
     });
     return await bipContract.deployed();
 }
-async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, cbGasLimit: number, reqVRFPerWinner: boolean) {
+async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, reqVRFPerWinner: boolean) {
     // const IterableMappingLib = await ethers.getContractFactory("IterableMapping");
     // const lib = await IterableMappingLib.deploy();
     // await lib.deployed();
@@ -547,7 +547,7 @@ async function deployFundWithVesting(tokenAddress: string, bionicInvsestorPass: 
         }
     });
     console.log(`Deploying BionicFundRasing contract...`);
-    return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass, vrfCoordinatorV2, gaslane, subId, cbGasLimit, reqVRFPerWinner);
+    return await FundWithVestingContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass, vrfCoordinatorV2, gaslane, subId, reqVRFPerWinner);
 }
 async function deployTBA(entryPoinAddress: string, guardianAddress: string) {
     const TokenBoundAccountFactory = await ethers.getContractFactory("TokenBoundAccount");

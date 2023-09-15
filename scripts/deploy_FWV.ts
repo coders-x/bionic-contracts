@@ -21,7 +21,7 @@ async function main() {
     console.log(`deployed fwv at ${contract.address}`)
     await verifyContract(contract, utils.address, [
         CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash,
-        CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner
+        CONFIG.subId, CONFIG.reqVRFPerWinner
     ]);
 
 
@@ -40,7 +40,7 @@ async function deployContract(opt: FactoryOptions) {
     const FundWithVestingContract = await ethers.getContractFactory("BionicFundRasing", opt);
 
     let funding = await FundWithVestingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
-        CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner);
+        CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner);
 
     return await funding.deployed();
 }

@@ -7,12 +7,12 @@
         "usdtAddress":"0xe583769738b6dd4E7CAF8451050d1948BE717679",
         "bionicInvestorPass":"0x0a705c9B51B4D6b48d59B5D80BB8Cc7151973a47",
         "tbaImpl":"0x32a507b82822c194aB25931bE5d72772aA4F9F3b",
-        "tbaGuardian":"0x4712e03DE21b2d8dfEDc996D1D401328f4cD9342",
-        "bionicLaunchPad":"0x768E4828971e20DF74862aF873Ac5d319aA138Da",
+        "tbaGuardian":"0xcdAF8f3eFaBBf656070F32f8449F340dD41B0668",
+        "bionicLaunchPad":"0xa18e97c9498338585d433b2c42d6c6ea15fd0aec",
         "entryPoint":"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
         "erc6551Reg":"0x02101dfB77FDE026414827Fdc604ddAF224F0921",
         "subId":14251,
-        "cbGasLimit":11200,
+        "cbGasLimit":60000,
         "reqVRFPerWinner":false
     },
     "mumbai":{

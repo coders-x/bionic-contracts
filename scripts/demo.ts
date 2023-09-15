@@ -4,7 +4,7 @@ import { getProviderFromRpcUrl } from "@thirdweb-dev/sdk";
 import { BigNumber, Contract, Signer } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { IERC20, TokenBoundAccount } from "../typechain-types";
-import { goerli as config } from './config.json';
+import { goerli as configInfo } from './config.json';
 
 dotenv.config();
 
@@ -12,18 +12,18 @@ interface User extends Signer {
     tokenId?: any;
 }
 // mumbai
-const BIP_CONTRACT = config.bionicInvestorPass,
-    TOKEN_BOUND_IMP_ADDR = config.tbaImpl,
-    BIONIC_LAUNCH_ADDR = config.bionicLaunchPad,
-    BIONIC_TOKEN_ADDR = config.tokenAddress,
-    USDT_ADDR = config.usdtAddress;
+const BIP_CONTRACT = configInfo.bionicInvestorPass,
+    TOKEN_BOUND_IMP_ADDR = configInfo.tbaImpl,
+    BIONIC_LAUNCH_ADDR = configInfo.bionicLaunchPad,
+    BIONIC_TOKEN_ADDR = configInfo.tokenAddress,
+    USDT_ADDR = configInfo.usdtAddress;
 
 //     // mumbai
 // const BIP_CONTRACT="0xfFD890eBB19277f59f9d0810D464Efd2775df08E", TOKEN_BOUND_IMP_ADDR="0xC0dC4Da60478e13e691E32261f5d63Fd3cDC075d",BIONIC_LAUNCH_ADDR="0x748b9d63815015A04057688c437B20e84ccD1b8E",
 //     BIONIC_TOKEN_ADDR="0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F", USDT_ADDR="0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848";
 
-const ENTRY_POINT = config.entryPoint,
-    ERC6551_REGISTRY_ADDR = config.erc6551Reg;
+const ENTRY_POINT = configInfo.entryPoint,
+    ERC6551_REGISTRY_ADDR = configInfo.erc6551Reg;
 // //goerli
 // const BIP_CONTRACT="0xA9652d7d33FacC265be044055B7392A261c3efD8",ERC6551_REGISTRY_ADDR="0x02101dfB77FDE026414827Fdc604ddAF224F0921",
 //     TOKEN_BOUND_IMP_ADDR="0x55FcaE61dF06858DC8115bDDd21B622F0634d8Ac",BIONIC_LAUNCH_ADDR="0x96Ccc65AD06205d8Ce83368755190A69213f0B94",
@@ -31,7 +31,7 @@ const ENTRY_POINT = config.entryPoint,
 let provider = getProviderFromRpcUrl(process.env.RPC_URL || "", {});
 let owner = new ethers.Wallet(process.env.PRIVATE_KEY || "", provider);
 
-async function main(level: number) {
+async function main(level: number, pid: number = 0) {
     /*
       1. generate n numbers of users
       2. mint BIP NFT for them
@@ -218,19 +218,18 @@ async function main(level: number) {
 
     /*** Add Project */
     //    level++;
-    let pid = 0,
-        pledgeAmount = 1000,
+    let pledgeAmount = 1000,
         tiers = [4, 3, 2];
     if (level == 3) {
         level++;
-        let timeDifference = 30;
+        let timeDifference = 10;
         let pledgeEnding = new Date();
         pledgeEnding.setMinutes(pledgeEnding.getMinutes() + timeDifference);
         let tokenAllocationStartTime = new Date(pledgeEnding.getTime());
-        tokenAllocationStartTime.setMinutes(tokenAllocationStartTime.getMinutes() + timeDifference);
+        tokenAllocationStartTime.setMinutes(tokenAllocationStartTime.getMinutes() + timeDifference / 4);
         console.log(
-            `now ${(Date.now() / 1000) | 0} and 3 hours later ${(pledgeEnding.getTime() / 1000) | 0
-            } and token allocation ${(tokenAllocationStartTime.getTime() / 1000) | 0}`
+            `now ${(Date.now() / 1000) | 0} and ${timeDifference} mins later ${(pledgeEnding.getTime() / 1000) | 0
+            } and token allocation will be at ${(tokenAllocationStartTime.getTime() / 1000) | 0}`
         );
         let r = await (
             await fundingContract
@@ -286,7 +285,7 @@ async function main(level: number) {
                     `approved and moved ${res.events[3].args.value} in  ${res.events[3].args.currency} from ${res.events[3].address} to ${res.events[3].args.spender} `
                 );
             } catch (err) {
-                console.error(err.receipt.logs);
+                console.error(err);
             }
         }
     }
@@ -320,8 +319,8 @@ async function main(level: number) {
     if (level <= 6) {
         level++;
         try {
-            let res = await (await fundingContract.draw(pid)).wait();
-            console.log(res.events);
+            let res = await (await fundingContract.draw(pid, configInfo.cbGasLimit)).wait();
+            console.log(`last tier initated with ${res.events[0].args.members.length}`, res.events[0].args.members);
         } catch (error) {
             let pool = await fundingContract.poolInfo(pid);
             let toWait = pool.tokenAllocationStartTime.sub(Date.now() / 1000 | 0);
@@ -423,5 +422,5 @@ async function getCurrencyPermitSignature(
         )
     );
 }
-
-main(6).then(console.log).catch(console.error);
+//step, pid
+main(3, 13).then(console.log).catch(console.error);

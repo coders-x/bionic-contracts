@@ -124,9 +124,8 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         address vrfCoordinatorV2,
         bytes32 gasLane, // keyHash
         uint64 subscriptionId,
-        uint32 callbackGasLimit,
         bool requestVRFPerWinner
-    ) Raffle(vrfCoordinatorV2,gasLane,subscriptionId,callbackGasLimit,requestVRFPerWinner) {
+    ) Raffle(vrfCoordinatorV2,gasLane,subscriptionId,requestVRFPerWinner) {
         if(address(_stakingToken)==address(0)){
             revert LPFRWV__InvalidRewardToken();
         }
@@ -155,11 +154,6 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     }
 
-    /// @notice Returns the number of pools that have been added by the owner
-    /// @return Number of pools
-    function numberOfPools() external view returns (uint256) {
-        return poolInfo.length;
-    }
 
     /// @dev Can only be called by the contract owner
     function add(
@@ -312,6 +306,43 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         _addToTier(pid, tierId, members);
     }
 
+
+    /**
+     * @dev will get the money out of users wallet into investment wallet
+     */
+    function draw(
+        uint256 _pid,
+        uint32 _callbackGasPerUser
+    ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
+        console.log("%s>=%s",_pid,poolInfo.length);
+        if(_pid >= poolInfo.length)
+            revert LPFRWV__InvalidPool();
+        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
+        if(pool.pledgingEndTime > block.timestamp) //solhint-disable-line not-rely-on-time
+            revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
+        if(poolIdToRequestId[_pid]!=0)
+            revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
+            
+        preDraw(_pid);
+
+        requestId = _draw(_pid,pool.winnersCount,_callbackGasPerUser);
+
+
+
+        emit DrawInitiated(_pid,requestId);
+    }
+
+    ///////////////
+    // Internall //
+    ///////////////
+
+
+    /// @notice Returns the number of pools that have been added by the owner
+    /// @return Number of pools
+    function numberOfPools() external view returns (uint256) {
+        return poolInfo.length;
+    }
+
     /**
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
@@ -333,29 +364,6 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     }
 
-    /**
-     * @dev will get the money out of users wallet into investment wallet
-     */
-    function draw(
-        uint256 _pid
-    ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
-        console.log("%s>=%s",_pid,poolInfo.length);
-        if(_pid >= poolInfo.length)
-            revert LPFRWV__InvalidPool();
-        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
-        if(pool.pledgingEndTime > block.timestamp) //solhint-disable-line not-rely-on-time
-            revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
-        if(poolIdToRequestId[_pid]!=0)
-            revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
-            
-        preDraw(_pid);
-
-        requestId = _draw(_pid,pool.winnersCount);
-
-
-
-        emit DrawInitiated(_pid,requestId);
-    }
 
     /**
      * @dev This is the function that Chainlink VRF node

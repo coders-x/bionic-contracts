@@ -32,7 +32,6 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     uint64 private immutable i_subscriptionId;
     bytes32 private immutable i_gasLane;
-    uint32 private immutable i_callbackGasPerWinner;
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
 
     // Lottery Variables
@@ -59,13 +58,11 @@ abstract contract Raffle is VRFConsumerBaseV2 {
         address vrfCoordinatorV2,
         bytes32 gasLane,
         uint64 subscriptionId,
-        uint32 callbackGasLimit,
         bool requestVRFPerWinner
     ) VRFConsumerBaseV2(vrfCoordinatorV2) {
         i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
         i_gasLane = gasLane;
         i_subscriptionId = subscriptionId;
-        i_callbackGasPerWinner = callbackGasLimit;
         i_requestVRFPerWinner = requestVRFPerWinner;
     }
 
@@ -86,7 +83,7 @@ abstract contract Raffle is VRFConsumerBaseV2 {
         emit TierInitiated(pid, tierId, members);
     }
 
-    function _draw(uint pid, uint32 winnersCount) internal returns (uint requestId) {
+    function _draw(uint pid, uint32 winnersCount,uint32 callbackGasPerUser) internal returns (uint requestId) {
         if (poolIdToRequestId[pid] != 0) {
             revert Raffle__RaffleAlreadyInProgressOrDone();
         }
@@ -94,7 +91,7 @@ abstract contract Raffle is VRFConsumerBaseV2 {
             i_gasLane,
             i_subscriptionId,
             REQUEST_CONFIRMATIONS,
-            i_callbackGasPerWinner*winnersCount,
+            callbackGasPerUser*winnersCount,
             i_requestVRFPerWinner ? winnersCount : uint32(poolIdToTiers[pid].length)
         );
 
