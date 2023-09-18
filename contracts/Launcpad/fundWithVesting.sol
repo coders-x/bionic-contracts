@@ -48,8 +48,7 @@ error LPFRWV__AlreadyPledgedToThisPool();
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
 
 /// @title Fund raising platform facilitated by launch pool
-/// @author Ali Mahdavi
-/// @notice Fork of MasterChef.sol from SushiSwap
+/// @author Coders-x
 /// @dev Only the owner can add new pools
 contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
@@ -58,10 +57,14 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     using Address for address;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
 
+
+
+    /*///////////////////////////////////////////////////////////////
+                                States
+    //////////////////////////////////////////////////////////////*/
     bytes32 public constant BROKER_ROLE = keccak256("BROKER_ROLE");
     bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
-
 
 
     /// @notice staking token is fixed for all pools
@@ -73,37 +76,27 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     /// @notice Container for holding all rewards
     Treasury public treasury;
-
     /// @notice Container for holding all rewards
     ClaimFunding public claimFund;
-
 
     /// @notice List of pools that users can stake into
     BionicStructs.PoolInfo[] public poolInfo;
 
     // Pool to accumulated share counters
-    mapping(uint256 => uint256) public poolIdToAccPercentagePerShare;
     mapping(uint256 => uint256) public poolIdToLastPercentageAllocTime;
-
-
     // Total amount staked into the pool
     mapping(uint256 => uint256) public poolIdToTotalStaked;
-
-
     /// @notice Per pool, info of each user that stakes ERC20 tokens.
     /// @notice Pool ID => User Address => User Info
     mapping(uint256=> EnumerableMap.AddressToUintMap) internal userPledge; //todo maybe optimize it more
-    // EnumerableMap.UintToAddressMap public pledgeAmount;
-    // EnumerableMap.AddressToUintMap public UserParticipation;
-    // mapping(uint256 => mapping(address => uint256)) public userPledge;
-
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
 
 
-
+    /*///////////////////////////////////////////////////////////////
+                                Events
+    //////////////////////////////////////////////////////////////*/
     event ContractDeployed(address indexed treasury);
-
     event PoolAdded(uint256 indexed pid);
     event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
     event DrawInitiated(uint256 indexed pid, uint256 requestId);
@@ -115,6 +108,9 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     event LotteryRefunded(address indexed user, uint256 indexed pid, uint256 amount);
 
 
+    /*///////////////////////////////////////////////////////////////
+                                Constructor
+    //////////////////////////////////////////////////////////////*/
     /// @param _stakingToken Address of the staking token for all pools
     /// @param _investingToken Address of the staking token for all pools
     constructor(
@@ -154,7 +150,9 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
     }
 
-
+    /*///////////////////////////////////////////////////////////////
+                        Public/External Functions
+    //////////////////////////////////////////////////////////////*/
     /// @dev Can only be called by the contract owner
     function add(
         IERC20 _rewardToken, // Address of the reward token contract.
@@ -212,16 +210,16 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
 
 
         pid=poolInfo.length.sub(1);
-
         poolIdToTiers[pid]=tiers;
 
 
-
-
-        poolIdToLastPercentageAllocTime[
-            pid
-        ] = _tokenAllocationStartTime;
-            try claimFund.registerProjectToken(pid,address(_rewardToken),_tokenAllocationPerMonth,_tokenAllocationStartTime,_tokenAllocationMonthCount){
+        try claimFund.registerProjectToken(
+            pid,
+            address(_rewardToken),
+            _tokenAllocationPerMonth,
+            _tokenAllocationStartTime,
+            _tokenAllocationMonthCount
+        ){
         }catch (bytes memory reason) {
             /// @solidity memory-safe-assembly
             assembly {
@@ -322,7 +320,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         if(poolIdToRequestId[_pid]!=0)
             revert LPFRWV__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[_pid]);
             
-        preDraw(_pid);
+        _preDraw(_pid);
 
         requestId = _draw(_pid,pool.winnersCount,_callbackGasPerUser);
 
@@ -331,21 +329,19 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         emit DrawInitiated(_pid,requestId);
     }
 
-    ///////////////
-    // Internall //
-    ///////////////
-
-
     /// @notice Returns the number of pools that have been added by the owner
     /// @return Number of pools
     function numberOfPools() external view returns (uint256) {
         return poolInfo.length;
     }
 
+    /*///////////////////////////////////////////////////////////////
+                        Private/Internal Functions
+    //////////////////////////////////////////////////////////////*/
     /**
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
-    function preDraw(uint256 _pid) internal{
+    function _preDraw(uint256 _pid) internal{
         //check all tiers except last(all other users) has members
         BionicStructs.Tier[] storage tiers=poolIdToTiers[_pid];
         address[] memory lastTierMembers = userPledge[_pid].keys();
@@ -373,11 +369,11 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         uint256[] memory randomWords
     ) internal override {
         uint pid = requestIdToPoolId[requestId];
-        address[] memory winners=pickWinners(pid,randomWords);
-        // claimFund.addWinningInvestors(pid, winners);
+        address[] memory winners=_pickWinners(pid,randomWords);
 
         ///@dev find losers and refund them their pledge.
         ///@notice post lottery refund non-winners
+        ///@audit-info gas maybe for gasoptimization move it to dedicated function
         address[] memory losers = userPledge[pid].keys();
         losers=Utils.excludeAddresses(losers,winners);
         for (uint i = 0; i < losers.length; i++) {
@@ -388,9 +384,6 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         }
     }
 
-    ////////////
-    // Private /
-    ////////////
     function stackPledge(address account,uint256 pid,uint256 _amount) private {
         try
             TokenBoundAccount(payable(account)).transferCurrency(
@@ -414,10 +407,10 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
                 }
             }
     }
+
     /*///////////////////////////////////////////////////////////////
                             Modifiers
     //////////////////////////////////////////////////////////////*/
-
     modifier onlyBionicAccount() virtual {
         // require(
         //     _msgSender().isContract() &&

@@ -17,9 +17,6 @@ error ErrNotEnoughTokenLeft(uint pid,address token); //"Not enough tokens availa
 contract ClaimFunding is Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
-
-    uint256 public constant MONTH_IN_SECONDS = 2629746; // Approx 1 month (assuming 15 seconds per block)
-
     struct UserClaim {
         uint256 lastClaim; // Month when the user last claimed tokens
         uint256 totalTokensClaimed; // Total tokens claimed by the user
@@ -32,6 +29,11 @@ contract ClaimFunding is Ownable {
         uint256 endMonth; // number of months allocation will go on
     }
 
+    /*///////////////////////////////////////////////////////////////
+                            States
+    //////////////////////////////////////////////////////////////*/
+    uint256 public constant MONTH_IN_SECONDS = 2629746; // Approx 1 month (assuming 15 seconds per block)
+
     // User's claim history for each project token useraddress => pid => UserClaim
     mapping(address => mapping(uint256 => UserClaim)) public s_userClaims; //solhint-disable-line var-name-mixedcase
     // pid to Project Reward pool
@@ -39,25 +41,21 @@ contract ClaimFunding is Ownable {
     //User's Active Projects 
     mapping(address=>EnumerableSet.UintSet) internal s_userProjects; // solhint-disable-line var-name-mixedcase
 
-
+    /*///////////////////////////////////////////////////////////////
+                            Events
+    //////////////////////////////////////////////////////////////*/
     event ProjectAdded(uint256 indexed pid,IERC20 indexed token, uint256 monthlyAmount, uint256 startMonth, uint256 endMonth);
     event TokensClaimed(address indexed user, uint256 indexed pid, uint256 month, uint256 amount);
 
-    modifier ExsitingProject(uint256 pid) {
-        if (address(s_projectTokens[pid].token) == address(0)) {
-            revert ErrInvalidProject();
-        }
-        _;
-    }
-    modifier projectDoesNotExists(uint256 pid) {
-        if (address(s_projectTokens[pid].token) == address(0)) {
-            revert ErrInvalidProject();
-        }
-        _;
-    }
 
+    /*///////////////////////////////////////////////////////////////
+                            Constructors
+    //////////////////////////////////////////////////////////////*/
     constructor() {}
 
+    /*///////////////////////////////////////////////////////////////
+                        Public/External Functions
+    //////////////////////////////////////////////////////////////*/
     // Owner can register a new project token with claim parameters
     function registerProjectToken(
         uint256 pid,
@@ -126,9 +124,8 @@ contract ClaimFunding is Ownable {
 
 
     /*///////////////////////////////////////////////////////////////
-                            Internal
+                        Private/Internal Functions
     //////////////////////////////////////////////////////////////*/
-
     function getClaimableMonthsCount(uint256 lastClaimedMonth, uint256 endMonth) internal view returns (uint256) {
         if (endMonth > block.timestamp) {// solhint-disable-line not-rely-on-time
             return ((block.timestamp.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)); // solhint-disable-line not-rely-on-time
@@ -173,5 +170,23 @@ contract ClaimFunding is Ownable {
         project.token.transfer(_msgSender(), tokensToClaim);
 
         emit TokensClaimed(_msgSender(), pid, claimableMonthCount, tokensToClaim);
+    }
+
+
+
+    /*///////////////////////////////////////////////////////////////
+                            Modifiers
+    //////////////////////////////////////////////////////////////*/
+    modifier exsitingProject(uint256 pid) {
+        if (address(s_projectTokens[pid].token) == address(0)) {
+            revert ErrInvalidProject();
+        }
+        _;
+    }
+    modifier projectDoesNotExists(uint256 pid) {
+        if (address(s_projectTokens[pid].token) == address(0)) {
+            revert ErrInvalidProject();
+        }
+        _;
     }
 }
