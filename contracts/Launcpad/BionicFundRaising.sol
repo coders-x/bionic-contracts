@@ -50,7 +50,7 @@ error LPFRWV__AlreadyPledgedToThisPool();
 /// @title Fund raising platform facilitated by launch pool
 /// @author Coders-x
 /// @dev Only the owner can add new pools
-contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
+contract BionicFundRaising is ReentrancyGuard,Raffle, AccessControl {
 
     using SafeMath for uint256;
     using SafeERC20 for IERC20;

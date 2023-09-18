@@ -44,7 +44,7 @@ async function main(level: number, pid: number = 0) {
     let chainId = network.config.chainId || 80001;
     let users: User[] = getSigners(20);
     let fundingContract = await ethers.getContractAt(
-        "BionicFundRasing",
+        "BionicFundRaising",
         BIONIC_LAUNCH_ADDR
     );
     let usdtContract = await ethers.getContractAt("ERC20", USDT_ADDR);

@@ -3,7 +3,7 @@ import { ethers } from "hardhat";
 import hre from "hardhat";
 import { FactoryOptions } from 'hardhat/types';
 import { goerli as config } from './config.json';
-import { BionicFundRasing } from '../typechain-types';
+import { BionicFundRaising } from '../typechain-types';
 dotenv.config()
 const CONFIG = config;
 
@@ -34,18 +34,18 @@ async function main() {
 
 async function deployContract(opt: FactoryOptions) {
 
-    console.log(`Deploying BionicFundRasing contract...`);
+    console.log(`Deploying BionicFundRaising contract...`);
 
 
-    const BionicFundRasingContract = await ethers.getContractFactory("BionicFundRasing", opt);
+    const BionicFundRaisingContract = await ethers.getContractFactory("BionicFundRaising", opt);
 
-    let funding = await BionicFundRasingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
+    let funding = await BionicFundRaisingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
         CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner);
 
     return await funding.deployed();
 }
 
-async function verifyContract(contract: BionicFundRasing, utilsAddress: string, args: any) {
+async function verifyContract(contract: BionicFundRaising, utilsAddress: string, args: any) {
     let res;
 
     console.log(`Verifying Utils Contract at ${utilsAddress}`);
