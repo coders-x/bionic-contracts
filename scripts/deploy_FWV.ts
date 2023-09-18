@@ -37,9 +37,9 @@ async function deployContract(opt: FactoryOptions) {
     console.log(`Deploying BionicFundRasing contract...`);
 
 
-    const FundWithVestingContract = await ethers.getContractFactory("BionicFundRasing", opt);
+    const BionicFundRasingContract = await ethers.getContractFactory("BionicFundRasing", opt);
 
-    let funding = await FundWithVestingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
+    let funding = await BionicFundRasingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
         CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner);
 
     return await funding.deployed();

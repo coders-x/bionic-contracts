@@ -76,6 +76,7 @@ contract ClaimFunding is Ownable {
             s_userClaims[investors[i]][pid] = UserClaim(block.timestamp, 0); // solhint-disable-line not-rely-on-time
         }
     }
+    
 
     // Users can claim tokens for the current month for a specific project token
     function claimTokens(uint256 pid) external{
