@@ -5,9 +5,12 @@ import { VRFCoordinatorV2Interface } from "@chainlink/contracts/src/v0.8/interfa
 import { VRFConsumerBaseV2 } from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import { BionicStructs } from "../libs/BionicStructs.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+import "hardhat/console.sol";
+
 
 /* Errors */
-error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
 error Raffle__TransferFailed();
 error Raffle__SendMoreToEnterRaffle();
 error Raffle__RaffleAlreadyInProgressOrDone();
@@ -22,6 +25,8 @@ error Raffle__MembersOnlyPermittedInOneTier(address member, uint256 existingTier
  */
 abstract contract Raffle is VRFConsumerBaseV2 {
     using SafeMath for uint256;
+    using EnumerableSet for EnumerableSet.AddressSet;
+    
     enum RaffleState {
         OPEN,
         CALCULATING
@@ -37,14 +42,15 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     // Lottery Variables
     bool private immutable i_requestVRFPerWinner;
 
-    ///@notice winners per raffle
-    mapping(uint256 => address[]) public poolTolotteryWinners;
+
     ///@notice requestId of vrf request on the pool
     mapping(uint256 => uint256) public poolIdToRequestId;
     mapping(uint256 => uint256) public requestIdToPoolId;
     /// @notice poolId to Tiers information of the pool
     mapping(uint256 => BionicStructs.Tier[]) public poolIdToTiers;
-
+    
+    ///@notice winners per raffle
+    mapping(uint256 => EnumerableSet.AddressSet) internal poolLotteryWinners;
 
     /* Events */
     event RequestedRaffleWinner(uint256 indexed requestId);
@@ -103,38 +109,32 @@ abstract contract Raffle is VRFConsumerBaseV2 {
      * @dev This is the function that Chainlink VRF node
      * calls to send the money to the random winner.
      */
-    function pickWinners(uint256 pid, uint256[] memory randomWords) internal returns (address[] memory winners) {
+    function pickWinners(uint256 pid, uint256[] memory randomWords) internal returns (address[] memory) {
         BionicStructs.Tier[] memory tiers = poolIdToTiers[pid];
-        uint totalWinners = getRaffleTotalWinners(pid);
-        winners = new address[](totalWinners);
-        uint winnerId = 0;
-
-        if (i_requestVRFPerWinner) {
-            for (uint i = 0; i < tiers.length; i++) {
-                address[] memory lotteryMembers = tiers[i].members;
-                uint memberCount = lotteryMembers.length;
-
-                for (uint j = 0; j < tiers[i].count; j++) {
-                    winners[winnerId] = lotteryMembers[randomWords[winnerId] % memberCount];
-                    winnerId++;
-                }
-            }
-        } else {
-            for (uint i = 0; i < tiers.length; i++) {
-                uint256 rand = randomWords[i];
-                address[] memory lotteryMembers = tiers[i].members;
-                uint memberCount = lotteryMembers.length;
-
-                for (uint j = 0; j < tiers[i].count; j++) {
-                    winners[winnerId] = lotteryMembers[rand % memberCount];
+        for (uint i = 0; i < tiers.length; i++) {
+            uint256 rand = randomWords[i];
+            address[] memory tierMembers = tiers[i].members;
+            uint memberCount = tierMembers.length;
+            console.log("3+,i:%s,memberCount:%s,tiers[i].count:%s",i,memberCount,tiers[i].count);
+            for (uint j = 0; j < tiers[i].count;) {
+                if (i_requestVRFPerWinner) {
+                    rand = randomWords[poolLotteryWinners[pid].length()];
+                }else{
                     rand = uint256(keccak256(abi.encodePacked(rand, block.prevrandao, block.chainid, i)));
-                    winnerId++;
                 }
+                address w= tierMembers[rand % memberCount];
+                if( poolLotteryWinners[pid].contains(w)){
+                    continue;
+                }
+                poolLotteryWinners[pid].add(w);
+                j++;
+                console.log("3-,winnerId :%s,j: %s,w: %s",poolLotteryWinners[pid].length(),j,w);
             }
         }
 
-        emit WinnersPicked(pid, winners);
-        return winners;
+
+        emit WinnersPicked(pid, poolLotteryWinners[pid].values());
+        return poolLotteryWinners[pid].values();
     }
 
     // /** Getter Functions */

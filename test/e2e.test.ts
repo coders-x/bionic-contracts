@@ -31,7 +31,8 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
     ACCOUNT_ADDRESS = "0x0a54aa8deB3536dD6E3B890C16C18d203e88C0d0",
-    CALLBACK_GAS_LIMIT_PER_USER = 110300,
+    CALLBACK_GAS_LIMIT_PER_USER = 90300,
+    REQUEST_VRF_PER_WINNER = true,
     PLEDGING_START_TIME = 20000000,
     PLEDGING_END_TIME = 2694616991,
     tokenAllocationStartTime = PLEDGING_END_TIME + 1000,
@@ -103,7 +104,7 @@ describe("e2e", function () {
 
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
-        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, true);
+        fundWithVesting = await deployFundWithVesting(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
         claimContract = await ethers.getContractAt("ClaimFunding", await fundWithVesting.claimFund())
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, fundWithVesting.address);
 

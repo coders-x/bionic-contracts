@@ -314,7 +314,6 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
         uint256 _pid,
         uint32 _callbackGasPerUser
     ) external payable nonReentrant onlyRole(SORTER_ROLE) returns (uint requestId){
-        console.log("%s>=%s",_pid,poolInfo.length);
         if(_pid >= poolInfo.length)
             revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[_pid];
@@ -375,12 +374,10 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
     ) internal override {
         uint pid = requestIdToPoolId[requestId];
         address[] memory winners=pickWinners(pid,randomWords);
-        claimFund.addWinningInvestors(pid, winners);
-        postLottery(pid,winners);
-    }
+        // claimFund.addWinningInvestors(pid, winners);
 
-    function postLottery(uint256 pid,address[] memory winners) internal{
-        // todo return lossers pledges;
+        ///@dev find losers and refund them their pledge.
+        ///@notice post lottery refund non-winners
         address[] memory losers = userPledge[pid].keys();
         losers=Utils.excludeAddresses(losers,winners);
         for (uint i = 0; i < losers.length; i++) {
@@ -390,6 +387,7 @@ contract BionicFundRasing is ReentrancyGuard,Raffle, AccessControl {
             userPledge[pid].set(losers[i], 0);
         }
     }
+
     ////////////
     // Private /
     ////////////
