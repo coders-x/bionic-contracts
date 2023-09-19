@@ -4,198 +4,232 @@ pragma solidity >=0.7.0 <0.9.0;
 import {Test} from "forge-std/Test.sol";
 import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "./BionicFundRaising.sol";
+import {VRFCoordinatorV2Mock} from "../libs/VRFCoordinatorV2Mock.sol";
+import {ERC6551Registry} from "../libs/ERC6551Registry.sol";
+import {AccountGuardian} from "../libs/AccountGuardian.sol";
+import {BionicInvestorPass} from "../BIP.sol";
+import {TokenBoundAccount, ECDSA} from "../TBA.sol";
+import {ClaimFunding} from "./Claim.sol";
+import {Bionic} from "../Bionic.sol";
+import "forge-std/console.sol";
 
-contract BionicFundRaisingTest is DSTest,Test {
-  uint256 public constant MONTH_IN_SECONDS = 2629746;// Approx 1 month 
+contract BionicFundRaisingTest is DSTest, Test {
+    address public constant ENTRY_POINT =
+        0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
+    ERC6551Registry public constant erc6551_Registry =
+        ERC6551Registry(0x02101dfB77FDE026414827Fdc604ddAF224F0921);
 
-  BionicFundRaising private bionicContract; 
-  ERC20Mock private rewardToken; 
-  ERC20Mock private rewardToken2; 
-  address private owner=address(this);
-  address[] private  winners=[address(1),address(2),address(3)];
+    uint256 public constant MONTH_IN_SECONDS = 30 days; // Approx 1 month
+    bytes32 public constant GAS_LANE =
+        0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f;
+    bool public constant REQ_PER_WINNER = false;
 
-  function setUp() public {
-    bionicContract = new BionicFundRaising();
-    rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
-    rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
-  }
+    BionicFundRaising private _bionicFundRaising;
+    Bionic private _bionicToken;
+    ERC20Mock private _investingToken;
+    BionicInvestorPass private _bipContract;
+    VRFCoordinatorV2Mock private _vrfCoordinatorV2;
+    uint64 private _subId;
+    TokenBoundAccount private _accountImplementation;
 
-  function registerProject() public {
-    bionicContract.registerProjectToken(
-      1,
-      address(rewardToken), 
-      10, 
-      100,
-      12 // a year
-    );
-  }
+    ClaimFunding private _claimContract;
 
+    ERC20Mock private _rewardToken;
+    ERC20Mock private _rewardToken2;
+    address private _owner = address(this);
+    address[] private _winners = [address(1), address(2), address(3)];
 
-  function testRegisterProject() public {
-    registerProject();
+    function setUp() public {
+        /**
+         * set up fork
+         */
+        string memory MUMBAI_RPC_URL = vm.envString("MUMBAI_RPC"); //solint-disable-line
+        uint256 mumbaiFork = vm.createFork(MUMBAI_RPC_URL);
+        vm.selectFork(mumbaiFork);
 
-    (IERC20 token,uint256 amount,uint256 start,uint256 end) = bionicContract.s_projectTokens(1);
-    assertEq(address(token),address(rewardToken));
-    assertEq(amount, 10);
-    assertEq(start, 100);
-    assertEq(end, start+(12 *  MONTH_IN_SECONDS));
-  }
+        _bionicToken = Bionic(
+            address(new UUPSProxy(address(new Bionic()), ""))
+        );
+        _bionicToken.initialize();
+        _bipContract = BionicInvestorPass(
+            address(new UUPSProxy(address(new BionicInvestorPass()), ""))
+        );
+        _bipContract.initialize();
+        _investingToken = new ERC20Mock("USD TETHER", "USDT");
+        _vrfCoordinatorV2 = new VRFCoordinatorV2Mock(
+            100000000000000000,
+            1000000000
+        );
 
-  function testAddUserAndClaim() public {
-    registerProject();
-    uint256 time=200;
-    uint pid=1;
+        _subId = _vrfCoordinatorV2.createSubscription();
+        _vrfCoordinatorV2.fundSubscription(_subId, 10e18);
 
-    //invalid project
-    vm.expectRevert(ErrInvalidProject.selector);
-    bionicContract.claimTokens(0);
+        _rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
+        _rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
 
-    //nothing to claim not winner of project
-    vm.expectRevert(ErrNotEligible.selector);
-    bionicContract.claimTokens(pid);
+        _bionicFundRaising = new BionicFundRaising(
+            IERC20(address(_bionicToken)),
+            _investingToken,
+            address(_bipContract),
+            address(_vrfCoordinatorV2),
+            GAS_LANE,
+            _subId,
+            REQ_PER_WINNER
+        );
 
+        _claimContract = ClaimFunding(_bionicFundRaising.claimFund());
 
-    //add winners and send transactions as winner0
-    bionicContract.addWinningInvestors(pid,winners);
-    vm.startPrank(winners[0]);
+        _accountImplementation = new TokenBoundAccount(
+            address(new AccountGuardian()),
+            ENTRY_POINT
+        );
+    }
 
-    //nothing to claim not in the window
-    vm.expectRevert(abi.encodePacked(ErrClaimingIsNotAllowedYet.selector, uint(100)));
-    bionicContract.claimTokens(pid);
-    vm.warp(time);
+    function registerProject() public returns (uint256 pid) {
+        uint32[] memory t = new uint32[](3);
+        t[0] = 3;
+        t[1] = 2;
+        t[2] = 1;
+        pid = _bionicFundRaising.add(
+            _rewardToken,
+            block.timestamp,
+            block.timestamp + 10 minutes,
+            1000,
+            100,
+            block.timestamp + 20 minutes,
+            10,
+            10e18,
+            t
+        );
 
+        return pid;
+    }
 
-    vm.expectRevert(ErrNothingToClaim.selector);
-    bionicContract.claimTokens(pid);
+    function testAddProject() public {
+        uint256 pid = registerProject();
+        (
+            IERC20 poolToken,
+            ,
+            ,
+            ,
+            uint256 tokenAllocationPerMonth,
+            uint256 tokenAllocationStartTime,
+            uint256 tokenAllocationMonthCount,
+            ,
 
-    time+=MONTH_IN_SECONDS;
-    vm.warp(time);
+        ) = _bionicFundRaising.poolInfo(pid);
+        (
+            IERC20 token,
+            uint256 amount,
+            uint256 start,
+            uint256 end
+        ) = _claimContract.s_projectTokens(pid);
+        assertEq(address(token), address(_rewardToken));
+        assertEq(address(token), address(poolToken));
+        assertEq(amount, tokenAllocationPerMonth);
+        assertEq(start, tokenAllocationStartTime);
+        assertEq(end, start + (tokenAllocationMonthCount * MONTH_IN_SECONDS));
+    }
 
+    function testPerformLotteryAndClaim() public {
+        uint256 pid = registerProject();
+        uint256 deadline = block.timestamp + 7 days;
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        address user = vm.addr(privateKey);
+        _bipContract.safeMint(user, "");
+        address accountAddress = erc6551_Registry.createAccount(
+            address(_accountImplementation),
+            block.chainid,
+            address(_bipContract),
+            0,
+            0,
+            ""
+        );
+        uint256 amount = 1000;
+        _investingToken.mint(accountAddress, amount ** 5);
+        TokenBoundAccount acc = TokenBoundAccount(payable(accountAddress));
+        bytes32 structHash = ECDSA.toTypedDataHash(
+            acc.DOMAIN_SEPARATOR(),
+            keccak256(
+                abi.encode(
+                    acc.CURRENCY_PERMIT_TYPEHASH(),
+                    _investingToken,
+                    address(_bionicFundRaising),
+                    amount,
+                    acc.nonce(),
+                    deadline
+                )
+            )
+        );
 
-    // vm.expectRevert(abi.encodePacked(ErrNotEnoughTokenLeft.selector, pid, address(rewardToken)));
-    vm.expectRevert(abi.encodePacked(hex"d34e968f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b"));
-    bionicContract.claimTokens(pid);
-    vm.stopPrank();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, structHash);
 
-    //Fund The Claiming Contract
-    uint totalBalance=10000;
-    rewardToken.mint(address(bionicContract), totalBalance);
+        vm.startPrank(user);
 
+        bytes memory data = abi.encodeWithSelector(
+            _bionicFundRaising.pledge.selector,
+            pid,
+            amount,
+            deadline,
+            v,
+            r,
+            s
+        );
+        acc.executeCall(address(_bionicFundRaising), 0, data);
+        // _bionicContract.pledge(pid, amount, deadline, v, r, s).;
+    }
 
-    //claim for a month
-    vm.startPrank(winners[0]);
-    uint claimable=bionicContract.claimableAmount(pid);
-    bionicContract.claimTokens(pid);
+    //   function testBatchClaim() public {
+    //     // vm.warp(100);
+    //     bionicContract.registerProjectToken(
+    //       1,
+    //       address(rewardToken),
+    //       10,
+    //       200,
+    //       12 // a year
+    //     );
+    //     bionicContract.registerProjectToken(
+    //       2,
+    //       address(rewardToken2),
+    //       20,
+    //       400,
+    //       6 //6 month
+    //     );
+    //     //Fund The Claiming Contract
+    //     uint totalBalance=10000;
+    //     rewardToken.mint(address(bionicContract), totalBalance);
+    //     rewardToken2.mint(address(bionicContract), totalBalance);
 
-    vm.expectRevert(ErrNothingToClaim.selector);
-    bionicContract.claimableAmount(pid);
-    
-    (uint256 lastMonth,uint256 totalTokenClaimed) = bionicContract.s_userClaims(winners[0], pid);
-    assertEq(lastMonth, time-199); 
-    assertEq(totalTokenClaimed, 10);
-    assertEq(totalTokenClaimed, claimable);
-    assertEq(rewardToken.balanceOf(address(bionicContract)), totalBalance-=10);
-    assertEq(rewardToken.balanceOf(address(winners[0])), 10);
+    //     //add winners and send transactions as winner0
+    //     bionicContract.addWinningInvestors(1,winners);
+    //     bionicContract.addWinningInvestors(2,winners);
+    //     vm.startPrank(winners[0]);
 
+    //     vm.expectRevert(abi.encodePacked(ErrClaimingIsNotAllowedYet.selector, uint(200)));
+    //     bionicContract.batchClaim();
 
-    //claim for 3 months
-    time+=MONTH_IN_SECONDS*3;
-    vm.warp(time);
-    bionicContract.claimTokens(pid);
+    //     uint256 time=MONTH_IN_SECONDS*3;
+    //     vm.warp(time);
 
-    (lastMonth,totalTokenClaimed) = bionicContract.s_userClaims(winners[0], pid);
-    assertEq(lastMonth, time-199); 
-    assertEq(totalTokenClaimed, 40);
-    assertEq(rewardToken.balanceOf(address(bionicContract)), totalBalance-=30);
-    assertEq(rewardToken.balanceOf(address(winners[0])), 40);
+    //     // vm.expectRevert(ErrNothingToClaim.selector);
+    //     bionicContract.batchClaim();
 
+    //     assertEq(rewardToken.balanceOf(address(bionicContract)), totalBalance-10*2);
+    //     assertEq(rewardToken.balanceOf(address(winners[0])), 10*2);
+    //     assertEq(rewardToken2.balanceOf(address(bionicContract)), totalBalance-20*2);
+    //     assertEq(rewardToken2.balanceOf(address(winners[0])), 20*2);
 
-    vm.expectRevert(ErrNothingToClaim.selector);
-    bionicContract.claimTokens(pid);
-
-
-
-    //claim for other winner 4 month claim
-    vm.startPrank(winners[1]);
-    bionicContract.claimTokens(pid);
-
-    (lastMonth,totalTokenClaimed) = bionicContract.s_userClaims(winners[1], pid);
-    assertEq(lastMonth, time-199); 
-    assertEq(totalTokenClaimed, 40);
-    assertEq(rewardToken.balanceOf(address(bionicContract)), totalBalance-=40);
-    assertEq(rewardToken.balanceOf(address(winners[1])), 40);
-
-    //claim for remaining months 4-12=8
-    // time+=MONTH_IN_SECONDS*12;
-    vm.warp(time+(MONTH_IN_SECONDS*12));
-    vm.startPrank(winners[1]);
-    bionicContract.claimTokens(pid);
-
-    (lastMonth,totalTokenClaimed) = bionicContract.s_userClaims(winners[1], pid);
-    assertEq(lastMonth, (time+(MONTH_IN_SECONDS*8))-199); 
-    assertEq(totalTokenClaimed, 120);
-    assertEq(rewardToken.balanceOf(address(bionicContract)), totalBalance-=80);
-    assertEq(rewardToken.balanceOf(address(winners[1])), 120);
-
-    vm.expectRevert(ErrNothingToClaim.selector);
-    bionicContract.claimTokens(pid);
-  }
-
-  function testBatchClaim() public {
-    // vm.warp(100);
-    bionicContract.registerProjectToken(
-      1,
-      address(rewardToken), 
-      10, 
-      200,
-      12 // a year
-    );
-    bionicContract.registerProjectToken(
-      2,
-      address(rewardToken2), 
-      20, 
-      400,
-      6 //6 month
-    );
-    //Fund The Claiming Contract
-    uint totalBalance=10000;
-    rewardToken.mint(address(bionicContract), totalBalance);
-    rewardToken2.mint(address(bionicContract), totalBalance);
-    
-    //add winners and send transactions as winner0
-    bionicContract.addWinningInvestors(1,winners);
-    bionicContract.addWinningInvestors(2,winners);
-    vm.startPrank(winners[0]);
-
-
-
-    vm.expectRevert(abi.encodePacked(ErrClaimingIsNotAllowedYet.selector, uint(200)));
-    bionicContract.batchClaim();
-
-
-    uint256 time=MONTH_IN_SECONDS*3;
-    vm.warp(time);
-
-
-    // vm.expectRevert(ErrNothingToClaim.selector);
-    bionicContract.batchClaim();
-
-
-    assertEq(rewardToken.balanceOf(address(bionicContract)), totalBalance-10*2);
-    assertEq(rewardToken.balanceOf(address(winners[0])), 10*2);
-    assertEq(rewardToken2.balanceOf(address(bionicContract)), totalBalance-20*2);
-    assertEq(rewardToken2.balanceOf(address(winners[0])), 20*2);
-
-  }
+    //   }
 }
 
-
-
-
 contract ERC20Mock is ERC20 {
-    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) {}
+    constructor(
+        string memory name_,
+        string memory symbol_
+    ) ERC20(name_, symbol_) {}
+
     function mint(address account, uint256 amount) external {
         _mint(account, amount);
     }
@@ -203,4 +237,11 @@ contract ERC20Mock is ERC20 {
     function burn(address account, uint256 amount) external {
         _burn(account, amount);
     }
+}
+
+contract UUPSProxy is ERC1967Proxy {
+    constructor(
+        address _implementation,
+        bytes memory _data
+    ) ERC1967Proxy(_implementation, _data) {}
 }

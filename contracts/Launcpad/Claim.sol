@@ -6,13 +6,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-
-
-error ErrInvalidProject();  //"Project token not registered. Contact admin to add project tokens"
+error ErrInvalidProject(); //"Project token not registered. Contact admin to add project tokens"
 error ErrClaimingIsNotAllowedYet(uint startAfter); //"Not in the time window for claiming rewards"
 error ErrNothingToClaim();
 error ErrNotEligible(); //"User is not assigned claims for this project."
-error ErrNotEnoughTokenLeft(uint pid,address token); //"Not enough tokens available for claiming. Please try Again"
+error ErrNotEnoughTokenLeft(uint pid, address token); //"Not enough tokens available for claiming. Please try Again"
 
 contract ClaimFunding is Ownable {
     using SafeMath for uint256;
@@ -32,21 +30,31 @@ contract ClaimFunding is Ownable {
     /*///////////////////////////////////////////////////////////////
                             States
     //////////////////////////////////////////////////////////////*/
-    uint256 public constant MONTH_IN_SECONDS = 2629746; // Approx 1 month (assuming 15 seconds per block)
+    uint256 public constant MONTH_IN_SECONDS = 30 days; // Approx 1 month (assuming 15 seconds per block)
 
     // User's claim history for each project token useraddress => pid => UserClaim
     mapping(address => mapping(uint256 => UserClaim)) public s_userClaims; //solhint-disable-line var-name-mixedcase
     // pid to Project Reward pool
     mapping(uint256 => ProjectToken) public s_projectTokens; //solhint-disable-line var-name-mixedcase
-    //User's Active Projects 
-    mapping(address=>EnumerableSet.UintSet) internal s_userProjects; // solhint-disable-line var-name-mixedcase
+    //User's Active Projects
+    mapping(address => EnumerableSet.UintSet) internal s_userProjects; // solhint-disable-line var-name-mixedcase
 
     /*///////////////////////////////////////////////////////////////
                             Events
     //////////////////////////////////////////////////////////////*/
-    event ProjectAdded(uint256 indexed pid,IERC20 indexed token, uint256 monthlyAmount, uint256 startMonth, uint256 endMonth);
-    event TokensClaimed(address indexed user, uint256 indexed pid, uint256 month, uint256 amount);
-
+    event ProjectAdded(
+        uint256 indexed pid,
+        IERC20 indexed token,
+        uint256 monthlyAmount,
+        uint256 startMonth,
+        uint256 endMonth
+    );
+    event TokensClaimed(
+        address indexed user,
+        uint256 indexed pid,
+        uint256 month,
+        uint256 amount
+    );
 
     /*///////////////////////////////////////////////////////////////
                             Constructors
@@ -64,25 +72,36 @@ contract ClaimFunding is Ownable {
         uint256 startMonth,
         uint256 totalMonths
     ) external onlyOwner {
-
-        s_projectTokens[pid] = ProjectToken(IERC20(projectTokenAddress), claimAmount, startMonth, startMonth.add(totalMonths.mul(MONTH_IN_SECONDS)));
-        emit ProjectAdded(pid,IERC20(projectTokenAddress), claimAmount, startMonth, totalMonths);
+        s_projectTokens[pid] = ProjectToken(
+            IERC20(projectTokenAddress),
+            claimAmount,
+            startMonth,
+            startMonth.add(totalMonths.mul(MONTH_IN_SECONDS))
+        );
+        emit ProjectAdded(
+            pid,
+            IERC20(projectTokenAddress),
+            claimAmount,
+            startMonth,
+            totalMonths
+        );
     }
 
     // Owner can add winning investors
-    function addWinningInvestors(uint256 pid, address[] calldata investors) external onlyOwner {
+    function addWinningInvestors(
+        uint256 pid,
+        address[] calldata investors
+    ) external onlyOwner {
         for (uint i = 0; i < investors.length; i++) {
             s_userProjects[investors[i]].add(pid);
             s_userClaims[investors[i]][pid] = UserClaim(block.timestamp, 0); // solhint-disable-line not-rely-on-time
         }
     }
-    
 
     // Users can claim tokens for the current month for a specific project token
-    function claimTokens(uint256 pid) external{
-       _claim(pid);
+    function claimTokens(uint256 pid) external {
+        _claim(pid);
     }
-
 
     // Users can claim tokens for all projects they are signed up for
     function batchClaim() external {
@@ -97,39 +116,52 @@ contract ClaimFunding is Ownable {
     /// @dev it's replica of checks on claimToken but just to let users know how much they owe
     /// @param pid pool Id you are trying to claim from
     /// @return amount to token you will be claiming when calling "claimToken"
-    function claimableAmount(uint256 pid) external view returns (uint256 amount){
-         ProjectToken memory project = s_projectTokens[pid];
+    function claimableAmount(
+        uint256 pid
+    ) external view returns (uint256 amount) {
+        ProjectToken memory project = s_projectTokens[pid];
         if (address(project.token) == address(0)) {
             revert ErrInvalidProject();
         }
         UserClaim storage userClaim = s_userClaims[_msgSender()][pid];
-        if (userClaim.lastClaim == 0 || userClaim.lastClaim >= project.endMonth) {
+        if (
+            userClaim.lastClaim == 0 || userClaim.lastClaim >= project.endMonth
+        ) {
             revert ErrNotEligible();
         }
-        if (project.startMonth > block.timestamp) {// solhint-disable-line not-rely-on-time
+        if (project.startMonth > block.timestamp) {
+            // solhint-disable-line not-rely-on-time
             revert ErrClaimingIsNotAllowedYet(project.startMonth);
         }
 
         // Calculate the amount to claim for the current month
-        uint256 claimableMonthCount = getClaimableMonthsCount(userClaim.lastClaim, project.endMonth);
+        uint256 claimableMonthCount = getClaimableMonthsCount(
+            userClaim.lastClaim,
+            project.endMonth
+        );
         if (claimableMonthCount == 0) {
             revert ErrNothingToClaim();
         }
         amount = project.monthlyAmount.mul(claimableMonthCount);
         // Ensure we have enough tokens available for claiming
         if (project.token.balanceOf(address(this)) < amount) {
-            revert ErrNotEnoughTokenLeft(pid,address(project.token));
+            revert ErrNotEnoughTokenLeft(pid, address(project.token));
         }
         return amount;
     }
 
-
     /*///////////////////////////////////////////////////////////////
                         Private/Internal Functions
     //////////////////////////////////////////////////////////////*/
-    function getClaimableMonthsCount(uint256 lastClaimedMonth, uint256 endMonth) internal view returns (uint256) {
-        if (endMonth > block.timestamp) {// solhint-disable-line not-rely-on-time
-            return ((block.timestamp.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)); // solhint-disable-line not-rely-on-time
+    function getClaimableMonthsCount(
+        uint256 lastClaimedMonth,
+        uint256 endMonth
+    ) internal view returns (uint256) {
+        if (endMonth > block.timestamp) {
+            // solhint-disable-line not-rely-on-time
+            return (
+                (block.timestamp.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)
+            ); // solhint-disable-line not-rely-on-time
         } else {
             return ((endMonth.sub(lastClaimedMonth)).div(MONTH_IN_SECONDS)); // solhint-disable-line not-rely-on-time
         }
@@ -143,37 +175,49 @@ contract ClaimFunding is Ownable {
             revert ErrInvalidProject();
         }
         UserClaim storage userClaim = s_userClaims[_msgSender()][pid];
-        if (userClaim.lastClaim == 0 || userClaim.lastClaim >= project.endMonth) {
+        if (
+            userClaim.lastClaim == 0 || userClaim.lastClaim >= project.endMonth
+        ) {
             s_userProjects[_msgSender()].remove(pid);
             revert ErrNotEligible();
         }
-        if (project.startMonth > block.timestamp) {// solhint-disable-line not-rely-on-time
+        if (project.startMonth > block.timestamp) {
+            // solhint-disable-line not-rely-on-time
             revert ErrClaimingIsNotAllowedYet(project.startMonth);
         }
 
         // Calculate the amount to claim for the current month
-        uint256 claimableMonthCount = getClaimableMonthsCount(userClaim.lastClaim, project.endMonth);
+        uint256 claimableMonthCount = getClaimableMonthsCount(
+            userClaim.lastClaim,
+            project.endMonth
+        );
         if (claimableMonthCount == 0) {
             revert ErrNothingToClaim();
         }
         uint256 tokensToClaim = project.monthlyAmount.mul(claimableMonthCount);
         // Ensure we have enough tokens available for claiming
         if (project.token.balanceOf(address(this)) < tokensToClaim) {
-            revert ErrNotEnoughTokenLeft(pid,address(project.token));
+            revert ErrNotEnoughTokenLeft(pid, address(project.token));
         }
 
         // Update user's claim data
-        userClaim.lastClaim = userClaim.lastClaim.add(MONTH_IN_SECONDS.mul(claimableMonthCount));
-        userClaim.totalTokensClaimed = userClaim.totalTokensClaimed.add(tokensToClaim);
-
+        userClaim.lastClaim = userClaim.lastClaim.add(
+            MONTH_IN_SECONDS.mul(claimableMonthCount)
+        );
+        userClaim.totalTokensClaimed = userClaim.totalTokensClaimed.add(
+            tokensToClaim
+        );
 
         // Transfer tokens to the user
         project.token.transfer(_msgSender(), tokensToClaim);
 
-        emit TokensClaimed(_msgSender(), pid, claimableMonthCount, tokensToClaim);
+        emit TokensClaimed(
+            _msgSender(),
+            pid,
+            claimableMonthCount,
+            tokensToClaim
+        );
     }
-
-
 
     /*///////////////////////////////////////////////////////////////
                             Modifiers
