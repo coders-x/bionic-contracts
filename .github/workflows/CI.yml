@@ -8,6 +8,7 @@ on:
 env:
   PRIVATE_KEY: "${{ secrets.PRIVATE_KEY }}"
   MUMBAI_RPC: "${{ secrets.MUMBAI_RPC }}"
+  RPC_URL: "${{ secrets.RPC_URL }}"
   THIRDWEB_API_KEY: "${{ secrets.THIRDWEB_API_KEY }}"
   ETHERSCAN_API_KEY: "${{ secrets.ETHERSCAN_API_KEY }}"
   POLYGONSCAN_API_KEY: "${{ secrets.POLYGONSCAN_API_KEY }}"
