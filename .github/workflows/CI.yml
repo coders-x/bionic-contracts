@@ -13,7 +13,7 @@ env:
   POLYGONSCAN_API_KEY: "${{ secrets.POLYGONSCAN_API_KEY }}"
   CHAIN: "${{ secrets.CHAIN }}"
 jobs:
-  start-hardhat-node:
+  Test:
     runs-on: ubuntu-latest
 
     strategy:
