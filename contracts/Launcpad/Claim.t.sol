@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
+import {Raffle} from "./Raffle.sol";
+
 import "./Claim.sol";
 
 contract ClaimingContractTest is DSTest, Test {
@@ -53,34 +55,42 @@ contract ClaimingContractTest is DSTest, Test {
         uint pid = 1;
 
         //invalid project
-        vm.expectRevert(ErrInvalidProject.selector);
+        vm.expectRevert(Claim__InvalidProject.selector);
         claimingContract.claimTokens(0);
 
         //nothing to claim not winner of project
-        vm.expectRevert(ErrNotEligible.selector);
+        vm.expectRevert(Claim__NotEligible.selector);
         claimingContract.claimTokens(pid);
 
-        //add winners and send transactions as winner0
-        claimingContract.addWinningInvestors(pid, winners);
+        //mock raffle
+        vm.mockCall(
+            address(claimingContract.owner()),
+            abi.encodeWithSelector(Raffle.getRaffleWinners.selector, pid),
+            abi.encode(winners)
+        );
+
         vm.startPrank(winners[0]);
+        //add winners and send transactions as winner0
+        claimingContract.addWinningInvestors(pid);
+        vm.clearMockedCalls();
 
         //nothing to claim not in the window
         vm.expectRevert(
-            abi.encodePacked(ErrClaimingIsNotAllowedYet.selector, uint(100))
+            abi.encodePacked(Claim__ClaimingIsNotAllowedYet.selector, uint(100))
         );
         claimingContract.claimTokens(pid);
         vm.warp(time);
 
-        vm.expectRevert(ErrNothingToClaim.selector);
+        vm.expectRevert(Claim__NothingToClaim.selector);
         claimingContract.claimTokens(pid);
 
         time += MONTH_IN_SECONDS;
         vm.warp(time);
 
-        // vm.expectRevert(abi.encodePacked(ErrNotEnoughTokenLeft.selector, pid, address(rewardToken)));
+        // vm.expectRevert(abi.encodePacked(Claim__NotEnoughTokenLeft.selector, pid, address(rewardToken)));
         vm.expectRevert(
             abi.encodePacked(
-                hex"d34e968f00000000000000000000000000000000000000000000000000000000000000010000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b"
+                hex"f02941ee00000000000000000000000000000000000000000000000000000000000000010000000000000000000000002e234dae75c793f67a35089c9d99245e1c58470b"
             )
         );
         claimingContract.claimTokens(pid);
@@ -92,11 +102,11 @@ contract ClaimingContractTest is DSTest, Test {
 
         //claim for a month
         vm.startPrank(winners[0]);
-        uint claimable = claimingContract.claimableAmount(pid);
+        uint claimable = claimingContract.claimableAmount(pid, winners[0]);
         claimingContract.claimTokens(pid);
 
-        vm.expectRevert(ErrNothingToClaim.selector);
-        claimingContract.claimableAmount(pid);
+        vm.expectRevert(Claim__NothingToClaim.selector);
+        claimingContract.claimableAmount(pid, winners[0]);
 
         (uint256 lastMonth, uint256 totalTokenClaimed) = claimingContract
             .s_userClaims(winners[0], pid);
@@ -126,7 +136,7 @@ contract ClaimingContractTest is DSTest, Test {
         );
         assertEq(rewardToken.balanceOf(address(winners[0])), 40);
 
-        vm.expectRevert(ErrNothingToClaim.selector);
+        vm.expectRevert(Claim__NothingToClaim.selector);
         claimingContract.claimTokens(pid);
 
         //claim for other winner 4 month claim
@@ -163,7 +173,7 @@ contract ClaimingContractTest is DSTest, Test {
         );
         assertEq(rewardToken.balanceOf(address(winners[1])), 120);
 
-        vm.expectRevert(ErrNothingToClaim.selector);
+        vm.expectRevert(Claim__NothingToClaim.selector);
         claimingContract.claimTokens(pid);
     }
 
@@ -189,19 +199,31 @@ contract ClaimingContractTest is DSTest, Test {
         rewardToken2.mint(address(claimingContract), totalBalance);
 
         //add winners and send transactions as winner0
-        claimingContract.addWinningInvestors(1, winners);
-        claimingContract.addWinningInvestors(2, winners);
+        vm.mockCall(
+            address(claimingContract.owner()),
+            abi.encodeWithSelector(Raffle.getRaffleWinners.selector, 1),
+            abi.encode(winners)
+        );
+        vm.mockCall(
+            address(claimingContract.owner()),
+            abi.encodeWithSelector(Raffle.getRaffleWinners.selector, 2),
+            abi.encode(winners)
+        );
+        claimingContract.addWinningInvestors(1);
+        claimingContract.addWinningInvestors(2);
+        vm.clearMockedCalls();
+
         vm.startPrank(winners[0]);
 
         vm.expectRevert(
-            abi.encodePacked(ErrClaimingIsNotAllowedYet.selector, uint(200))
+            abi.encodePacked(Claim__ClaimingIsNotAllowedYet.selector, uint(200))
         );
         claimingContract.batchClaim();
 
         uint256 time = MONTH_IN_SECONDS * 3;
         vm.warp(time);
 
-        // vm.expectRevert(ErrNothingToClaim.selector);
+        // vm.expectRevert(Claim__NothingToClaim.selector);
         claimingContract.batchClaim();
 
         assertEq(
