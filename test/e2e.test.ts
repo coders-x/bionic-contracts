@@ -253,7 +253,13 @@ describe("e2e", function () {
                 await expect(abstractedAccount.connect(client).executeCall(BionicFundRaising.address, 0, raw))
                     .to.be.revertedWithCustomError(BionicFundRaising, "LPFRWV__NotValidPledgeAmount").withArgs(1000);
             });
+            it("Should fail if Not Enough Stake on the account", async function () {
+                let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await expect(abstractedAccount.connect(client).executeCall(BionicFundRaising.address, 0, raw))
+                    .to.be.revertedWithCustomError(BionicFundRaising, "LPFRWV__NotEnoughStake");
+            });
             it("Should fail if expired deadline", async function () {
+                await bionicContract.transfer(abstractedAccount.address, BionicFundRaising.MINIMUM_BIONIC_STAKE());
                 let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(BionicFundRaising.address, 0, raw))
                     .to.be.revertedWith("CurrencyPermit: expired deadline");
@@ -267,6 +273,7 @@ describe("e2e", function () {
                 const deadline = ethers.constants.MaxUint256;
                 for (let i = 0; i < AbstractAccounts.length; i++) {
                     const aac = AbstractAccounts[i];
+                    await bionicContract.transfer(aac.address, BionicFundRaising.MINIMUM_BIONIC_STAKE());
                     const alreadyPledged = await BionicFundRaising.userTotalPledge(aac.address);
                     const amount = BigNumber.from(1000);
                     const { v, r, s } = await getCurrencyPermitSignature(

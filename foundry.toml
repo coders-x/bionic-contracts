@@ -11,7 +11,7 @@ optimizer = true
 optimizer_runs = 1000
 
 
-no_match_test = "testPerformLotteryAndClaim"
+# no_match_test = "testPerformLotteryAndClaim"
 
 # remappings = [
 #     # "lib/tokenbound:@openzeppelin/=node_modules/@openzeppelin/",

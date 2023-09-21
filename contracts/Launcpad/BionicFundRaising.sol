@@ -29,6 +29,7 @@ error LPFRWV__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime shou
 error LPFRWV__AllocationShouldBeAfterPledgingEnd(); //"add: _tokenAllocationStartTime must be after pledging end"
 error LPFRWV__TargetToBeRaisedMustBeMoreThanZero();
 error LPFRWV__PledgingHasClosed();
+error LPFRWV__NotEnoughStake();
 error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
 error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
 error LPFRWV__NotEnoughRandomWordsForLottery();
@@ -59,6 +60,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     bytes32 public constant BROKER_ROLE = keccak256("BROKER_ROLE");
     bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
+    uint256 public constant MINIMUM_BIONIC_STAKE = 10e18;
 
     /// @notice staking token is fixed for all pools
     IERC20 public stakingToken;
@@ -221,48 +223,53 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     // step 1
     // @dev should first query the pleadged amount already and then try to sign amount+ alreadey_pledged permit to be used here
     function pledge(
-        uint256 _pid,
-        uint256 _amount,
+        uint256 pid,
+        uint256 amount,
         uint256 deadline,
         uint8 v,
         bytes32 r,
         bytes32 s
     ) external nonReentrant onlyBionicAccount {
-        if (_pid >= poolInfo.length) {
+        if (pid >= poolInfo.length) {
             revert LPFRWV__InvalidPool();
         }
-        BionicStructs.PoolInfo storage pool = poolInfo[_pid];
-        (, uint256 pledged) = userPledge[_pid].tryGet(_msgSender());
+        BionicStructs.PoolInfo storage pool = poolInfo[pid];
+        (, uint256 pledged) = userPledge[pid].tryGet(_msgSender());
         if (pledged != 0) {
             revert LPFRWV__AlreadyPledgedToThisPool();
         }
-        if (pledged.add(_amount) != pool.pledgingAmountPerUser) {
+        if (pledged.add(amount) != pool.pledgingAmountPerUser) {
             revert LPFRWV__NotValidPledgeAmount(pool.pledgingAmountPerUser);
+        }
+        if (
+            IERC20(stakingToken).balanceOf(_msgSender()) < MINIMUM_BIONIC_STAKE
+        ) {
+            revert LPFRWV__NotEnoughStake();
         }
         if (block.timestamp > pool.pledgingEndTime) {
             // solhint-disable-line not-rely-on-time
             revert LPFRWV__PledgingHasClosed();
         }
 
-        userPledge[_pid].set(_msgSender(), pledged.add(_amount));
+        userPledge[pid].set(_msgSender(), pledged.add(amount));
         userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(
-            _amount
+            amount
         );
 
-        poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
+        poolIdToTotalStaked[pid] = poolIdToTotalStaked[pid].add(amount);
 
         try
             ICurrencyPermit(_msgSender()).permit(
                 address(investingToken),
                 address(this),
-                _amount,
+                amount,
                 deadline,
                 v,
                 r,
                 s
             )
         {
-            emit Pledge(_msgSender(), _pid, _amount);
+            emit Pledge(_msgSender(), pid, amount);
         } catch (bytes memory reason) {
             if (reason.length == 0) {
                 revert ICurrencyPermit__NoReason();
@@ -273,7 +280,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
                 }
             }
         }
-        stackPledge(_msgSender(), _pid, _amount);
+        _stackPledge(_msgSender(), pid, amount);
     }
 
     /// @notice Add user members to Lottery Tiers
@@ -299,8 +306,8 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
      * @dev will get the money out of users wallet into investment wallet
      */
     function draw(
-        uint256 _pid,
-        uint32 _callbackGasPerUser
+        uint256 pid,
+        uint32 callbackGasPerUser
     )
         external
         payable
@@ -308,21 +315,21 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         onlyRole(SORTER_ROLE)
         returns (uint requestId)
     {
-        if (_pid >= poolInfo.length) revert LPFRWV__InvalidPool();
-        BionicStructs.PoolInfo memory pool = poolInfo[_pid];
+        if (pid >= poolInfo.length) revert LPFRWV__InvalidPool();
+        BionicStructs.PoolInfo memory pool = poolInfo[pid];
         if (pool.pledgingEndTime > block.timestamp)
             //solhint-disable-line not-rely-on-time
             revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
-        if (poolIdToRequestId[_pid] != 0)
+        if (poolIdToRequestId[pid] != 0)
             revert LPFRWV__DrawForThePoolHasAlreadyStarted(
-                poolIdToRequestId[_pid]
+                poolIdToRequestId[pid]
             );
 
-        _preDraw(_pid);
+        _preDraw(pid);
 
-        requestId = _draw(_pid, pool.winnersCount, _callbackGasPerUser);
+        requestId = _draw(pid, pool.winnersCount, callbackGasPerUser);
 
-        emit DrawInitiated(_pid, requestId);
+        emit DrawInitiated(pid, requestId);
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -337,10 +344,10 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     /**
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
-    function _preDraw(uint256 _pid) internal {
+    function _preDraw(uint256 pid) internal {
         //check all tiers except last(all other users) has members
-        BionicStructs.Tier[] storage tiers = poolIdToTiers[_pid];
-        address[] memory lastTierMembers = userPledge[_pid].keys();
+        BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
+        address[] memory lastTierMembers = userPledge[pid].keys();
         for (uint k = 0; k < tiers.length - 1; k++) {
             if (tiers[k].members.length < 1) {
                 revert LPFRWV__TiersHaveNotBeenInitialized();
@@ -352,7 +359,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         }
         //check if last tier is empty add rest of people pledged to the tier
         if (tiers[tiers.length - 1].members.length < 1) {
-            _addToTier(_pid, tiers.length - 1, lastTierMembers);
+            _addToTier(pid, tiers.length - 1, lastTierMembers);
             // tiers[tiers.length-1].members=lastTierMembers;
         }
     }
@@ -381,7 +388,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         }
     }
 
-    function stackPledge(
+    function _stackPledge(
         address account,
         uint256 pid,
         uint256 _amount

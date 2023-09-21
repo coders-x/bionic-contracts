@@ -171,6 +171,10 @@ contract BionicFundRaisingTest is DSTest, Test {
                 0,
                 ""
             );
+            _bionicToken.transfer(
+                accountAddress,
+                _bionicFundRaising.MINIMUM_BIONIC_STAKE()
+            );
             uint256 amount = 1000;
             _investingToken.mint(accountAddress, amount ** 5);
             TokenBoundAccount acc = TokenBoundAccount(payable(accountAddress));

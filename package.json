@@ -23,11 +23,10 @@
   "scripts": {
     "slither": "slither . --solc-remaps '@openzeppelin=node_modules/@openzeppelin @chainlink=node_modules/@chainlink' --exclude naming-convention,external-function,low-level-calls --json a.json",
     "build": "hardhat compile",
-    "deploy": "npx thirdweb@latest deploy",
-    "release": "npx thirdweb@latest release",
     "compile": "npx hardhat typechain",
     "test:hardhat": "hardhat test",
-    "test:forge": "forge test --via-ir -vv",
+    "test:forge": "forge test --via-ir -vv --nmt testPerformLotteryAndClaim",
+    "test:forge:full": "forge test --via-ir -vv",
     "test": "npm run test:hardhat && npm run test:forge",
     "dev": "ts-node scripts/index.ts"
   }
