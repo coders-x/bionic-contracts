@@ -383,20 +383,27 @@ describe("e2e", function () {
                     "0x389B436278b6d136bA0996c3F4a0Afc680fD79ED",]
                 expect(await usdtContract.balanceOf(BionicFundRaising.address)).to.be.equal(0);
                 expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(1000));
+                await expect(
+                    BionicFundRaising.refundLosers(
+                        0
+                    )
+                ).to.revertedWithCustomError(BionicFundRaising, "LPFRWV__LotteryIsPending");
+
                 // simulate callback from the oracle network
                 await expect(
                     vrfCoordinatorV2MockContract.fulfillRandomWords(
                         1,
                         BionicFundRaising.address
                     )
-                ).to.emit(BionicFundRaising, "WinnersPicked").withArgs(0, winners)
+                ).to.emit(BionicFundRaising, "WinnersPicked").withArgs(0, winners);
+                // simulate callback from the oracle network
+                await expect(
+                    BionicFundRaising.refundLosers(
+                        0
+                    )
+                )
                     .to.emit(BionicFundRaising, "LotteryRefunded");
 
-                // for (let i = 0; i < winners.length; i++) {
-                //     expect(winners).to.contains(await BionicFundRaising.poolTolotteryWinners(0,i))
-                // }
-
-                // expect(await BionicFundRaising.postLottery(0)).to.emit(BionicFundRaising,"LotteryRefunded")
 
                 let losers = AbstractAccounts.filter((v, i) => !winners.includes(v.address) && i < 12)
                 expect(losers.length).to.equal(5);

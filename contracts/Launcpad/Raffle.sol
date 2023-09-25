@@ -1,21 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import { VRFCoordinatorV2Interface } from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import { VRFConsumerBaseV2 } from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
+import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
+import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import { BionicStructs } from "../libs/BionicStructs.sol";
+import {BionicStructs} from "../libs/BionicStructs.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
-
 
 /* Errors */
 error Raffle__TransferFailed();
 error Raffle__SendMoreToEnterRaffle();
 error Raffle__RaffleAlreadyInProgressOrDone();
-error Raffle__TierMembersCountInvalid(uint256 expectedMemberCount, uint256 receivedMemberCount);
+error Raffle__TierMembersCountInvalid(
+    uint256 expectedMemberCount,
+    uint256 receivedMemberCount
+);
 error Raffle__NotEnoughRandomWordsForLottery();
-error Raffle__MembersOnlyPermittedInOneTier(address member, uint256 existingTier, uint256 newTier);
+error Raffle__MembersOnlyPermittedInOneTier(
+    address member,
+    uint256 existingTier,
+    uint256 newTier
+);
 
 /** @title A sample Raffle Contract
  *  @author Ali Mahdavi
@@ -25,10 +30,11 @@ error Raffle__MembersOnlyPermittedInOneTier(address member, uint256 existingTier
 abstract contract Raffle is VRFConsumerBaseV2 {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
-    
+
     enum RaffleState {
         OPEN,
-        CALCULATING
+        CALCULATING,
+        CLOSED
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -45,16 +51,14 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     // Lottery Variables
     bool private immutable i_requestVRFPerWinner;
 
-
     ///@notice requestId of vrf request on the pool
     mapping(uint256 => uint256) public poolIdToRequestId;
     mapping(uint256 => uint256) public requestIdToPoolId;
     /// @notice poolId to Tiers information of the pool
     mapping(uint256 => BionicStructs.Tier[]) public poolIdToTiers;
-    
+
     ///@notice winners per raffle
     mapping(uint256 => EnumerableSet.AddressSet) internal poolLotteryWinners;
-
 
     /*///////////////////////////////////////////////////////////////
                             Events
@@ -63,7 +67,6 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     event RaffleEnter(address indexed player);
     event TierInitiated(uint256 pid, uint256 tierId, address[] members);
     event WinnersPicked(uint256 pid, address[] winners);
-
 
     /*///////////////////////////////////////////////////////////////
                             Constructor
@@ -79,7 +82,6 @@ abstract contract Raffle is VRFConsumerBaseV2 {
         i_subscriptionId = subscriptionId;
         i_requestVRFPerWinner = requestVRFPerWinner;
     }
-
 
     /*///////////////////////////////////////////////////////////////
                             Public/External Functions
@@ -99,14 +101,22 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     /// @param pid PoolId for the raffle
     /// @param tierId id of tier user will be belong to
     /// @param members members for this tier (they must have pledged and don't be a member of pervous tiers).
-    function _addToTier(uint256 pid, uint256 tierId, address[] memory members) internal {
+    function _addToTier(
+        uint256 pid,
+        uint256 tierId,
+        address[] memory members
+    ) internal {
         BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
 
         for (uint k = 0; k < tiers.length; k++) {
             for (uint i = 0; i < tiers[k].members.length; i++) {
                 for (uint j = 0; j < members.length; j++) {
                     if (tiers[k].members[i] == members[j]) {
-                        revert Raffle__MembersOnlyPermittedInOneTier(members[j], k, tierId);
+                        revert Raffle__MembersOnlyPermittedInOneTier(
+                            members[j],
+                            k,
+                            tierId
+                        );
                     }
                 }
             }
@@ -121,7 +131,11 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     /// @param winnersCount total count of winners for this pool, (sum of all tiers winners count).
     /// @param callbackGasPerUser gas limit per winner for the VRF callback
     /// @return requestId for the VRF Requested.
-    function _draw(uint pid, uint32 winnersCount,uint32 callbackGasPerUser) internal returns (uint requestId) {
+    function _draw(
+        uint pid,
+        uint32 winnersCount,
+        uint32 callbackGasPerUser
+    ) internal returns (uint requestId) {
         if (poolIdToRequestId[pid] != 0) {
             revert Raffle__RaffleAlreadyInProgressOrDone();
         }
@@ -129,32 +143,47 @@ abstract contract Raffle is VRFConsumerBaseV2 {
             i_gasLane,
             i_subscriptionId,
             REQUEST_CONFIRMATIONS,
-            callbackGasPerUser*winnersCount,
-            i_requestVRFPerWinner ? winnersCount : uint32(poolIdToTiers[pid].length)
+            callbackGasPerUser * winnersCount,
+            i_requestVRFPerWinner
+                ? winnersCount
+                : uint32(poolIdToTiers[pid].length)
         );
 
         poolIdToRequestId[pid] = requestId;
         requestIdToPoolId[requestId] = pid;
         emit RequestedRaffleWinner(requestId);
     }
+
     /// @dev This is the function in charge of actual raffle after recieving vrf random words
     /// @param pid pool Id for the raffle
     /// @param randomWords array of random words that will be used to pick the numbers
     /// @return winners address[] the return variables of a contract’s function state variable
-    function _pickWinners(uint256 pid, uint256[] memory randomWords) internal returns (address[] memory) {
+    function _pickWinners(
+        uint256 pid,
+        uint256[] memory randomWords
+    ) internal returns (address[] memory) {
         BionicStructs.Tier[] memory tiers = poolIdToTiers[pid];
         for (uint i = 0; i < tiers.length; i++) {
             uint256 rand = randomWords[i];
             address[] memory tierMembers = tiers[i].members;
             uint memberCount = tierMembers.length;
-            for (uint j = 0; j < tiers[i].count;) {
+            for (uint j = 0; j < tiers[i].count; ) {
                 if (i_requestVRFPerWinner) {
                     rand = randomWords[poolLotteryWinners[pid].length()];
-                }else{
-                    rand = uint256(keccak256(abi.encodePacked(rand, block.prevrandao, block.chainid, i)));
+                } else {
+                    rand = uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                rand,
+                                block.prevrandao,
+                                block.chainid,
+                                i
+                            )
+                        )
+                    );
                 }
-                address w= tierMembers[rand % memberCount];
-                if( poolLotteryWinners[pid].contains(w)){
+                address w = tierMembers[rand % memberCount];
+                if (poolLotteryWinners[pid].contains(w)) {
                     continue;
                 }
                 poolLotteryWinners[pid].add(w);
@@ -162,15 +191,11 @@ abstract contract Raffle is VRFConsumerBaseV2 {
             }
         }
 
-
         emit WinnersPicked(pid, poolLotteryWinners[pid].values());
         return poolLotteryWinners[pid].values();
     }
 
-
-
     /*///////////////////////////////////////////////////////////////
                             
     //////////////////////////////////////////////////////////////*/
-
 }

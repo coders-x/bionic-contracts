@@ -8,6 +8,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {AccessControl, IERC165} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {ICurrencyPermit, ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
@@ -37,6 +38,7 @@ error LPFRWV__FundingPledgeFailed(address user, uint pid);
 error LPFRWV__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
 error LPFRWV__TiersHaveNotBeenInitialized();
 error LPFRWV__AlreadyPledgedToThisPool();
+error LPFRWV__LotteryIsPending();
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
 // ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
@@ -53,6 +55,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     using SafeERC20 for IERC20;
     using Address for address;
     using EnumerableMap for EnumerableMap.AddressToUintMap;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /*///////////////////////////////////////////////////////////////
                                 States
@@ -317,8 +320,8 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     {
         if (pid >= poolInfo.length) revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[pid];
+        //solhint-disable-next-line not-rely-on-time
         if (pool.pledgingEndTime > block.timestamp)
-            //solhint-disable-line not-rely-on-time
             revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
         if (poolIdToRequestId[pid] != 0)
             revert LPFRWV__DrawForThePoolHasAlreadyStarted(
@@ -345,22 +348,22 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
     function _preDraw(uint256 pid) internal {
-        //check all tiers except last(all other users) has members
         BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
-        address[] memory lastTierMembers = userPledge[pid].keys();
-        for (uint k = 0; k < tiers.length - 1; k++) {
-            if (tiers[k].members.length < 1) {
-                revert LPFRWV__TiersHaveNotBeenInitialized();
-            }
-            lastTierMembers = Utils.excludeAddresses(
-                lastTierMembers,
-                tiers[k].members
-            );
-        }
         //check if last tier is empty add rest of people pledged to the tier
         if (tiers[tiers.length - 1].members.length < 1) {
+            //check all tiers except last(all other users) has members
+            address[] memory lastTierMembers = userPledge[pid].keys();
+            for (uint k = 0; k < tiers.length - 1; k++) {
+                if (tiers[k].members.length < 1) {
+                    revert LPFRWV__TiersHaveNotBeenInitialized();
+                }
+                lastTierMembers = Utils.excludeAddresses(
+                    lastTierMembers,
+                    tiers[k].members
+                );
+            }
+
             _addToTier(pid, tiers.length - 1, lastTierMembers);
-            // tiers[tiers.length-1].members=lastTierMembers;
         }
     }
 
@@ -374,7 +377,13 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     ) internal override {
         uint pid = requestIdToPoolId[requestId];
         address[] memory winners = _pickWinners(pid, randomWords);
+    }
 
+    function refundLosers(uint256 pid) external {
+        address[] memory winners = poolLotteryWinners[pid].values();
+        if (winners.length == 0) {
+            revert LPFRWV__LotteryIsPending();
+        }
         ///@dev find losers and refund them their pledge.
         ///@notice post lottery refund non-winners
         ///@audit-info gas maybe for gasoptimization move it to dedicated function

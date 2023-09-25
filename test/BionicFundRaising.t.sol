@@ -13,7 +13,6 @@ import {BionicInvestorPass} from "../contracts/BIP.sol";
 import {TokenBoundAccount, ECDSA} from "../contracts/TBA.sol";
 import "../contracts/Launcpad/Claim.sol";
 import {Bionic} from "../contracts/Bionic.sol";
-import "forge-std/console.sol";
 
 contract BionicFundRaisingTest is DSTest, Test {
     address public constant ENTRY_POINT =
@@ -157,7 +156,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         uint256[] memory privateKeys = getPrivateKeys(25, count);
         TokenBoundAccount[] memory accs = new TokenBoundAccount[](count);
         //1. pledge
-        console.log("length %s", privateKeys.length);
+
         for (uint256 i = 0; i < privateKeys.length; i++) {
             uint256 privateKey = privateKeys[i];
             address user = vm.addr(privateKey);
