@@ -28,10 +28,11 @@ const config: HardhatUserConfig = {
         blockNumber: 39990000
       }
     },
-    // goerli: {
-    //   url: process.env.RPC_URL,
-    //   accounts: [process.env.PRIVATE_KEY || ""],
-    // },
+    goerli: {
+      chainId:5,
+      url: process.env.RPC_URL,
+      accounts: [process.env.PRIVATE_KEY || ""],
+    },
     mumbai: {
       chainId:80001,
       url: process.env.MUMBAI_RPC,
@@ -54,8 +55,8 @@ const config: HardhatUserConfig = {
       goerli: process.env.ETHERSCAN_API_KEY || "",
       kovan: process.env.ETHERSCAN_API_KEY || "",
       //polygon
-      polygon: process.env.ETHERSCAN_API_KEY || "",
-      polygonMumbai: process.env.ETHERSCAN_API_KEY || ""
+      polygon: process.env.POLYGONSCAN_API_KEY || "",
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY || ""
     }
   }
 };

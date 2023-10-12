@@ -17,10 +17,9 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeab
 
 import {BaseAccount as BaseERC4337Account, IEntryPoint, UserOperation} from "tokenbound/lib/account-abstraction/contracts/core/BaseAccount.sol";
 import {IAccountGuardian} from "tokenbound/src/interfaces/IAccountGuardian.sol";
-
 import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 
-import "hardhat/console.sol";
+import "forge-std/console.sol";
 
 error NotAuthorized();
 error InvalidInput();
@@ -28,6 +27,7 @@ error AccountLocked();
 error ExceedsMaxLockTime();
 error UntrustedImplementation();
 error OwnershipCycle();
+error InvalidSigniture();
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
 // ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
@@ -35,7 +35,7 @@ error OwnershipCycle();
 // ┃╭━╮┃┃┃┃┃╱┃┃┃╰╮┃┃┃┃┃┃╱╭╮
 // ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
-/// @title ERC6551Account Contract 
+/// @title ERC6551Account Contract
 /// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
 /// @notice Fork of Account.sol from TokenBouand
 /// @dev TokenBoundAccount that gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
@@ -73,8 +73,7 @@ contract TokenBoundAccount is
     /// @dev mapping from owner => caller => has permissions
     mapping(address => mapping(address => bool)) public permissions;
 
-        // solhint-disable-next-line var-name-mixedcase
-    bytes32 private constant _CURRENCY_PERMIT_TYPEHASH =
+    bytes32 public constant CURRENCY_PERMIT_TYPEHASH =
         keccak256(
             "Permit(address currency,address spender,uint256 value,uint256 nonce,uint256 deadline)"
         );
@@ -89,7 +88,6 @@ contract TokenBoundAccount is
     );
 
     event PermissionUpdated(address owner, address caller, bool hasPermission);
-
 
     /*///////////////////////////////////////////////////////////////
                             modifiers
@@ -109,7 +107,10 @@ contract TokenBoundAccount is
     /*///////////////////////////////////////////////////////////////
                             Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor(address _guardian, address entryPoint_) EIP712("BionicAccount","1") {
+    constructor(
+        address _guardian,
+        address entryPoint_
+    ) EIP712("BionicAccount", "1") {
         if (_guardian == address(0) || entryPoint_ == address(0))
             revert InvalidInput();
 
@@ -178,7 +179,6 @@ contract TokenBoundAccount is
         _incrementNonce();
     }
 
-
     /**
      * @dev See {ICurrencyPermit-permit}.
      */
@@ -190,20 +190,16 @@ contract TokenBoundAccount is
         uint8 v,
         bytes32 r,
         bytes32 s
-    ) external  {
-        console.log("block.timestamp <= deadline");
-
+    ) external {
         require(
-            block.timestamp <= deadline,        // solhint-disable-line not-rely-on-time
+            block.timestamp <= deadline, // solhint-disable-line not-rely-on-time
             "CurrencyPermit: expired deadline"
         );
         address _signer = owner();
-        console.log("owner %s",_signer);
         uint256 n = nonce();
-        console.log("nonce %s",n);
         bytes32 structHash = keccak256(
             abi.encode(
-                _CURRENCY_PERMIT_TYPEHASH,
+                CURRENCY_PERMIT_TYPEHASH,
                 currency,
                 spender,
                 value,
@@ -211,20 +207,12 @@ contract TokenBoundAccount is
                 deadline
             )
         );
-        console.log("structHash");
-        console.logBytes32(structHash);
-
 
         bytes32 hash = _hashTypedDataV4(structHash);
-        console.log("hash");
-        console.logBytes32(hash);
         address signer = ECDSA.recover(hash, v, r, s);
-        console.log("signer %s",signer);
-        require(
-            signer == _signer,
-            string(abi.encode(signer, "!=", _signer, hash))
-        );
-        console.log("==> %s",string(abi.encode(signer, "!=", _signer, hash)));
+        if (signer != _signer) {
+            revert InvalidSigniture();
+        }
         _approve(currency, spender, value);
     }
 
@@ -240,24 +228,20 @@ contract TokenBoundAccount is
         uint256 amount
     ) public virtual returns (bool) {
         _spendAllowance(currency, msg.sender, amount);
-        if (currency==address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)){
-            _call(to, amount,msg.data);
-        }else{
+        if (currency == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+            _call(to, amount, msg.data);
+        } else {
             return IERC20(currency).transfer(to, amount);
         }
         return true;
     }
 
-
-
-
     /// @dev EIP-1271 signature validation. By default, only the owner of the account is permissioned to sign.
     /// This function can be overriden.
-    function isValidSignature(bytes32 hash, bytes memory signature)
-        external
-        view
-        returns (bytes4 magicValue)
-    {
+    function isValidSignature(
+        bytes32 hash,
+        bytes memory signature
+    ) external view returns (bytes4 magicValue) {
         _handleOverrideStatic();
 
         bool isValid = SignatureChecker.isValidSignatureNow(
@@ -278,30 +262,23 @@ contract TokenBoundAccount is
     function token()
         external
         view
-        returns (
-            uint256 chainId,
-            address tokenContract,
-            uint256 tokenId
-        )
+        returns (uint256 chainId, address tokenContract, uint256 tokenId)
     {
         return ERC6551AccountLib.token();
     }
 
     /// @dev Returns the current account nonce
-    function nonce() public view override(ICurrencyPermit, IERC6551Account) returns (uint256) {
-        console.log("trying to get nonce");
-        try IEntryPoint(_entryPoint).getNonce(address(this), 0) returns (uint256 n) {
-            console.log("got nonce %s for %s from %s",n,msg.sender,_entryPoint);
-            return n;
-        } catch  (bytes memory reason){
-            console.log("!!!Failed");
-            console.logBytes(reason);
-        }
+    function nonce()
+        public
+        view
+        override(ICurrencyPermit, IERC6551Account)
+        returns (uint256)
+    {
+        return IEntryPoint(_entryPoint).getNonce(address(this), 0);
     }
 
     /// @dev Increments the account nonce if the caller is not the ERC-4337 entry point
     function _incrementNonce() internal {
-        console.log("increamenting Nonce for %s",address(this));
         if (msg.sender != _entryPoint)
             IEntryPoint(_entryPoint).incrementNonce(0);
     }
@@ -310,6 +287,7 @@ contract TokenBoundAccount is
     function entryPoint() public view override returns (IEntryPoint) {
         return IEntryPoint(_entryPoint);
     }
+
     /**
      * @dev See {ICurrencyPermit-DOMAIN_SEPARATOR}.
      */
@@ -317,6 +295,7 @@ contract TokenBoundAccount is
     function DOMAIN_SEPARATOR() external view override returns (bytes32) {
         return _domainSeparatorV4();
     }
+
     /**
      * @dev See {IERC20-allowance}.
      */
@@ -324,7 +303,6 @@ contract TokenBoundAccount is
         address currency,
         address spender
     ) public view virtual returns (uint256) {
-        console.log("checking allowence for %s on %s",spender,currency);
         return allowances[currency][spender];
     }
 
@@ -371,12 +349,9 @@ contract TokenBoundAccount is
 
     /// @dev Returns true if a given interfaceId is supported by this account. This method can be
     /// extended by an override.
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override
-        returns (bool)
-    {
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view override returns (bool) {
         bool defaultSupport = interfaceId == type(IERC165).interfaceId ||
             interfaceId == type(IERC1155Receiver).interfaceId ||
             interfaceId == type(IERC6551Account).interfaceId;
@@ -440,18 +415,14 @@ contract TokenBoundAccount is
         return this.onERC1155BatchReceived.selector;
     }
 
-
     /*///////////////////////////////////////////////////////////////
                             Internal Functions
     //////////////////////////////////////////////////////////////*/
     /// @dev Contract upgrades can only be performed by the owner and the new implementation must
     /// be trusted
-    function _authorizeUpgrade(address newImplementation)
-        internal
-        view
-        override
-        onlyOwner
-    {
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal view override onlyOwner {
         bool isTrusted = IAccountGuardian(guardian).isTrustedImplementation(
             newImplementation
         );
@@ -505,11 +476,10 @@ contract TokenBoundAccount is
     }
 
     /// @dev Executes a low-level static call
-    function _callStatic(address to, bytes calldata data)
-        internal
-        view
-        returns (bytes memory result)
-    {
+    function _callStatic(
+        address to,
+        bytes calldata data
+    ) internal view returns (bytes memory result) {
         bool success;
         (success, result) = to.staticcall(data);
 
@@ -556,7 +526,6 @@ contract TokenBoundAccount is
             // }
         }
     }
-
 
     // /**
     //  * @dev Sets `amount` as the allowance of `spender` over the owner's `currency` tokens.
