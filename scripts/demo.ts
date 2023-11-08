@@ -4,7 +4,7 @@ import { getProviderFromRpcUrl } from "@thirdweb-dev/sdk";
 import { BigNumber, Contract, Signer } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { IERC20, TokenBoundAccount } from "../typechain-types";
-import { goerli as configInfo } from './config.json';
+import { mumbai as configInfo } from './config.json';
 
 dotenv.config();
 
@@ -18,17 +18,13 @@ const BIP_CONTRACT = configInfo.bionicInvestorPass,
     BIONIC_TOKEN_ADDR = configInfo.tokenAddress,
     USDT_ADDR = configInfo.usdtAddress;
 
-//     // mumbai
-// const BIP_CONTRACT="0xfFD890eBB19277f59f9d0810D464Efd2775df08E", TOKEN_BOUND_IMP_ADDR="0xC0dC4Da60478e13e691E32261f5d63Fd3cDC075d",BIONIC_LAUNCH_ADDR="0x748b9d63815015A04057688c437B20e84ccD1b8E",
-//     BIONIC_TOKEN_ADDR="0xa0262DCE141a5C9574B2Ae8a56494aeFe7A28c8F", USDT_ADDR="0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848";
 
 const ENTRY_POINT = configInfo.entryPoint,
     ERC6551_REGISTRY_ADDR = configInfo.erc6551Reg;
 // //goerli
-// const BIP_CONTRACT="0xA9652d7d33FacC265be044055B7392A261c3efD8",ERC6551_REGISTRY_ADDR="0x02101dfB77FDE026414827Fdc604ddAF224F0921",
-//     TOKEN_BOUND_IMP_ADDR="0x55FcaE61dF06858DC8115bDDd21B622F0634d8Ac",BIONIC_LAUNCH_ADDR="0x96Ccc65AD06205d8Ce83368755190A69213f0B94",
-//     BIONIC_TOKEN_ADDR="0x2111efE6FB546EDdF98A293BFEbEa50e594211Ef", USDT_ADDR="0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848";
-let provider = getProviderFromRpcUrl(process.env.RPC_URL || "", {});
+// let provider = getProviderFromRpcUrl(process.env.RPC_URL || "", {});
+// //mumbai
+let provider = getProviderFromRpcUrl(process.env.MUMBAI_RPC || "", {});
 let owner = new ethers.Wallet(process.env.PRIVATE_KEY || "", provider);
 
 async function main(level: number, pid: number = 0) {
@@ -55,56 +51,51 @@ async function main(level: number, pid: number = 0) {
     // console.log(`tokenBoundAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
     let abstractAccounts: TokenBoundAccount[] = [];
     //goerli
-    const aa_addresses = [
-        "0xEb061CC58a39483A26089d7Ce514a4CFB50881E5",
-        "0x29A9194b77292b4875f8D070C819f23A90Cf478E",
-        "0x4f7805C1Ef304405840B250B69E4d16b5450f9f2",
-        "0x43daA91B9b339DFD8daE48d824e46b060e012135",
-        "0x81A8a47c2b06A47C594C5C3711d9C8ddd3B78d8f",
-        "0xc92cf3FBEED66aDa7617Acd998Ce70533C552fdA",
-        "0xe23EF0D205C42bE572CC016265978EF111d010ee",
-        "0x247408c3C21C28756F29990380d518246d1a88f3",
-        "0x234Ec7c68743F1614f58bFF1DA15BA9A24567D49",
-        "0xbE87210E920C773F6F9438FA42B804D204f9222d",
-        "0xfA8f3B8Cd42a7054c9BA7d786f526Ad4758F1446",
-        "0x432F3bBFB0b09e07554559e7706b08c11bc121ec",
-        "0x1E5945182718bfF7B85689edDD51cd32a1c9Fad8",
-        "0x93ed97C8d3b28192a42864668F1F7DB7661Ee998",
-        "0x15CA19E0de7E5F2CCB07e4989EF3b030eE938551",
-        "0xD75621624811Ff6D6BCff1048bAc90FE219b4A9d",
-        "0x74af39f573Dc681deBCfA58c2863Aa44F23D3c99",
-        "0x28310d3c8Ff416c0FC158AAC741b73253dBA80F5",
-        "0x83eCD224c33fD5D7713597fD0869064d9C81e9a7",
-        "0x7b42735dc0923eDD8f99f522a38503e1653bc6Ce",
-    ];
-
-    // const aa_addresses=[
-    //     "0xdeE730aFb19d80BD159E05F4BBFbd4EdD6178e6d",
-    //     "0x14e5712Afe66BA0be8cFBeEB526b2fCc82e0d14C",
-    //     "0x45FdECD8fdd7361Daf004C274240A0604E6C649E",
-    //     "0x3DFBb9DEeb3478552a9aA3D2e827bE4E18a6ab65",
-    //     "0x93A48Dcc435F9B6D2c39bf3a77c73d4898f2EB4e",
-    //     "0xd20466A64f5C1C64ce6F77f8A3098F66963d9b5b",
-    //     "0x89820a675e5D19306409935F80f21b22151Eb015",
-    //     "0xEA76900a714060Eb51857587816a6E24B140CECe",
-    //     "0xDe05170cd367f320c4712Bb25FF07D5529E25a68",
-    //     "0xd77E947C267D0D04cccD93c95973426446c275d9",
-    //     "0x53fa973B987DbDf6a7479Ac47cC58227855aE068",
-    //     "0xd532190F51bc6B1FaDF9A47Aa852a3F254f217a0",
-    //     "0x31150dbc756767c7FA58E3b726caAE02B18C9A73",
-    //     "0x8504821fd23aeF6799a512c735f756c69E222a7D",
-    //     "0x1F4cA47748016B034B3A6E4390c29Bc83fC5908F",
-    //     "0x621f0B0F8E3bfbF2d3C1bbDE7b456aBB0E467910",
-    //     "0x5251D29f488DB8389188b1c46DD0bDf7A4bb2dBE",
-    //     "0x3b6D0CCd7DfB81cD5616f1c4fA680347378C09e2",
-    //     "0xF8264A7e01195DDCf552Eb8d925a5aB25fEA0F90",
-    //     "0x6Da6bCaBECFBa8ebBEeDbe8900Bf3C8FE3BbcD2F",
-    //     "0x2bE509dB39F11959fEaBCEb955326b2dA2c36c2A",
-    //     "0xC5aD426778B8bEEba0f903773ceADB8d0EE644e8",
-    //     "0x461813314C71D6baCB99643Db5F244CEcbA07e1B",
-    //     "0xD899E84Ca45c1b11cDAd95c9f29850425B3fC42D",
-    //     "0xf262A2C0753c19E4CE7fDd43211779347bBF016d"
+    // const aa_addresses = [
+    //     "0xEb061CC58a39483A26089d7Ce514a4CFB50881E5",
+    //     "0x29A9194b77292b4875f8D070C819f23A90Cf478E",
+    //     "0x4f7805C1Ef304405840B250B69E4d16b5450f9f2",
+    //     "0x43daA91B9b339DFD8daE48d824e46b060e012135",
+    //     "0x81A8a47c2b06A47C594C5C3711d9C8ddd3B78d8f",
+    //     "0xc92cf3FBEED66aDa7617Acd998Ce70533C552fdA",
+    //     "0xe23EF0D205C42bE572CC016265978EF111d010ee",
+    //     "0x247408c3C21C28756F29990380d518246d1a88f3",
+    //     "0x234Ec7c68743F1614f58bFF1DA15BA9A24567D49",
+    //     "0xbE87210E920C773F6F9438FA42B804D204f9222d",
+    //     "0xfA8f3B8Cd42a7054c9BA7d786f526Ad4758F1446",
+    //     "0x432F3bBFB0b09e07554559e7706b08c11bc121ec",
+    //     "0x1E5945182718bfF7B85689edDD51cd32a1c9Fad8",
+    //     "0x93ed97C8d3b28192a42864668F1F7DB7661Ee998",
+    //     "0x15CA19E0de7E5F2CCB07e4989EF3b030eE938551",
+    //     "0xD75621624811Ff6D6BCff1048bAc90FE219b4A9d",
+    //     "0x74af39f573Dc681deBCfA58c2863Aa44F23D3c99",
+    //     "0x28310d3c8Ff416c0FC158AAC741b73253dBA80F5",
+    //     "0x83eCD224c33fD5D7713597fD0869064d9C81e9a7",
+    //     "0x7b42735dc0923eDD8f99f522a38503e1653bc6Ce",
     // ];
+    //mumbai
+    const aa_addresses = [
+        "0xEF8A4118c332dA68A8021725b8720823c83EE32b",
+        "0x917e66a24C1cba42E2f296D84cb3DB90919e1931",
+        "0x4ed1036D34E3aA2b74a15884248602C8600e54B6",
+        "0x37D17BaF2435f6148b6B3d720aFa37DCfb71376b",
+        "0xab9cC70492D4D418777fB75C8518D8C19D88b2f2",
+        "0x6EDee3FcEfB5C97194A64794f2F2d2B4BBF80876",
+        "0x2D2F0dA03fF258820DddDBd1db9C0D3B167B6197",
+        "0xF59818808E6474Ac6799db497167A71cE14A348A",
+        "0x50430177170225E450D8f72B04c6E72f910ac612",
+        "0x7cda89f88a24259aCB3c5624ea89Cb09bF9B64f4",
+        "0x07674Ee6C456C556Ac1Ae73f645670638219ce34",
+        "0x2B5b2da3C5d07249AC60dce0D09219eacb0Ad002",
+        "0xEcF899766dc38acC29DBc89922E4a27317fD5e32",
+        "0xCe5Bfb0632C71F33e3D06b3dd90D95B633b70389",
+        "0x03d2D94AfDDEFcfbF339Ec97206Ea2be472b242C",
+        "0xbB5A909a2441B18182f69407035A3ED6a0F0992D",
+        "0x53ACCcF4cf5207F2e8B85B6E41AdcA2eDD6454ca",
+        "0x9A07d707Ae26AEF0B28b3B2481A3184a313Bd8C0",
+        "0xa4F111e2524D3484c5A99816C25348f6b01B73c1",
+        "0xc1F5F6b508259378C5F261C7819A6Df315225550",
+    ];
 
     /*** Mint BIP and Assign SmartWallet */
     if (level == 1) {
@@ -160,26 +151,26 @@ async function main(level: number, pid: number = 0) {
             abstractAccounts.push(acc);
         }
         /**
-                Minted 0 for address 0x1cf71Ae69ed0c16253f1523a4B5c2cA4fcd967BA and assigned 0xEb061CC58a39483A26089d7Ce514a4CFB50881E5
-                Minted 1 for address 0xedB346a71c747608B4966f0932DA83976DA41652 and assigned 0x29A9194b77292b4875f8D070C819f23A90Cf478E
-                Minted 2 for address 0x132d6c57A3f39859536d6C04db56bAA70Cf32E9C and assigned 0x4f7805C1Ef304405840B250B69E4d16b5450f9f2
-                Minted 3 for address 0x6cA18dBf7a9eb5E99f481E181C053bFAe32Ed010 and assigned 0x43daA91B9b339DFD8daE48d824e46b060e012135
-                Minted 4 for address 0x2370172164b26D37d0B47e6582823Afa7006ea95 and assigned 0x81A8a47c2b06A47C594C5C3711d9C8ddd3B78d8f
-                Minted 5 for address 0x8e61F9d8AC761a936aAD8A1421fA5CeaD5942Af3 and assigned 0xc92cf3FBEED66aDa7617Acd998Ce70533C552fdA
-                Minted 6 for address 0xf9E4a48A1131373e2ad08992aAb63F0750f6a277 and assigned 0xe23EF0D205C42bE572CC016265978EF111d010ee
-                Minted 7 for address 0x3b6982853DDC791fb365A18014221EAbb46B92D7 and assigned 0x247408c3C21C28756F29990380d518246d1a88f3
-                Minted 8 for address 0x7AfF777a45f071E5666332fa6ed5Feb4c90f6369 and assigned 0x234Ec7c68743F1614f58bFF1DA15BA9A24567D49
-                Minted 9 for address 0x4d26a02eD5dac607301880aE1d1a87215a32E0ed and assigned 0xbE87210E920C773F6F9438FA42B804D204f9222d
-                Minted 10 for address 0x1d80EbD4fa787EC5Fb4b18aa4f3561954fE9fF6F and assigned 0xfA8f3B8Cd42a7054c9BA7d786f526Ad4758F1446
-                Minted 11 for address 0xd3111f9253Bb484FF5490F575AC21978D981cD3e and assigned 0x432F3bBFB0b09e07554559e7706b08c11bc121ec
-                Minted 12 for address 0x9c175A24c56BFe220f43DC78446ED6787AF3b519 and assigned 0x1E5945182718bfF7B85689edDD51cd32a1c9Fad8
-                Minted 13 for address 0xF1459f47eA0F225D1A7ec635d4F9cDF28a42F66e and assigned 0x93ed97C8d3b28192a42864668F1F7DB7661Ee998
-                Minted 14 for address 0xBD6bad70a2756058BE287a12078ecd469B933B7e and assigned 0x15CA19E0de7E5F2CCB07e4989EF3b030eE938551
-                Minted 15 for address 0xBe2453FfE7caAc3268dc82E6561496579Dacf034 and assigned 0xD75621624811Ff6D6BCff1048bAc90FE219b4A9d
-                Minted 16 for address 0xC26FC7D5ff5aef027406c918ceD5a11c30068914 and assigned 0x74af39f573Dc681deBCfA58c2863Aa44F23D3c99
-                Minted 17 for address 0x4c71747Dd0BBc1A023136A424334072FDf0aB1Ce and assigned 0x28310d3c8Ff416c0FC158AAC741b73253dBA80F5
-                Minted 18 for address 0xBA3e816a5F664B0Bb119fd51a3D4886B759510A5 and assigned 0x83eCD224c33fD5D7713597fD0869064d9C81e9a7
-                Minted 19 for address 0xeba6FdBc5Bf93d1850411694750a9729c67A6ad1 and assigned 0x7b42735dc0923eDD8f99f522a38503e1653bc6Ce
+        Minted 0 for address 0x1cf71Ae69ed0c16253f1523a4B5c2cA4fcd967BA and assigned 0xEF8A4118c332dA68A8021725b8720823c83EE32b
+        Minted 1 for address 0xedB346a71c747608B4966f0932DA83976DA41652 and assigned 0x917e66a24C1cba42E2f296D84cb3DB90919e1931
+        Minted 2 for address 0x132d6c57A3f39859536d6C04db56bAA70Cf32E9C and assigned 0x4ed1036D34E3aA2b74a15884248602C8600e54B6
+        Minted 3 for address 0x6cA18dBf7a9eb5E99f481E181C053bFAe32Ed010 and assigned 0x37D17BaF2435f6148b6B3d720aFa37DCfb71376b
+        Minted 4 for address 0x2370172164b26D37d0B47e6582823Afa7006ea95 and assigned 0xab9cC70492D4D418777fB75C8518D8C19D88b2f2
+        Minted 5 for address 0x8e61F9d8AC761a936aAD8A1421fA5CeaD5942Af3 and assigned 0x6EDee3FcEfB5C97194A64794f2F2d2B4BBF80876
+        Minted 6 for address 0xf9E4a48A1131373e2ad08992aAb63F0750f6a277 and assigned 0x2D2F0dA03fF258820DddDBd1db9C0D3B167B6197
+        Minted 7 for address 0x3b6982853DDC791fb365A18014221EAbb46B92D7 and assigned 0xF59818808E6474Ac6799db497167A71cE14A348A
+        Minted 8 for address 0x7AfF777a45f071E5666332fa6ed5Feb4c90f6369 and assigned 0x50430177170225E450D8f72B04c6E72f910ac612
+        Minted 9 for address 0x4d26a02eD5dac607301880aE1d1a87215a32E0ed and assigned 0x7cda89f88a24259aCB3c5624ea89Cb09bF9B64f4
+        Minted 10 for address 0x1d80EbD4fa787EC5Fb4b18aa4f3561954fE9fF6F and assigned 0x07674Ee6C456C556Ac1Ae73f645670638219ce34
+        Minted 11 for address 0xd3111f9253Bb484FF5490F575AC21978D981cD3e and assigned 0x2B5b2da3C5d07249AC60dce0D09219eacb0Ad002
+        Minted 12 for address 0x9c175A24c56BFe220f43DC78446ED6787AF3b519 and assigned 0xEcF899766dc38acC29DBc89922E4a27317fD5e32
+        Minted 13 for address 0xF1459f47eA0F225D1A7ec635d4F9cDF28a42F66e and assigned 0xCe5Bfb0632C71F33e3D06b3dd90D95B633b70389
+        Minted 14 for address 0xBD6bad70a2756058BE287a12078ecd469B933B7e and assigned 0x03d2D94AfDDEFcfbF339Ec97206Ea2be472b242C
+        Minted 15 for address 0xBe2453FfE7caAc3268dc82E6561496579Dacf034 and assigned 0xbB5A909a2441B18182f69407035A3ED6a0F0992D
+        Minted 16 for address 0xC26FC7D5ff5aef027406c918ceD5a11c30068914 and assigned 0x53ACCcF4cf5207F2e8B85B6E41AdcA2eDD6454ca
+        Minted 17 for address 0x4c71747Dd0BBc1A023136A424334072FDf0aB1Ce and assigned 0x9A07d707Ae26AEF0B28b3B2481A3184a313Bd8C0
+        Minted 18 for address 0xBA3e816a5F664B0Bb119fd51a3D4886B759510A5 and assigned 0xa4F111e2524D3484c5A99816C25348f6b01B73c1
+        Minted 19 for address 0xeba6FdBc5Bf93d1850411694750a9729c67A6ad1 and assigned 0xc1F5F6b508259378C5F261C7819A6Df315225550
             */
     } else {
         for (const a of aa_addresses) {
@@ -423,4 +414,4 @@ async function getCurrencyPermitSignature(
     );
 }
 //step, pid
-main(2, 13).then(console.log).catch(console.error);
+main(3, 0).then(console.log).catch(console.error);

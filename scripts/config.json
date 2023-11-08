@@ -16,6 +16,20 @@
         "reqVRFPerWinner":false
     },
     "mumbai":{
-
+        "name": "mumbai",
+        "keyHash": "0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f",
+        "vrfCoordinator": "0x7a1bac17ccc5b313516c5e16fb24f7659aa5ebed",
+        "tokenAddress":"0x76812c0Dfe910545587F39464aE51F5B73384F4C",
+        "usdtAddress":"0x2F7b97837F2D14bA2eD3a4B2282e259126A9b848",
+        "bionicInvestorPass":"0x2c404b6544E75dBA1928bbAE5d5b3f1797462D35",
+        "tbaImpl":"0x31B203D5Dea02Dc00B630C6877b9ffa9A49f9EbC",
+        "tbaGuardian":"0xF4386C22A1e7D6A730C387f2b7a2cbFE82B38d28",
+        "bionicLaunchPad":"0xdF9BB1C113298A8CF9FAdFA6733BeA127126978b",
+        "entryPoint":"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+        "erc6551Reg":"0x02101dfB77FDE026414827Fdc604ddAF224F0921",
+        "utilsAddress":"0xb721d73F972EB5acA257963f5Ed98cbf795ac5dd",
+        "subId":5682,
+        "cbGasLimit":60000,
+        "reqVRFPerWinner":false
     }
 }
