@@ -3,6 +3,9 @@ pragma solidity >=0.7.0 <0.9.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
@@ -13,6 +16,10 @@ import "@thirdweb-dev/contracts/extension/LazyMint.sol";
 import "@thirdweb-dev/contracts/extension/DropSinglePhase.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 
+error BIP__Deprecated();
+error BIP__AccountRescueSignitureOutDated();
+error BIP__InvalidSigniture();
+
 contract BionicInvestorPass is
     Initializable,
     ERC721Upgradeable,
@@ -21,6 +28,7 @@ contract BionicInvestorPass is
     AccessControlUpgradeable,
     ERC721BurnableUpgradeable,
     UUPSUpgradeable,
+    EIP712,
     LazyMint,
     DropSinglePhase
 {
@@ -28,15 +36,18 @@ contract BionicInvestorPass is
 
     // Mapping from token ID to guardian address
     mapping(uint256 => address) private _guardians;
-
+    bytes32 public constant ACCOUNT_RESCUE_TYPEHASH =
+        keccak256(
+            "AccountRescueApprove(address to,uint256 tokenId,uint256 deadline)"
+        );
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    CountersUpgradeable.Counter private _tokenIdCounter;
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+    CountersUpgradeable.Counter private _tokenIdCounter;
     address private platformFeeRecipient;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
+    constructor() EIP712("BIP", "1") {
         _disableInitializers();
     }
 
@@ -83,6 +94,61 @@ contract BionicInvestorPass is
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
         _guardians[tokenId] = guardian;
+    }
+
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) public virtual override(ERC721Upgradeable, IERC721Upgradeable) {
+        revert BIP__Deprecated();
+    }
+
+    function safeTransferFrom(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override(ERC721Upgradeable, IERC721Upgradeable) {
+        revert BIP__Deprecated();
+    }
+
+    function accountRescueApprove(
+        address to,
+        uint tokenId,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (block.timestamp > deadline) {
+            revert BIP__AccountRescueSignitureOutDated();
+        }
+
+        bytes32 structHash = keccak256(
+            abi.encode(ACCOUNT_RESCUE_TYPEHASH, to, tokenId, deadline)
+        );
+        address signer = ECDSA.recover(_hashTypedDataV4(structHash), v, r, s);
+        if (signer != _guardians[tokenId]) {
+            revert BIP__InvalidSigniture();
+        }
+
+        _safeTransfer(super._ownerOf(tokenId), to, tokenId, "");
+    }
+
+    /**
+     * @dev See {EIP712-DOMAIN_SEPARATOR}.
+     */
+    // solhint-disable-next-line func-name-mixedcase
+    function DOMAIN_SEPARATOR() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
+    /**
+     * @dev Returns the owner of the `tokenId`. Does NOT revert if token doesn't exist
+     */
+    function guardianOf(uint256 tokenId) external view returns (address) {
+        return _guardians[tokenId];
     }
 
     function tokenURI(

@@ -9,7 +9,7 @@ import "../contracts/Launcpad/BionicFundRaising.sol";
 import {VRFCoordinatorV2Mock} from "../contracts/libs/VRFCoordinatorV2Mock.sol";
 import {ERC6551Registry} from "../contracts/libs/ERC6551Registry.sol";
 import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
-import {BionicInvestorPass} from "../contracts/BIP.sol";
+import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../contracts/BIP.sol";
 import {TokenBoundAccount, ECDSA} from "../contracts/TBA.sol";
 import "../contracts/Launcpad/Claim.sol";
 import {Bionic} from "../contracts/Bionic.sol";
@@ -267,6 +267,48 @@ contract BionicFundRaisingTest is DSTest, Test {
             vm.expectRevert(Claim__NothingToClaim.selector);
             _claimContract.claimTokens(pid);
         }
+    }
+
+    function testTransferNFT() public {
+        uint256[] memory privateKeys = getPrivateKeys(50, 3);
+        address user = vm.addr(privateKeys[0]);
+        address guardian = vm.addr(privateKeys[1]);
+        address rescue = vm.addr(privateKeys[2]);
+        uint256 tokenId = 0;
+        uint256 deadline = block.timestamp + 7 days;
+
+        _bipContract.safeMint(user, guardian, "");
+        assertEq(_bipContract.ownerOf(0), user);
+        assertEq(_bipContract.guardianOf(0), guardian);
+
+        vm.expectRevert(BIP__Deprecated.selector);
+        _bipContract.transferFrom(user, guardian, tokenId);
+        vm.expectRevert(BIP__Deprecated.selector);
+        _bipContract.safeTransferFrom(user, guardian, tokenId);
+
+        bytes32 structHash = ECDSA.toTypedDataHash(
+            _bipContract.DOMAIN_SEPARATOR(),
+            keccak256(
+                abi.encode(
+                    _bipContract.ACCOUNT_RESCUE_TYPEHASH(),
+                    rescue,
+                    tokenId,
+                    deadline
+                )
+            )
+        );
+
+        //privatekey[0] belongs to owner
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKeys[0], structHash);
+        vm.expectRevert(BIP__InvalidSigniture.selector);
+        _bipContract.accountRescueApprove(rescue, tokenId, deadline, v, r, s);
+
+        //privatekey[0] belongs to guardian
+        (v, r, s) = vm.sign(privateKeys[1], structHash);
+        _bipContract.accountRescueApprove(rescue, tokenId, deadline, v, r, s);
+
+        assertEq(_bipContract.ownerOf(0), rescue);
+        assertEq(_bipContract.guardianOf(0), guardian);
     }
 }
 
