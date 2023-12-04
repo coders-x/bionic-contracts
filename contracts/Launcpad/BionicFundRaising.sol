@@ -19,6 +19,8 @@ import {Treasury} from "./Treasury.sol";
 import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
 
+// import "hardhat/console.sol";
+
 /* Errors */
 error LPFRWV__NotDefinedError();
 error LPFRWV__InvalidPool();

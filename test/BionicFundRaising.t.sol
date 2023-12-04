@@ -153,15 +153,15 @@ contract BionicFundRaisingTest is DSTest, Test {
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 1025;
         uint256 winnersCount = 500;
-        uint256[] memory privateKeys = getPrivateKeys(25, count);
+        uint256[] memory privateKeys = getPrivateKeys(50, count);
         TokenBoundAccount[] memory accs = new TokenBoundAccount[](count);
         //1. pledge
 
         for (uint256 i = 0; i < privateKeys.length; i++) {
-            uint256 privateKey = privateKeys[i];
-            address user = vm.addr(privateKey);
+            address user = vm.addr(privateKeys[i * 2]);
+            address guardian = vm.addr(privateKeys[(i * 2) + 1]);
 
-            _bipContract.safeMint(user, "");
+            _bipContract.safeMint(user, guardian, "");
             address accountAddress = erc6551_Registry.createAccount(
                 address(_accountImplementation),
                 block.chainid,
@@ -192,7 +192,10 @@ contract BionicFundRaisingTest is DSTest, Test {
                 )
             );
 
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, structHash);
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+                privateKeys[i],
+                structHash
+            );
 
             vm.prank(user);
             bytes memory data = abi.encodeWithSelector(

@@ -13,7 +13,6 @@ import "@thirdweb-dev/contracts/extension/LazyMint.sol";
 import "@thirdweb-dev/contracts/extension/DropSinglePhase.sol";
 import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
 
-
 contract BionicInvestorPass is
     Initializable,
     ERC721Upgradeable,
@@ -27,12 +26,14 @@ contract BionicInvestorPass is
 {
     using CountersUpgradeable for CountersUpgradeable.Counter;
 
+    // Mapping from token ID to guardian address
+    mapping(uint256 => address) private _guardians;
+
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     CountersUpgradeable.Counter private _tokenIdCounter;
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     address private platformFeeRecipient;
-
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -47,13 +48,12 @@ contract BionicInvestorPass is
         __ERC721Burnable_init();
         __UUPSUpgradeable_init();
 
-        platformFeeRecipient=msg.sender;
+        platformFeeRecipient = msg.sender;
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
-
 
         // _pause();//don't allow transfers only claim //todo fix _mint issue
     }
@@ -66,37 +66,23 @@ contract BionicInvestorPass is
         _unpause();
     }
 
+    /**
+     * @notice Safely mints a new token, assigning it to the specified address, with a given guardian and URI.
+     * @param to The recipient address to receive the minted token.
+     * @param guardian The guardian address associated with the minted token.
+     * @param uri The URI for the metadata of the minted token.
+     * @dev Only callable by an address with the MINTER_ROLE role.
+     */
     function safeMint(
         address to,
+        address guardian,
         string memory uri
     ) public onlyRole(MINTER_ROLE) {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _safeMint(to, tokenId);
         _setTokenURI(tokenId, uri);
-    }
-
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId,
-        uint256 batchSize
-    ) internal override whenNotPaused {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
-        require(this.balanceOf(to)==0,"already have been MINTED Membership");
-
-    }
-
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyRole(UPGRADER_ROLE) {}
-
-    // The following functions are overrides required by Solidity.
-
-    function _burn(
-        uint256 tokenId
-    ) internal override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
-        super._burn(tokenId);
+        _guardians[tokenId] = guardian;
     }
 
     function tokenURI(
@@ -125,10 +111,31 @@ contract BionicInvestorPass is
         return super.supportsInterface(interfaceId);
     }
 
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    ) internal override whenNotPaused {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        require(this.balanceOf(to) == 0, "already have been MINTED Membership");
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(UPGRADER_ROLE) {}
+
+    // The following functions are overrides required by Solidity.
+
+    function _burn(
+        uint256 tokenId
+    ) internal override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
+        super._burn(tokenId);
+    }
+
     function _canLazyMint() internal view virtual override returns (bool) {
         return hasRole(MINTER_ROLE, msg.sender);
     }
-
 
     /// @dev Collects and distributes the primary sale value of NFTs being claimed.
     function _collectPriceOnClaim(
@@ -141,7 +148,9 @@ contract BionicInvestorPass is
             return;
         }
 
-        address saleRecipient = _primarySaleRecipient == address(0) ? platformFeeRecipient : _primarySaleRecipient;
+        address saleRecipient = _primarySaleRecipient == address(0)
+            ? platformFeeRecipient
+            : _primarySaleRecipient;
 
         uint256 totalPrice = _quantityToClaim * _pricePerToken;
 
@@ -151,7 +160,12 @@ contract BionicInvestorPass is
             }
         }
 
-        CurrencyTransferLib.transferCurrency(_currency, _msgSender(), saleRecipient, totalPrice);
+        CurrencyTransferLib.transferCurrency(
+            _currency,
+            _msgSender(),
+            saleRecipient,
+            totalPrice
+        );
     }
 
     function _transferTokensOnClaim(
