@@ -4,7 +4,7 @@ import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
     IERC20Permit, ERC6551Registry, BionicFundRaising, ERC20Upgradeable, TokenBoundAccount, MockEntryPoint,
-    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding
+    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding, ERC20
 }
     from "../typechain-types";
 import { BytesLike } from "ethers";
@@ -43,13 +43,11 @@ describe("e2e", function () {
         tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, AbstractAccounts: TokenBoundAccount[],
         usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock,
         claimContract: ClaimFunding, mockEntryPoint: MockEntryPoint;
-    let owner: SignerWithAddress;
-    let client: SignerWithAddress;
+    let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
     before(async () => {
-        [owner, ...signers] = await ethers.getSigners();
-        client = signers[0];
+        [owner, client, guardian, ...signers] = await ethers.getSigners();
         bionicContract = await deployBionic();
         bipContract = await deployBIP();
         let TokenBoundContractRegistryFacory = await ethers.getContractFactory("ERC6551Registry");
@@ -80,10 +78,10 @@ describe("e2e", function () {
         AbstractAccounts = [abstractedAccount];
         for (let i = 0; i < 10; i++) {
             //mint BIP 
-            let res = await bipContract.safeMint(signers[i + 1].address, "https://linktoNFT.com");
+            let res = await bipContract.safeMint(signers[(i * 2)].address, signers[(i * 2) + 1].address, "https://linktoNFT.com");
             let r = await res.wait()
             //@ts-ignore
-            expect(BigNumber.from(r?.events[0]?.args[2])).to.equal(BigNumber.from(i))
+            expect(BigNumber.from(r?.events[0]?.args.tokenId)).to.equal(BigNumber.from(i))
             //create abstracted accounts
             res = await tokenBoundContractRegistry.createAccount(tokenBoundImpContract.address,
                 network.config.chainId as number, bipContract.address,
@@ -91,6 +89,8 @@ describe("e2e", function () {
             let newAcc = await res.wait(1);
             let acc = await ethers.getContractAt("TokenBoundAccount", newAcc?.events[0]?.args?.account);
             await usdtContract.connect(whale).transfer(acc.address, HUNDRED_THOUSAND);
+            expect(await acc.owner()).to.equal(signers[i * 2].address);
+
             AbstractAccounts.push(acc);
         }
 
@@ -158,7 +158,8 @@ describe("e2e", function () {
             expect(await bipContract.hasRole(await bipContract.UPGRADER_ROLE(), owner.address)).to.be.true;
         });
         it("Should Mint NFT to other user", async function () {
-            let res = await bipContract.safeMint(client.address, "https://linktoNFT.com");
+            let res = await bipContract.safeMint(client.address, guardian.address, "https://linktoNFT.com");
+
             let r = await res.wait()
             expect(r.events[0].args[0]).to.equal('0x0000000000000000000000000000000000000000')
             expect(BigNumber.from(r.events[0].args[2])).to.equal(BigNumber.from(10))
@@ -276,34 +277,16 @@ describe("e2e", function () {
                     await bionicContract.transfer(aac.address, BionicFundRaising.MINIMUM_BIONIC_STAKE());
                     const alreadyPledged = await BionicFundRaising.userTotalPledge(aac.address);
                     const amount = BigNumber.from(1000);
-                    const { v, r, s } = await getCurrencyPermitSignature(
-                        signers[i],
-                        aac,
-                        usdtContract,
-                        BionicFundRaising.address,
-                        amount,
-                        deadline
-                    )
-                    let treasuryAddress = await BionicFundRaising.treasury();
-                    let oldbalance = await usdtContract.balanceOf(treasuryAddress);
-                    let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
-                    await expect(aac.connect(signers[i]).executeCall(BionicFundRaising.address, 0, raw))
-                        .to.emit(BionicFundRaising, "Pledge").withArgs(aac.address, 0, amount)
-                        .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, BionicFundRaising.address, amount)
-                        .to.emit(BionicFundRaising, "PledgeFunded").withArgs(aac.address, 0, amount);
-
-                    expect(oldbalance).to.not.equal(await usdtContract.balanceOf(treasuryAddress));
-                    expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(oldbalance.add(alreadyPledged.add(amount)))
-                    expect(await aac.allowance(usdtContract.address, BionicFundRaising.address)).to.equal(0);
+                    await pledgeBySigner(aac, i == 0 ? client : signers[(i - 1) * 2], usdtContract, BionicFundRaising, amount, deadline, alreadyPledged)
                 }
             });
 
-            it("Should add on user pledge and permit contract with new amount", async function () {
+            it("Should fail on updating pledge amount", async function () {
                 const deadline = ethers.constants.MaxUint256;
                 const alreadyPledged = await BionicFundRaising.userTotalPledge(abstractedAccount.address);
                 const amount = BigNumber.from(20);
-                let treasuryAddress = await BionicFundRaising.treasury();
-                const treasuryOldBalance = await usdtContract.balanceOf(treasuryAddress);
+                // let treasuryAddress = await BionicFundRaising.treasury();
+                // const treasuryOldBalance = await usdtContract.balanceOf(treasuryAddress);
                 expect(alreadyPledged).to.equal(1000);
                 const { v, r, s } = await getCurrencyPermitSignature(
                     client,
@@ -317,9 +300,9 @@ describe("e2e", function () {
                 let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
                 await expect(abstractedAccount.connect(client).executeCall(BionicFundRaising.address, 0, raw))
                     .to.revertedWithCustomError(BionicFundRaising, "LPFRWV__AlreadyPledgedToThisPool");
-                //     .to.emit(BionicFundRaising, "Pledge").withArgs(abstractedAccount.address, 0, amount)
-                //     .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, BionicFundRaising.address, amount)
-                //     .to.emit(BionicFundRaising, "PledgeFunded").withArgs(abstractedAccount.address, 0, amount);
+                // .to.emit(BionicFundRaising, "Pledge").withArgs(abstractedAccount.address, 0, amount)
+                // .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, BionicFundRaising.address, amount)
+                // .to.emit(BionicFundRaising, "PledgeFunded").withArgs(abstractedAccount.address, 0, amount);
                 // expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(amount.add(treasuryOldBalance))
                 // expect(await abstractedAccount.allowance(usdtContract.address, BionicFundRaising.address)).to.equal(0).not.equal(amount);
             });
@@ -600,3 +583,26 @@ async function deployVRFCoordinatorV2Mock() {
 
 //     return await ERC6551RegContract.deploy();
 // }
+
+async function pledgeBySigner(aac: TokenBoundAccount, signer: SignerWithAddress, usdtContract: ERC20, BionicFundRaising: BionicFundRaising, amount: BigNumber, deadline: BigNumber, alreadyPledged: BigNumber) {
+    expect(await aac.owner()).to.equal(signer.address);
+    const { v, r, s } = await getCurrencyPermitSignature(
+        signer,
+        aac,
+        usdtContract,
+        BionicFundRaising.address,
+        amount,
+        deadline
+    )
+    let treasuryAddress = await BionicFundRaising.treasury();
+    let oldbalance = await usdtContract.balanceOf(treasuryAddress);
+    let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
+    await expect(aac.connect(signer).executeCall(BionicFundRaising.address, 0, raw))
+        .to.emit(BionicFundRaising, "Pledge").withArgs(aac.address, 0, amount)
+        .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, BionicFundRaising.address, amount)
+        .to.emit(BionicFundRaising, "PledgeFunded").withArgs(aac.address, 0, amount);
+
+    expect(oldbalance).to.not.equal(await usdtContract.balanceOf(treasuryAddress));
+    expect(await usdtContract.balanceOf(treasuryAddress)).to.equal(oldbalance.add(alreadyPledged.add(amount)))
+    expect(await aac.allowance(usdtContract.address, BionicFundRaising.address)).to.equal(0);
+}

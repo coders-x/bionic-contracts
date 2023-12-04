@@ -289,7 +289,7 @@ contract TokenBoundAccount is
     }
 
     /**
-     * @dev See {ICurrencyPermit-DOMAIN_SEPARATOR}.
+     * @dev See {EIP712-DOMAIN_SEPARATOR}.
      */
     // solhint-disable-next-line func-name-mixedcase
     function DOMAIN_SEPARATOR() external view override returns (bytes32) {

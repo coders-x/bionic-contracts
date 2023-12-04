@@ -23,20 +23,23 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
+      accounts: {
+        count: 60,
+      },
       forking: {
         url: process.env.MUMBAI_RPC as string,
         blockNumber: 39990000
       }
     },
     goerli: {
-      chainId:5,
+      chainId: 5,
       url: process.env.RPC_URL,
       accounts: [process.env.PRIVATE_KEY || ""],
     },
     mumbai: {
-      chainId:80001,
+      chainId: 80001,
       url: process.env.MUMBAI_RPC,
-      accounts:[process.env.PRIVATE_KEY || ""],
+      accounts: [process.env.PRIVATE_KEY || ""],
     },
 
     // mainnet: {
