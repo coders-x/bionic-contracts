@@ -2,19 +2,20 @@ import dotenv from 'dotenv';
 import { ethers } from "hardhat";
 import hre from "hardhat";
 import { FactoryOptions } from 'hardhat/types';
-import { goerli as config } from './config.json';
+import { mumbai as config } from './config.json';
 import { BionicFundRaising } from '../typechain-types';
 dotenv.config()
 const CONFIG = config;
 
 async function main() {
-    const UtilsLib = await ethers.getContractFactory("Utils");
-    const utils = await UtilsLib.deploy();
-    await utils.deployed();
-    console.log(`deployed utils at ${utils.address}`)
+    // const UtilsLib = await ethers.getContractFactory("Utils");
+    // const utils = await UtilsLib.deploy();
+    // await utils.deployed();
+    // console.log(`deployed utils at ${utils.address}`);
+
     let contract = await deployContract({
         libraries: {
-            Utils: utils.address,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
+            // Utils: utils.address,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
             // Utils: CONFIG.utilsAddress,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
         }
     })
@@ -25,8 +26,8 @@ async function main() {
     ]);
 
 
-    // await verifyContract("0xf6e470B6A6433880a97f80e7a841644237518259",CONFIG.utilsAddress,[
-    //     CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash, 
+    // await verifyContract("0xf6e470B6A6433880a97f80e7a841644237518259", CONFIG.utilsAddress, [
+    //     CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash,
     //     CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner
     // ]);
 }
