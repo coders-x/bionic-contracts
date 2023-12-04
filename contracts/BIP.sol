@@ -4,7 +4,7 @@ pragma solidity >=0.7.0 <0.9.0;
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -22,13 +22,12 @@ error BIP__InvalidSigniture();
 
 contract BionicInvestorPass is
     Initializable,
-    ERC721Upgradeable,
+    EIP712Upgradeable,
     ERC721URIStorageUpgradeable,
     PausableUpgradeable,
     AccessControlUpgradeable,
     ERC721BurnableUpgradeable,
     UUPSUpgradeable,
-    EIP712,
     LazyMint,
     DropSinglePhase
 {
@@ -47,12 +46,13 @@ contract BionicInvestorPass is
     address private platformFeeRecipient;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() EIP712("BIP", "1") {
+    constructor() {
         _disableInitializers();
     }
 
     function initialize() public initializer {
         __ERC721_init("Bionic Investor Pass", "BIP");
+        __EIP712_init("BIP", "1");
         __ERC721URIStorage_init();
         __Pausable_init();
         __AccessControl_init();

@@ -153,11 +153,11 @@ contract BionicFundRaisingTest is DSTest, Test {
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 1025;
         uint256 winnersCount = 500;
-        uint256[] memory privateKeys = getPrivateKeys(50, count);
+        uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
         TokenBoundAccount[] memory accs = new TokenBoundAccount[](count);
         //1. pledge
 
-        for (uint256 i = 0; i < privateKeys.length; i++) {
+        for (uint256 i = 0; i < count; i++) {
             address user = vm.addr(privateKeys[i * 2]);
             address guardian = vm.addr(privateKeys[(i * 2) + 1]);
 
@@ -193,7 +193,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             );
 
             (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                privateKeys[i],
+                privateKeys[i * 2],
                 structHash
             );
 
@@ -270,7 +270,7 @@ contract BionicFundRaisingTest is DSTest, Test {
     }
 
     function testTransferNFT() public {
-        uint256[] memory privateKeys = getPrivateKeys(50, 3);
+        uint256[] memory privateKeys = getPrivateKeys(5, 3);
         address user = vm.addr(privateKeys[0]);
         address guardian = vm.addr(privateKeys[1]);
         address rescue = vm.addr(privateKeys[2]);
