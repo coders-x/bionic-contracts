@@ -7,7 +7,7 @@
     "@nomicfoundation/hardhat-network-helpers": "^1.0.9",
     "@nomicfoundation/hardhat-toolbox": "^2.0.2",
     "@nomiclabs/hardhat-ethers": "^2.2.2",
-    "@openzeppelin/hardhat-upgrades": "^1.28.0",
+    "@openzeppelin/hardhat-upgrades": "^3.0.0",
     "@thirdweb-dev/wallets": "^2.1.10",
     "@tokenbound/sdk": "^0.3.0",
     "dotenv": "^16.3.1",
