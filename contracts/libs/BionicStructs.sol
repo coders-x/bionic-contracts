@@ -38,7 +38,6 @@ library BionicStructs {
         uint256 tierId;
         uint256 minimumPledge; // Minimum pledge amount for this tier
         uint256 maximumPledge; // Maximum pledge amount for this tier
-        uint32 allocation; // Percentage of total pool allocation for this tier
     }
 
     /// @dev Info of each TierInPool.

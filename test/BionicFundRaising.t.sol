@@ -110,9 +110,9 @@ contract BionicFundRaisingTest is DSTest, Test {
         BionicStructs.PledgeTier[] memory pt = new BionicStructs.PledgeTier[](
             3
         );
-        pt[0] = BionicStructs.PledgeTier(1, 1000, 1000, 0);
-        pt[1] = BionicStructs.PledgeTier(2, 3000, 3000, 0);
-        pt[2] = BionicStructs.PledgeTier(3, 5000, 5000, 0);
+        pt[0] = BionicStructs.PledgeTier(1, 1000, 1000);
+        pt[1] = BionicStructs.PledgeTier(2, 3000, 3000);
+        pt[2] = BionicStructs.PledgeTier(3, 5000, 5000);
         pid = _bionicFundRaising.add(
             _rewardToken,
             block.timestamp,
