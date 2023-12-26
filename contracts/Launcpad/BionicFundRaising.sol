@@ -20,6 +20,7 @@ import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
 
 // import "hardhat/console.sol";
+// import "forge-std/console.sol";
 
 /* Errors */
 error LPFRWV__NotDefinedError();
@@ -156,12 +157,13 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         IERC20 _rewardToken, // Address of the reward token contract.
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
-        uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
+        // uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
         uint256 _tokenAllocationPerMonth, // the amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
-        uint32[] calldata _tiers
+        uint32[] calldata _tiers,
+        BionicStructs.PledgeTier[] memory _pledgeTiers
     ) external onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
         if (rewardTokenAddress == address(0)) {
@@ -195,11 +197,12 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
                 rewardToken: _rewardToken,
                 pledgingStartTime: _pledgingStartTime,
                 pledgingEndTime: _pledgingEndTime,
-                pledgingAmountPerUser: _pledgingAmountPerUser,
+                // pledgingAmountPerUser: _pledgingAmountPerUser,
                 tokenAllocationPerMonth: _tokenAllocationPerMonth,
                 tokenAllocationStartTime: _tokenAllocationStartTime,
                 tokenAllocationMonthCount: _tokenAllocationMonthCount,
                 targetRaise: _targetRaise,
+                pledgeTiers: _pledgeTiers,
                 winnersCount: winnersCount
             })
         );
@@ -243,8 +246,8 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         if (pledged != 0) {
             revert LPFRWV__AlreadyPledgedToThisPool();
         }
-        if (pledged.add(amount) != pool.pledgingAmountPerUser) {
-            revert LPFRWV__NotValidPledgeAmount(pool.pledgingAmountPerUser);
+        if (!_isValidPledge(pledged.add(amount), pool.pledgeTiers)) {
+            revert LPFRWV__NotValidPledgeAmount(amount);
         }
         if (
             IERC20(stakingToken).balanceOf(_msgSender()) < MINIMUM_BIONIC_STAKE
@@ -346,6 +349,20 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     /*///////////////////////////////////////////////////////////////
                         Private/Internal Functions
     //////////////////////////////////////////////////////////////*/
+
+    function _isValidPledge(
+        uint256 amount,
+        BionicStructs.PledgeTier[] memory tiers
+    ) internal returns (bool) {
+        for (uint i = 0; i < tiers.length; i++) {
+            if (
+                tiers[i].minimumPledge <= amount &&
+                amount <= tiers[i].maximumPledge
+            ) return true;
+        }
+        return false;
+    }
+
     /**
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */

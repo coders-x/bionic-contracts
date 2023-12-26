@@ -13,6 +13,7 @@ import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../con
 import {TokenBoundAccount, ECDSA} from "../contracts/TBA.sol";
 import "../contracts/Launcpad/Claim.sol";
 import {Bionic} from "../contracts/Bionic.sol";
+import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 
 contract BionicFundRaisingTest is DSTest, Test {
     address public constant ENTRY_POINT =
@@ -106,16 +107,23 @@ contract BionicFundRaisingTest is DSTest, Test {
         t[0] = 300;
         t[1] = 100;
         t[2] = 100;
+        BionicStructs.PledgeTier[] memory pt = new BionicStructs.PledgeTier[](
+            3
+        );
+        pt[0] = BionicStructs.PledgeTier(1, 1000, 1000, 0);
+        pt[1] = BionicStructs.PledgeTier(2, 3000, 3000, 0);
+        pt[2] = BionicStructs.PledgeTier(3, 5000, 5000, 0);
         pid = _bionicFundRaising.add(
             _rewardToken,
             block.timestamp,
             block.timestamp + 10 minutes,
-            1000,
+            // 1000, 1k
             100,
             block.timestamp + 20 minutes,
             10,
             10e18,
-            t
+            t,
+            pt
         );
 
         return (pid, t);
@@ -125,7 +133,6 @@ contract BionicFundRaisingTest is DSTest, Test {
         (uint256 pid, ) = registerProject();
         (
             IERC20 poolToken,
-            ,
             ,
             ,
             uint256 tokenAllocationPerMonth,
@@ -223,7 +230,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         }
 
         //3. move time and do draw get the winners
-        (, , , , , uint256 tokenAllocationStartTime, , , ) = _bionicFundRaising
+        (, , , , uint256 tokenAllocationStartTime, , , ) = _bionicFundRaising
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
         uint256 requestId = _bionicFundRaising.draw(pid, 1000000);
