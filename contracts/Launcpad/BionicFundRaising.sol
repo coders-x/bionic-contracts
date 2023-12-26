@@ -346,6 +346,26 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         return poolInfo.length;
     }
 
+    /// @notice Returns the number of pools that have been added by the owner
+    /// @return Number of pools
+    function pledgeTiers(
+        uint256 poolId
+    ) external view returns (BionicStructs.PledgeTier[] memory) {
+        // BionicStructs.PledgeTier[]
+        //     memory result = new BionicStructs.PledgeTier[](
+        //         poolInfo[poolId].pledgeTiers.length
+        //     );
+        // for (uint256 i = 0; i < poolInfo[poolId].pledgeTiers.length; i++) {
+        //     result[i] = poolInfo[poolId].pledgeTiers[i];
+        // }
+        // // for (uint256 id in poolInfo[poolId].pledgeTiers) {
+        // //     result[i] = myStructs[id];
+        // //     i++;
+        // // }
+
+        return poolInfo[poolId].pledgeTiers;
+    }
+
     /*///////////////////////////////////////////////////////////////
                         Private/Internal Functions
     //////////////////////////////////////////////////////////////*/

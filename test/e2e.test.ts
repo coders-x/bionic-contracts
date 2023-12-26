@@ -229,13 +229,15 @@ describe("e2e", function () {
             it("Should return same Pool upon request", async () => {
                 let pool = await BionicFundRaising.poolInfo(0);
                 let poolTiers = await BionicFundRaising.poolIdToTiers(0, 0);
+                let pledgeTier = await BionicFundRaising.pledgeTiers(0);
 
                 expect(poolTiers).to.equal(3);
                 expect(pool.rewardToken).to.equal(bionicContract.address);
                 expect(pool.tokenAllocationStartTime).to.equal(tokenAllocationStartTime);
                 expect(pool.pledgingEndTime).to.equal(PLEDGING_END_TIME);
                 expect(pool.targetRaise).to.equal(targetRaise);
-                // expect(pool.pledgeTiers).to.equal(pledgingTiers);
+                expect(pledgeTier[0].maximumPledge).to.equal(pledgingTiers[0].maximumPledge);
+                expect(pledgeTier[0].minimumPledge).to.equal(pledgingTiers[0].minimumPledge);
             })
 
         });
