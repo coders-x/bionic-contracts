@@ -111,6 +111,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 indexed pid,
         uint256 amount
     );
+    event Invested(uint256 pid, address winner);
 
     /*///////////////////////////////////////////////////////////////
                                 Constructor
@@ -292,6 +293,10 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
             }
         }
         _stackPledge(_msgSender(), pid, amount);
+        if (!pool.useRaffle) {
+            poolLotteryWinners[pid].add(_msgSender());
+            emit Invested(pid, _msgSender());
+        }
     }
 
     /// @notice Add user members to Lottery Tiers
@@ -335,6 +340,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     {
         if (pid >= poolInfo.length) revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[pid];
+        if (!pool.useRaffle) revert LPFRWV__PoolRaffleDisabled();
         //solhint-disable-next-line not-rely-on-time
         if (pool.pledgingEndTime > block.timestamp)
             revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
@@ -361,18 +367,6 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     function pledgeTiers(
         uint256 poolId
     ) external view returns (BionicStructs.PledgeTier[] memory) {
-        // BionicStructs.PledgeTier[]
-        //     memory result = new BionicStructs.PledgeTier[](
-        //         poolInfo[poolId].pledgeTiers.length
-        //     );
-        // for (uint256 i = 0; i < poolInfo[poolId].pledgeTiers.length; i++) {
-        //     result[i] = poolInfo[poolId].pledgeTiers[i];
-        // }
-        // // for (uint256 id in poolInfo[poolId].pledgeTiers) {
-        // //     result[i] = myStructs[id];
-        // //     i++;
-        // // }
-
         return poolInfo[poolId].pledgeTiers;
     }
 

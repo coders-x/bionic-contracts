@@ -28,6 +28,7 @@
     "test:forge": "forge test --via-ir -vv --nmt testPerformLotteryAndClaim",
     "test:forge:full": "forge test --via-ir -vv",
     "test": "npm run test:hardhat && npm run test:forge",
+    "test:full": "npm run test:hardhat && npm run test:forge:full",
     "clean": "npm run clean:hh && npm run clean:forge",
     "clean:forge": "forge clean",
     "clean:hh": "hardhat clean",
