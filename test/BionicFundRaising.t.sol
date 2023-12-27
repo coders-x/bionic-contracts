@@ -102,7 +102,9 @@ contract BionicFundRaisingTest is DSTest, Test {
         );
     }
 
-    function registerProject() public returns (uint256 pid, uint32[] memory t) {
+    function registerProject(
+        bool useRaffle
+    ) public returns (uint256 pid, uint32[] memory t) {
         t = new uint32[](3);
         t[0] = 300;
         t[1] = 100;
@@ -122,6 +124,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             block.timestamp + 20 minutes,
             10,
             10e18,
+            useRaffle,
             t,
             pt
         );
@@ -130,7 +133,7 @@ contract BionicFundRaisingTest is DSTest, Test {
     }
 
     function testAddProject() public {
-        (uint256 pid, ) = registerProject();
+        (uint256 pid, ) = registerProject(false);
         (
             IERC20 poolToken,
             ,
@@ -138,6 +141,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             uint256 tokenAllocationPerMonth,
             uint256 tokenAllocationStartTime,
             uint256 tokenAllocationMonthCount,
+            ,
             ,
 
         ) = _bionicFundRaising.poolInfo(pid);
@@ -156,7 +160,7 @@ contract BionicFundRaisingTest is DSTest, Test {
 
     function testPerformLotteryAndClaim() public {
         //0. add project
-        (uint256 pid, uint32[] memory tiers) = registerProject();
+        (uint256 pid, uint32[] memory tiers) = registerProject(true);
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 1025;
         uint256 winnersCount = 500;
@@ -230,7 +234,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         }
 
         //3. move time and do draw get the winners
-        (, , , , uint256 tokenAllocationStartTime, , , ) = _bionicFundRaising
+        (, , , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
         uint256 requestId = _bionicFundRaising.draw(pid, 1000000);

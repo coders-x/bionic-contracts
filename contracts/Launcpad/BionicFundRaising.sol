@@ -24,6 +24,7 @@ import {Raffle} from "./Raffle.sol";
 
 /* Errors */
 error LPFRWV__NotDefinedError();
+error LPFRWV__PoolRaffleDisabled();
 error LPFRWV__InvalidPool();
 error LPFRWV__NotValidPledgeAmount(uint amount);
 error LPFRWV__InvalidRewardToken(); //"constructor: _stakingToken must not be zero address"
@@ -162,6 +163,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
+        bool _useRaffle,
         uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
     ) external onlyRole(BROKER_ROLE) returns (uint256 pid) {
@@ -203,7 +205,8 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
                 tokenAllocationMonthCount: _tokenAllocationMonthCount,
                 targetRaise: _targetRaise,
                 pledgeTiers: _pledgeTiers,
-                winnersCount: winnersCount
+                winnersCount: winnersCount,
+                useRaffle: _useRaffle
             })
         );
 
@@ -301,13 +304,20 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 tierId,
         address[] memory members
     ) external nonReentrant onlyRole(SORTER_ROLE) {
-        for (uint i = 0; i < members.length; i++) {
-            if (!userPledge[pid].contains(members[i])) {
-                revert LPFRWV__TierMembersShouldHaveAlreadyPledged(pid, tierId);
+        if (poolInfo[pid].useRaffle) {
+            for (uint i = 0; i < members.length; i++) {
+                if (!userPledge[pid].contains(members[i])) {
+                    revert LPFRWV__TierMembersShouldHaveAlreadyPledged(
+                        pid,
+                        tierId
+                    );
+                }
             }
-        }
 
-        _addToTier(pid, tierId, members);
+            _addToTier(pid, tierId, members);
+        } else {
+            revert LPFRWV__PoolRaffleDisabled();
+        }
     }
 
     /**
@@ -387,22 +397,24 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
     function _preDraw(uint256 pid) internal {
-        BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
-        //check if last tier is empty add rest of people pledged to the tier
-        if (tiers[tiers.length - 1].members.length < 1) {
-            //check all tiers except last(all other users) has members
-            address[] memory lastTierMembers = userPledge[pid].keys();
-            for (uint k = 0; k < tiers.length - 1; k++) {
-                if (tiers[k].members.length < 1) {
-                    revert LPFRWV__TiersHaveNotBeenInitialized();
+        if (poolInfo[pid].useRaffle) {
+            BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
+            //check if last tier is empty add rest of people pledged to the tier
+            if (tiers[tiers.length - 1].members.length < 1) {
+                //check all tiers except last(all other users) has members
+                address[] memory lastTierMembers = userPledge[pid].keys();
+                for (uint k = 0; k < tiers.length - 1; k++) {
+                    if (tiers[k].members.length < 1) {
+                        revert LPFRWV__TiersHaveNotBeenInitialized();
+                    }
+                    lastTierMembers = Utils.excludeAddresses(
+                        lastTierMembers,
+                        tiers[k].members
+                    );
                 }
-                lastTierMembers = Utils.excludeAddresses(
-                    lastTierMembers,
-                    tiers[k].members
-                );
-            }
 
-            _addToTier(pid, tiers.length - 1, lastTierMembers);
+                _addToTier(pid, tiers.length - 1, lastTierMembers);
+            }
         }
     }
 

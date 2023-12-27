@@ -217,12 +217,12 @@ describe("e2e", function () {
             const tokenAllocationPerMonth = 100, tokenAllocationMonthCount = 10, targetRaise = PLEDGE_AMOUNT * PLEDGE_AMOUNT
             it("Should fail if the not BROKER", async function () {
                 await expect(BionicFundRaising.connect(client)
-                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION, pledgingTiers))
+                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await BionicFundRaising.hasRole(await BionicFundRaising.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(BionicFundRaising.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION, pledgingTiers))
+                await expect(BionicFundRaising.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.emit(BionicFundRaising, "PoolAdded").withArgs(0)
                     .to.emit(claimContract, "ProjectAdded").withArgs(0, bionicContract.address, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount);
             });
