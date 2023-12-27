@@ -30,6 +30,7 @@ library BionicStructs {
         uint256 tokenAllocationMonthCount; // number of months tokens will be allocated
         uint256 targetRaise; // Amount that the project wishes to raise
         uint32 winnersCount;
+        bool useRaffle; // New field to indicate whether the pool uses a raffle or not
         PledgeTier[] pledgeTiers; // Information about each tier
     }
 

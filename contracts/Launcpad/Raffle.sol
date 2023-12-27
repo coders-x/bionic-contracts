@@ -100,102 +100,194 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     /// @dev Add Users who pledged to their tiers for the raffle
     /// @param pid PoolId for the raffle
     /// @param tierId id of tier user will be belong to
-    /// @param members members for this tier (they must have pledged and don't be a member of pervous tiers).
-    function _addToTier(
+    /// @param newMember address of the user
+    function __addTierMember(
         uint256 pid,
         uint256 tierId,
-        address[] memory members
-    ) internal {
-        BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
-
-        for (uint k = 0; k < tiers.length; k++) {
-            for (uint i = 0; i < tiers[k].members.length; i++) {
-                for (uint j = 0; j < members.length; j++) {
-                    if (tiers[k].members[i] == members[j]) {
-                        revert Raffle__MembersOnlyPermittedInOneTier(
-                            members[j],
-                            k,
-                            tierId
-                        );
-                    }
-                }
-            }
-        }
-
-        tiers[tierId].members = members;
-        emit TierInitiated(pid, tierId, members);
+        address newMember
+    ) private {
+        require(
+            BionicStructs.poolIdToTiers[pid].length > tierId,
+            "Invalid Tier Id"
+        );
+        uint256 tierIndex = tierId;
+        require(
+            !EnumerableSet.contains(
+                BionicStructs.poolIdToTiers[pid][tierIndex].tierMembers,
+                newMember
+            ),
+            "Address already part of the Tier"
+        );
+        EnumerableSet.add(
+            BionicStructs.poolIdToTiers[pid][tierIndex].tierMembers,
+            newMember
+        );
+        emit RaffleEnter(newMember);
     }
 
-    /// @dev Request randomw words from VRF to perform raffle
-    /// @param pid PoolId for the Raffle to be performed on
-    /// @param winnersCount total count of winners for this pool, (sum of all tiers winners count).
-    /// @param callbackGasPerUser gas limit per winner for the VRF callback
-    /// @return requestId for the VRF Requested.
-    function _draw(
-        uint pid,
-        uint32 winnersCount,
-        uint32 callbackGasPerUser
-    ) internal returns (uint requestId) {
-        if (poolIdToRequestId[pid] != 0) {
-            revert Raffle__RaffleAlreadyInProgressOrDone();
+    /// @dev Function to check if members belong to only one tier for raffle
+    /// @param poolId poolId for raffle
+    /// @param newTier TierId user wants to belong to
+    function __checkIfMembersBelongsToOneTier(
+        uint256 poolId,
+        uint256 newTier,
+        address newMember
+    ) private {
+        for (uint256 tierIndex = 0; tierIndex < newTier; tierIndex++) {
+            require(
+                !EnumerableSet.contains(
+                    BionicStructs.poolIdToTiers[poolId][tierIndex]
+                        .tierMembers,
+                    newMember
+                ),
+                "Address already part of another Tier"
+            );
         }
-        requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
-            REQUEST_CONFIRMATIONS,
-            callbackGasPerUser * winnersCount,
-            i_requestVRFPerWinner
-                ? winnersCount
-                : uint32(poolIdToTiers[pid].length)
-        );
+    }
 
+    /// @dev This function is used to Initiate Tier at the time of pledging
+    /// @param pid PoolId for the raffle
+    /// @param tierId id of tier user will be belong to
+    /// @param numberOfMembers address of the user
+    function __initiateTier(
+        uint256 pid,
+        uint256 tierId,
+        uint256 numberOfMembers,
+        uint256 winningMemberCount
+    ) private {
+        require(
+            BionicStructs.poolIdToTiers[pid].length > tierId,
+            "Invalid Tier Id"
+        );
+        uint256 tierIndex = tierId;
+        EnumerableSet.AddressSet storage tierMembers =
+            BionicStructs.poolIdToTiers[pid][tierIndex].tierMembers;
+        for (uint256 i = 0; i < numberOfMembers; i++) {
+            tierMembers.add(msg.sender);
+            emit RaffleEnter(msg.sender);
+            if (tierMembers.length() == winningMemberCount) {
+                __requestRaffleWinner(pid);
+            }
+        }
+        emit TierInitiated(pid, tierId, tierMembers.values());
+    }
+
+    /// @dev This function is used to request raffle winner
+    /// @param pid PoolId for the raffle
+    function __requestRaffleWinner(uint256 pid) internal {
+        uint256 seed = __getRandomSeed(pid);
+        // Sends a request to Chainlink VRF Coordinator to get a random number
+        uint256 requestId = i_vrfCoordinator.requestRandomWords(i_gasLane, seed, REQUEST_CONFIRMATIONS);
         poolIdToRequestId[pid] = requestId;
         requestIdToPoolId[requestId] = pid;
         emit RequestedRaffleWinner(requestId);
     }
 
-    /// @dev This is the function in charge of actual raffle after recieving vrf random words
-    /// @param pid pool Id for the raffle
-    /// @param randomWords array of random words that will be used to pick the numbers
-    /// @return winners address[] the return variables of a contract’s function state variable
-    function _pickWinners(
+    /// @dev Get Random Seed for Chainlink VRF Request
+    /// @param pid PoolId for the raffle
+    /// @return uint256 Random seed
+    function __getRandomSeed(uint256 pid) internal view returns (uint256) {
+        // Use poolId and the current block details as a seed for randomness
+        uint256 seed =
+            uint256(
+                keccak256(
+                    abi.encodePacked(
+                        blockhash(block.number - 1),
+                        block.timestamp,
+                        pid
+                    )
+                )
+            );
+        return seed;
+    }
+
+    /// @dev Function to calculate winners
+    /// @param pid PoolId for the raffle
+    /// @param tierId id of tier user will be belong to
+    /// @param numberOfMembers number of members in the tier
+    function __calculateRaffleWinners(
         uint256 pid,
-        uint256[] memory randomWords
-    ) internal returns (address[] memory) {
-        BionicStructs.Tier[] memory tiers = poolIdToTiers[pid];
-        for (uint i = 0; i < tiers.length; i++) {
-            uint256 rand = randomWords[i];
-            address[] memory tierMembers = tiers[i].members;
-            uint memberCount = tierMembers.length;
-            for (uint j = 0; j < tiers[i].count; ) {
-                if (i_requestVRFPerWinner) {
-                    rand = randomWords[poolLotteryWinners[pid].length()];
-                } else {
-                    rand = uint256(
-                        keccak256(
-                            abi.encodePacked(
-                                rand,
-                                block.prevrandao,
-                                block.chainid,
-                                i
-                            )
-                        )
-                    );
-                }
-                address w = tierMembers[rand % memberCount];
-                if (poolLotteryWinners[pid].contains(w)) {
-                    continue;
-                }
-                poolLotteryWinners[pid].add(w);
-                j++;
-            }
+        uint256 tierId,
+        uint256 numberOfMembers
+    ) internal {
+        require(
+            BionicStructs.poolIdToTiers[pid].length > tierId,
+            "Invalid Tier Id"
+        );
+        uint256 tierIndex = tierId;
+        EnumerableSet.AddressSet storage tierMembers =
+            BionicStructs.poolIdToTiers[pid][tierIndex].tierMembers;
+        uint256 totalMembers = tierMembers.length();
+        uint256 winnersCount = BionicStructs.poolInfo[pid].winnersCount;
+        require(
+            winnersCount <= numberOfMembers && winnersCount <= totalMembers,
+            "Winners count cannot be more than total members count"
+        );
+
+        address[] memory winners = new address[](winnersCount);
+
+        for (uint256 i = 0; i < winnersCount; i++) {
+            winners[i] = tierMembers.at(i);
         }
 
-        emit WinnersPicked(pid, poolLotteryWinners[pid].values());
-        return poolLotteryWinners[pid].values();
+        emit WinnersPicked(pid, winners);
+        // Store the winners for the raffle
+        for (uint256 i = 0; i < winnersCount; i++) {
+            EnumerableSet.add(poolLotteryWinners[pid], winners[i]);
+        }
     }
 
     /*///////////////////////////////////////////////////////////////
-                            
+                            Chainlink VRF Callbacks
     //////////////////////////////////////////////////////////////*/
-}
+
+    /** @dev Callback function called by VRF Coordinator when random words are generated.
+     *  @param requestId Id of the VRF request
+     *  @param randomWords The random words generated by Chainlink VRF
+     */
+    function __fulfillRandomness(uint256 requestId, uint256[] memory randomWords) internal override {
+        uint256 pid = requestIdToPoolId[requestId];
+        uint256 tierId = __getTierIdForRequest(requestId, pid);
+        uint256 numberOfMembers = BionicStructs.poolIdToTiers[pid][tierId]
+            .tierMembers
+            .length();
+
+        if (randomWords.length < numberOfMembers) {
+            revert Raffle__NotEnoughRandomWordsForLottery();
+        }
+
+        // Calculate winners
+        __calculateRaffleWinners(pid, tierId, numberOfMembers);
+
+        // If requestVRFPerWinner is true, initiate the next raffle for the same pool
+        if (i_requestVRFPerWinner) {
+            __requestRaffleWinner(pid);
+        }
+    }
+
+    /** @dev Function to get TierId for the given request.
+     *  It uses the requestId and the number of tiers to calculate the TierId.
+     *  @param requestId Id of the VRF request
+     *  @param pid Id of the pool
+     *  @return uint256 TierId for the request
+     */
+    function __getTierIdForRequest(uint256 requestId, uint256 pid) internal view returns (uint256) {
+        return (requestId % BionicStructs.poolIdToTiers[pid].length);
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                            Modifiers
+    //////////////////////////////////////////////////////////////*/
+    modifier __onlyValidTierMembers(
+        uint256 pid,
+        uint256 tierId,
+        address[] memory members
+    ) {
+        // Check that the correct number of members are provided
+        require(
+            BionicStructs.poolIdToTiers[pid][tierId].tierMembers.length() ==
+                members.length,
+            "Raffle__TierMembersCountInvalid"
+        );
+
+        // Check that each member
