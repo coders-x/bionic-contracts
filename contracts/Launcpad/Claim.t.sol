@@ -232,14 +232,14 @@ contract ClaimingContractTest is DSTest, Test {
         claimingContract.registerProjectToken(
             1,
             address(rewardToken),
-            10,
+            1e6,
             200,
             12 // a year
         );
         claimingContract.registerProjectToken(
             2,
             address(rewardToken2),
-            20,
+            2e6,
             400,
             6 //6 month
         );
@@ -279,19 +279,38 @@ contract ClaimingContractTest is DSTest, Test {
         uint256 time = MONTH_IN_SECONDS * 3;
         vm.warp(time);
 
+        vm.mockCall(
+            address(claimingContract.owner()),
+            abi.encodeWithSelector(
+                BionicFundRaising.userPledgeOnPool.selector,
+                1,
+                winners[0]
+            ),
+            abi.encode(1e3)
+        );
+
+        vm.mockCall(
+            address(claimingContract.owner()),
+            abi.encodeWithSelector(
+                BionicFundRaising.userPledgeOnPool.selector,
+                2,
+                winners[0]
+            ),
+            abi.encode(1e3)
+        );
         // vm.expectRevert(Claim__NothingToClaim.selector);
         claimingContract.batchClaim();
 
         assertEq(
             rewardToken.balanceOf(address(claimingContract)),
-            totalBalance - 10 * 2
+            totalBalance -2e3
         );
-        assertEq(rewardToken.balanceOf(address(winners[0])), 10 * 2);
+        assertEq(rewardToken.balanceOf(address(winners[0])), 2e3);
         assertEq(
             rewardToken2.balanceOf(address(claimingContract)),
-            totalBalance - 20 * 2
+            totalBalance - 2e3 * 2
         );
-        assertEq(rewardToken2.balanceOf(address(winners[0])), 20 * 2);
+        assertEq(rewardToken2.balanceOf(address(winners[0])), 2e3 * 2);
     }
 }
 

@@ -114,6 +114,7 @@ contract ClaimFunding is Ownable {
     function batchClaim() external {
         // Loop through all projects the user is signed up for and calculate claimable tokens
         for (uint256 i = 0; i < s_userProjects[_msgSender()].length(); i++) {
+            console.log("%d I'm batching for project %d ",i, s_userProjects[_msgSender()].at(i));
             //todo find a way to not fail
             _claim(s_userProjects[_msgSender()].at(i));
         }
