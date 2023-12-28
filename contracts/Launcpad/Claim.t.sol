@@ -45,7 +45,7 @@ contract ClaimingContractTest is DSTest, Test {
 
         ) = claimingContract.s_projectTokens(1);
         assertEq(address(token), address(rewardToken));
-        assertEq(amount, 10);
+        assertEq(amount, 1e6);
         assertEq(start, 100);
         assertEq(end, start + (12 * MONTH_IN_SECONDS));
     }
