@@ -160,7 +160,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
         // uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
-        uint256 _tokenAllocationPerMonth, // the amount of token will be released to lottery winners per month
+        uint256 _tokenAllocationPerMonth, // the total amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
@@ -368,6 +368,15 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 poolId
     ) external view returns (BionicStructs.PledgeTier[] memory) {
         return poolInfo[poolId].pledgeTiers;
+    }
+
+    /// @notice Returns the number of pools that have been added by the owner
+    /// @return Number of pools
+    function userPledgeOnPool(
+        uint256 poolId,
+        address user
+    ) external view returns (uint256) {
+        return userPledge[poolId].get(user);
     }
 
     /*///////////////////////////////////////////////////////////////

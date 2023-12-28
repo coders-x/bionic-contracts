@@ -15,6 +15,8 @@ import "../contracts/Launcpad/Claim.sol";
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 
+import "forge-std/console.sol";
+
 contract BionicFundRaisingTest is DSTest, Test {
     address public constant ENTRY_POINT =
         0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
@@ -46,7 +48,7 @@ contract BionicFundRaisingTest is DSTest, Test {
     function getPrivateKeys(
         uint256 startIndex,
         uint256 count
-    ) internal returns (uint256[] memory prvKeys) {
+    ) internal pure returns (uint256[] memory prvKeys) {
         prvKeys = new uint256[](count);
         for (uint256 i = startIndex; i < count + startIndex; i++) {
             // uint256 privateKey = vm.deriveKey(MNEMONIC, i);
@@ -103,7 +105,8 @@ contract BionicFundRaisingTest is DSTest, Test {
     }
 
     function registerProject(
-        bool useRaffle
+        bool useRaffle,
+        uint256 allocatedTokenPerMonth
     ) public returns (uint256 pid, uint32[] memory t) {
         t = new uint32[](3);
         t[0] = 300;
@@ -120,7 +123,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             block.timestamp,
             block.timestamp + 10 minutes,
             // 1000, 1k
-            100,
+            allocatedTokenPerMonth,
             block.timestamp + 20 minutes,
             10,
             10e18,
@@ -133,7 +136,7 @@ contract BionicFundRaisingTest is DSTest, Test {
     }
 
     function testAddProject() public {
-        (uint256 pid, ) = registerProject(false);
+        (uint256 pid, ) = registerProject(false, 100);
         (
             IERC20 poolToken,
             ,
@@ -160,7 +163,7 @@ contract BionicFundRaisingTest is DSTest, Test {
 
     function testPerformLotteryAndClaim() public {
         //0. add project
-        (uint256 pid, uint32[] memory tiers) = registerProject(true);
+        (uint256 pid, uint32[] memory tiers) = registerProject(true, 100);
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 1025;
         uint256 winnersCount = 500;
@@ -253,18 +256,21 @@ contract BionicFundRaisingTest is DSTest, Test {
         assertEq(_rewardToken.balanceOf(address(_claimContract)), totalBalance);
 
         _claimContract.addWinningInvestors(pid);
-        (IERC20 token, uint256 amount, uint256 start, ) = _claimContract
+        (IERC20 token, uint256 monthShare, uint256 start, ) = _claimContract
             .s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
 
         uint256 time = start + MONTH_IN_SECONDS * 3;
         vm.warp(time);
-        uint256 claimable = 3 * amount;
         for (uint256 i = 0; i < winners.length; i++) {
-            assertEq(
-                _claimContract.claimableAmount(pid, winners[i]),
-                claimable
+            uint256 claimable = 3 *
+                ((monthShare / _bionicFundRaising.poolIdToTotalStaked(pid)) *
+                    1000);
+            (uint256 userClaim, ) = _claimContract.claimableAmount(
+                pid,
+                winners[i]
             );
+            assertEq(userClaim, claimable);
             vm.prank(winners[i]);
             _claimContract.claimTokens(pid);
             totalBalance -= claimable;
@@ -282,14 +288,16 @@ contract BionicFundRaisingTest is DSTest, Test {
 
     function testPerformInvestmentAndClaim() public {
         //0. add project
-        (uint256 pid, uint32[] memory tiers) = registerProject(false);
+        (uint256 pid, uint32[] memory tiers) = registerProject(false, 1e10);
         uint256 deadline = block.timestamp + 7 days;
-        uint256 count = 50;
+        uint256 count = 10;
         uint256 winnersCount = 500;
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
         TokenBoundAccount[] memory accs = new TokenBoundAccount[](count);
-        //1. pledge
+        BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
+            .pledgeTiers(pid);
 
+        //1. pledge
         for (uint256 i = 0; i < count; i++) {
             address user = vm.addr(privateKeys[i * 2]);
             address guardian = vm.addr(privateKeys[(i * 2) + 1]);
@@ -307,7 +315,7 @@ contract BionicFundRaisingTest is DSTest, Test {
                 accountAddress,
                 _bionicFundRaising.MINIMUM_BIONIC_STAKE()
             );
-            uint256 amount = 1000;
+            uint256 amount = pledgeTiers[i % 3].minimumPledge;
             _investingToken.mint(accountAddress, amount ** 5);
             TokenBoundAccount acc = TokenBoundAccount(payable(accountAddress));
             accs[i] = acc;
@@ -368,36 +376,42 @@ contract BionicFundRaisingTest is DSTest, Test {
         assertEq(winners.length, count);
 
         // //4. add winners to claim
-        // uint totalBalance = 30 * 10e18;
-        // _rewardToken.mint(address(_claimContract), totalBalance);
-        // assertEq(_rewardToken.balanceOf(address(_claimContract)), totalBalance);
+        uint totalBalance = 30 * 10 ether;
+        _rewardToken.mint(address(_claimContract), totalBalance);
+        assertEq(_rewardToken.balanceOf(address(_claimContract)), totalBalance);
 
-        // _claimContract.addWinningInvestors(pid);
-        // (IERC20 token, uint256 amount, uint256 start, ) = _claimContract
-        //     .s_projectTokens(pid);
-        // assertEq(address(token), address(_rewardToken));
+        _claimContract.addWinningInvestors(pid);
+        (IERC20 token, uint256 monthShare, uint256 start, ) = _claimContract
+            .s_projectTokens(pid);
+        assertEq(address(token), address(_rewardToken));
 
-        // uint256 time = start + MONTH_IN_SECONDS * 3;
-        // vm.warp(time);
-        // uint256 claimable = 3 * amount;
-        // for (uint256 i = 0; i < winners.length; i++) {
-        //     assertEq(
-        //         _claimContract.claimableAmount(pid, winners[i]),
-        //         claimable
-        //     );
-        //     vm.prank(winners[i]);
-        //     _claimContract.claimTokens(pid);
-        //     totalBalance -= claimable;
-        //     assertEq(_rewardToken.balanceOf(winners[i]), claimable);
-        //     assertEq(
-        //         _rewardToken.balanceOf(address(_claimContract)),
-        //         totalBalance
-        //     );
+        uint256 time = start + MONTH_IN_SECONDS * 3;
+        vm.warp(time);
 
-        //     vm.prank(winners[i]);
-        //     vm.expectRevert(Claim__NothingToClaim.selector);
-        //     _claimContract.claimTokens(pid);
-        // }
+        for (uint256 i = 0; i < winners.length; i++) {
+            uint256 claimable = 3 *
+                ((monthShare / _bionicFundRaising.poolIdToTotalStaked(pid)) *
+                    pledgeTiers[i % 3].minimumPledge);
+
+            (uint256 userClaim, ) = _claimContract.claimableAmount(
+                pid,
+                winners[i]
+            );
+
+            assertEq(userClaim, claimable);
+            vm.prank(winners[i]);
+            _claimContract.claimTokens(pid);
+            totalBalance -= claimable;
+            assertEq(_rewardToken.balanceOf(winners[i]), claimable);
+            assertEq(
+                _rewardToken.balanceOf(address(_claimContract)),
+                totalBalance
+            );
+
+            vm.prank(winners[i]);
+            vm.expectRevert(Claim__NothingToClaim.selector);
+            _claimContract.claimTokens(pid);
+        }
     }
 
     function testTransferNFT() public {
