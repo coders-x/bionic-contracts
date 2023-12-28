@@ -6,7 +6,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {BionicFundRaising} from "./BionicFundRaising.sol";
-import "forge-std/console.sol";
+// import "forge-std/console.sol";
 
 error Claim__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
 error Claim__ClaimingIsNotAllowedYet(uint startAfter); //"Not in the time window for claiming rewards"
@@ -114,7 +114,6 @@ contract ClaimFunding is Ownable {
     function batchClaim() external {
         // Loop through all projects the user is signed up for and calculate claimable tokens
         for (uint256 i = 0; i < s_userProjects[_msgSender()].length(); i++) {
-            console.log("%d I'm batching for project %d ",i, s_userProjects[_msgSender()].at(i));
             //todo find a way to not fail
             _claim(s_userProjects[_msgSender()].at(i));
         }
@@ -144,7 +143,6 @@ contract ClaimFunding is Ownable {
         if (claimableMonthCount == 0) {
             revert Claim__NothingToClaim();
         }
-        console.log("here we are, %s", user);
         // math to calculate tokens of user to be cliamed
         // monthCount*(projectMonthlyAllocation/totalInvestment)*userInvestment
         amount = project
@@ -152,17 +150,7 @@ contract ClaimFunding is Ownable {
             .div(project.totalRaised)
             .mul(BionicFundRaising(owner()).userPledgeOnPool(pid, user))
             .mul(claimableMonthCount);
-        console.log(
-            "c: monthlyAmount:%d, poolIdToTotalStaked:%d userPledgeOnPool:%d",
-            project.monthlyAmount,
-            project.totalRaised,
-            BionicFundRaising(owner()).userPledgeOnPool(pid, user)
-        );
-        console.log(
-            "c: claimable:%d for %d months",
-            amount,
-            claimableMonthCount
-        );
+
         // Ensure we have enough tokens available for claiming
         if (project.token.balanceOf(address(this)) < amount) {
             revert Claim__NotEnoughTokenLeft(pid, address(project.token));

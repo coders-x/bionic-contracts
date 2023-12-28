@@ -15,7 +15,7 @@ import "../contracts/Launcpad/Claim.sol";
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 
-import "forge-std/console.sol";
+// import "forge-std/console.sol";
 
 contract BionicFundRaisingTest is DSTest, Test {
     address public constant ENTRY_POINT =

@@ -168,7 +168,6 @@ contract ClaimingContractTest is DSTest, Test {
         claimingContract.claimTokens(pid);
 
         // //claim for other winner 4 month claim
-        console.log("*****************");
         vm.mockCall(
             address(claimingContract.owner()),
             abi.encodeWithSelector(
