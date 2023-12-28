@@ -152,7 +152,8 @@ contract BionicFundRaisingTest is DSTest, Test {
             IERC20 token,
             uint256 amount,
             uint256 start,
-            uint256 end
+            uint256 end,
+
         ) = _claimContract.s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
         assertEq(address(token), address(poolToken));
@@ -256,7 +257,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         assertEq(_rewardToken.balanceOf(address(_claimContract)), totalBalance);
 
         _claimContract.addWinningInvestors(pid);
-        (IERC20 token, uint256 monthShare, uint256 start, ) = _claimContract
+        (IERC20 token, uint256 monthShare, uint256 start, , ) = _claimContract
             .s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
 
@@ -381,7 +382,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         assertEq(_rewardToken.balanceOf(address(_claimContract)), totalBalance);
 
         _claimContract.addWinningInvestors(pid);
-        (IERC20 token, uint256 monthShare, uint256 start, ) = _claimContract
+        (IERC20 token, uint256 monthShare, uint256 start, , ) = _claimContract
             .s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
 

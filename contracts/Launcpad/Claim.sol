@@ -5,7 +5,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {Raffle} from "./Raffle.sol";
 import {BionicFundRaising} from "./BionicFundRaising.sol";
 import "forge-std/console.sol";
 
@@ -28,6 +27,7 @@ contract ClaimFunding is Ownable {
         uint256 monthlyAmount; // Amount of tokens users can claim per month
         uint256 startMonth; // firstMonth token is claimable
         uint256 endMonth; // number of months allocation will go on
+        uint256 totalRaised;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -79,7 +79,8 @@ contract ClaimFunding is Ownable {
             IERC20(projectTokenAddress),
             claimAmount,
             startMonth,
-            startMonth.add(totalMonths.mul(MONTH_IN_SECONDS))
+            startMonth.add(totalMonths.mul(MONTH_IN_SECONDS)),
+            0
         );
         emit ProjectAdded(
             pid,
@@ -92,7 +93,8 @@ contract ClaimFunding is Ownable {
 
     // Owner can add winning investors
     function addWinningInvestors(uint256 pid) external {
-        address[] memory investors = Raffle(owner()).getRaffleWinners(pid);
+        (uint256 total, address[] memory investors) = BionicFundRaising(owner())
+            .getProjectInvestors(pid);
         if (investors.length == 0) {
             revert Claim__InvalidProject();
         }
@@ -100,6 +102,7 @@ contract ClaimFunding is Ownable {
             s_userProjects[investors[i]].add(pid);
             s_userClaims[investors[i]][pid] = UserClaim(block.timestamp, 0); // solhint-disable-line not-rely-on-time
         }
+        s_projectTokens[pid].totalRaised = total;
     }
 
     // Users can claim tokens for the current month for a specific project token
@@ -140,21 +143,25 @@ contract ClaimFunding is Ownable {
         if (claimableMonthCount == 0) {
             revert Claim__NothingToClaim();
         }
-        console.log("here we are");
+        console.log("here we are, %s", user);
         // math to calculate tokens of user to be cliamed
         // monthCount*(projectMonthlyAllocation/totalInvestment)*userInvestment
         amount = project
             .monthlyAmount
-            .div(BionicFundRaising(owner()).poolIdToTotalStaked(pid))
+            .div(project.totalRaised)
             .mul(BionicFundRaising(owner()).userPledgeOnPool(pid, user))
             .mul(claimableMonthCount);
         console.log(
             "c: monthlyAmount:%d, poolIdToTotalStaked:%d userPledgeOnPool:%d",
             project.monthlyAmount,
-            BionicFundRaising(owner()).poolIdToTotalStaked(pid),
+            project.totalRaised,
             BionicFundRaising(owner()).userPledgeOnPool(pid, user)
         );
-        console.log("c: claimable:%d", amount);
+        console.log(
+            "c: claimable:%d for %d months",
+            amount,
+            claimableMonthCount
+        );
         // Ensure we have enough tokens available for claiming
         if (project.token.balanceOf(address(this)) < amount) {
             revert Claim__NotEnoughTokenLeft(pid, address(project.token));

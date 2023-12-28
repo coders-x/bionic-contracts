@@ -89,7 +89,9 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     /// @notice Get Winners for a particular poolId
     /// @param pid id for the pool winners are requested from
     /// @return address[] array of winners for the raffle
-    function getRaffleWinners(uint pid) public view returns (address[] memory) {
+    function getRaffleWinners(
+        uint pid
+    ) external view returns (address[] memory) {
         return poolLotteryWinners[pid].values();
     }
 

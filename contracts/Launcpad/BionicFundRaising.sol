@@ -380,13 +380,25 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     }
 
     /*///////////////////////////////////////////////////////////////
+                            Public/External Functions
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Get Winners for a particular poolId
+    /// @param pid id for the pool winners are requested from
+    /// @return address[] array of winners for the raffle
+    function getProjectInvestors(
+        uint pid
+    ) public view returns (uint256, address[] memory) {
+        return (poolIdToTotalStaked[pid], poolLotteryWinners[pid].values());
+    }
+
+    /*///////////////////////////////////////////////////////////////
                         Private/Internal Functions
     //////////////////////////////////////////////////////////////*/
 
     function _isValidPledge(
         uint256 amount,
         BionicStructs.PledgeTier[] memory tiers
-    ) internal returns (bool) {
+    ) internal pure returns (bool) {
         for (uint i = 0; i < tiers.length; i++) {
             if (
                 tiers[i].minimumPledge <= amount &&
