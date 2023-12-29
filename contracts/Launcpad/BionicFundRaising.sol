@@ -20,9 +20,11 @@ import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
 
 // import "hardhat/console.sol";
+// import "forge-std/console.sol";
 
 /* Errors */
 error LPFRWV__NotDefinedError();
+error LPFRWV__PoolRaffleDisabled();
 error LPFRWV__InvalidPool();
 error LPFRWV__NotValidPledgeAmount(uint amount);
 error LPFRWV__InvalidRewardToken(); //"constructor: _stakingToken must not be zero address"
@@ -109,6 +111,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 indexed pid,
         uint256 amount
     );
+    event Invested(uint256 pid, address winner);
 
     /*///////////////////////////////////////////////////////////////
                                 Constructor
@@ -156,12 +159,14 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         IERC20 _rewardToken, // Address of the reward token contract.
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
-        uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
-        uint256 _tokenAllocationPerMonth, // the amount of token will be released to lottery winners per month
+        // uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
+        uint256 _tokenAllocationPerMonth, // the total amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
-        uint32[] calldata _tiers
+        bool _useRaffle,
+        uint32[] calldata _tiers,
+        BionicStructs.PledgeTier[] memory _pledgeTiers
     ) external onlyRole(BROKER_ROLE) returns (uint256 pid) {
         address rewardTokenAddress = address(_rewardToken);
         if (rewardTokenAddress == address(0)) {
@@ -195,12 +200,14 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
                 rewardToken: _rewardToken,
                 pledgingStartTime: _pledgingStartTime,
                 pledgingEndTime: _pledgingEndTime,
-                pledgingAmountPerUser: _pledgingAmountPerUser,
+                // pledgingAmountPerUser: _pledgingAmountPerUser,
                 tokenAllocationPerMonth: _tokenAllocationPerMonth,
                 tokenAllocationStartTime: _tokenAllocationStartTime,
                 tokenAllocationMonthCount: _tokenAllocationMonthCount,
                 targetRaise: _targetRaise,
-                winnersCount: winnersCount
+                pledgeTiers: _pledgeTiers,
+                winnersCount: winnersCount,
+                useRaffle: _useRaffle
             })
         );
 
@@ -243,8 +250,8 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         if (pledged != 0) {
             revert LPFRWV__AlreadyPledgedToThisPool();
         }
-        if (pledged.add(amount) != pool.pledgingAmountPerUser) {
-            revert LPFRWV__NotValidPledgeAmount(pool.pledgingAmountPerUser);
+        if (!_isValidPledge(pledged.add(amount), pool.pledgeTiers)) {
+            revert LPFRWV__NotValidPledgeAmount(amount);
         }
         if (
             IERC20(stakingToken).balanceOf(_msgSender()) < MINIMUM_BIONIC_STAKE
@@ -286,6 +293,10 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
             }
         }
         _stackPledge(_msgSender(), pid, amount);
+        if (!pool.useRaffle) {
+            poolLotteryWinners[pid].add(_msgSender());
+            emit Invested(pid, _msgSender());
+        }
     }
 
     /// @notice Add user members to Lottery Tiers
@@ -298,13 +309,20 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 tierId,
         address[] memory members
     ) external nonReentrant onlyRole(SORTER_ROLE) {
-        for (uint i = 0; i < members.length; i++) {
-            if (!userPledge[pid].contains(members[i])) {
-                revert LPFRWV__TierMembersShouldHaveAlreadyPledged(pid, tierId);
+        if (poolInfo[pid].useRaffle) {
+            for (uint i = 0; i < members.length; i++) {
+                if (!userPledge[pid].contains(members[i])) {
+                    revert LPFRWV__TierMembersShouldHaveAlreadyPledged(
+                        pid,
+                        tierId
+                    );
+                }
             }
-        }
 
-        _addToTier(pid, tierId, members);
+            _addToTier(pid, tierId, members);
+        } else {
+            revert LPFRWV__PoolRaffleDisabled();
+        }
     }
 
     /**
@@ -322,6 +340,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     {
         if (pid >= poolInfo.length) revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[pid];
+        if (!pool.useRaffle) revert LPFRWV__PoolRaffleDisabled();
         //solhint-disable-next-line not-rely-on-time
         if (pool.pledgingEndTime > block.timestamp)
             revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
@@ -343,29 +362,74 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         return poolInfo.length;
     }
 
+    /// @notice Returns the number of pools that have been added by the owner
+    /// @return Number of pools
+    function pledgeTiers(
+        uint256 poolId
+    ) external view returns (BionicStructs.PledgeTier[] memory) {
+        return poolInfo[poolId].pledgeTiers;
+    }
+
+    /// @notice Returns the number of pools that have been added by the owner
+    /// @return Number of pools
+    function userPledgeOnPool(
+        uint256 poolId,
+        address user
+    ) external view returns (uint256) {
+        return userPledge[poolId].get(user);
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                            Public/External Functions
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Get Winners for a particular poolId
+    /// @param pid id for the pool winners are requested from
+    /// @return address[] array of winners for the raffle
+    function getProjectInvestors(
+        uint pid
+    ) public view returns (uint256, address[] memory) {
+        return (poolIdToTotalStaked[pid], poolLotteryWinners[pid].values());
+    }
+
     /*///////////////////////////////////////////////////////////////
                         Private/Internal Functions
     //////////////////////////////////////////////////////////////*/
+
+    function _isValidPledge(
+        uint256 amount,
+        BionicStructs.PledgeTier[] memory tiers
+    ) internal pure returns (bool) {
+        for (uint i = 0; i < tiers.length; i++) {
+            if (
+                tiers[i].minimumPledge <= amount &&
+                amount <= tiers[i].maximumPledge
+            ) return true;
+        }
+        return false;
+    }
+
     /**
      * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
      */
     function _preDraw(uint256 pid) internal {
-        BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
-        //check if last tier is empty add rest of people pledged to the tier
-        if (tiers[tiers.length - 1].members.length < 1) {
-            //check all tiers except last(all other users) has members
-            address[] memory lastTierMembers = userPledge[pid].keys();
-            for (uint k = 0; k < tiers.length - 1; k++) {
-                if (tiers[k].members.length < 1) {
-                    revert LPFRWV__TiersHaveNotBeenInitialized();
+        if (poolInfo[pid].useRaffle) {
+            BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
+            //check if last tier is empty add rest of people pledged to the tier
+            if (tiers[tiers.length - 1].members.length < 1) {
+                //check all tiers except last(all other users) has members
+                address[] memory lastTierMembers = userPledge[pid].keys();
+                for (uint k = 0; k < tiers.length - 1; k++) {
+                    if (tiers[k].members.length < 1) {
+                        revert LPFRWV__TiersHaveNotBeenInitialized();
+                    }
+                    lastTierMembers = Utils.excludeAddresses(
+                        lastTierMembers,
+                        tiers[k].members
+                    );
                 }
-                lastTierMembers = Utils.excludeAddresses(
-                    lastTierMembers,
-                    tiers[k].members
-                );
-            }
 
-            _addToTier(pid, tiers.length - 1, lastTierMembers);
+                _addToTier(pid, tiers.length - 1, lastTierMembers);
+            }
         }
     }
 

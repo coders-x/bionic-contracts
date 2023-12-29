@@ -7,6 +7,7 @@ import {
     BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding, ERC20
 }
     from "../typechain-types";
+import { BionicStructs } from "../typechain-types/contracts/Launcpad/BionicFundRaising";
 import { BytesLike } from "ethers";
 
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
@@ -36,6 +37,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     PLEDGING_START_TIME = 20000000,
     PLEDGING_END_TIME = 2694616991,
     tokenAllocationStartTime = PLEDGING_END_TIME + 1000,
+    PLEDGE_AMOUNT = 1000,
     TIER_ALLOCATION = [3, 2, 1];
 
 describe("e2e", function () {
@@ -46,6 +48,8 @@ describe("e2e", function () {
     let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
+    let pledgingTiers: BionicStructs.PledgeTierStruct[]
+
     before(async () => {
         [owner, client, guardian, ...signers] = await ethers.getSigners();
         bionicContract = await deployBionic();
@@ -61,7 +65,11 @@ describe("e2e", function () {
         tokenBoundImpContract = await deployTBA(mockEntryPoint.address, accountGuardian.address);
         bionicDecimals = await bionicContract.decimals();
         abstractedAccount = await ethers.getContractAt("TokenBoundAccount", ACCOUNT_ADDRESS);
-
+        pledgingTiers = [
+            { maximumPledge: PLEDGE_AMOUNT, minimumPledge: PLEDGE_AMOUNT, tierId: 1 },
+            { maximumPledge: PLEDGE_AMOUNT * 3, minimumPledge: PLEDGE_AMOUNT * 3, tierId: 2 },
+            { maximumPledge: PLEDGE_AMOUNT * 5, minimumPledge: PLEDGE_AMOUNT * 5, tierId: 1 }
+        ]
 
         await network.provider.request({
             method: "hardhat_impersonateAccount",
@@ -206,28 +214,30 @@ describe("e2e", function () {
     });
     describe("FundingRegistry", () => {
         describe("Add", function () {
-            const pledgingAmountPerUser = 1000, tokenAllocationPerMonth = 100, tokenAllocationMonthCount = 10, targetRaise = pledgingAmountPerUser * pledgingAmountPerUser
+            const tokenAllocationPerMonth = 100, tokenAllocationMonthCount = 10, targetRaise = PLEDGE_AMOUNT * PLEDGE_AMOUNT
             it("Should fail if the not BROKER", async function () {
                 await expect(BionicFundRaising.connect(client)
-                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, pledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION))
+                    .add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await BionicFundRaising.hasRole(await BionicFundRaising.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(BionicFundRaising.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, pledgingAmountPerUser, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, TIER_ALLOCATION))
+                await expect(BionicFundRaising.add(bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.emit(BionicFundRaising, "PoolAdded").withArgs(0)
                     .to.emit(claimContract, "ProjectAdded").withArgs(0, bionicContract.address, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount);
             });
             it("Should return same Pool upon request", async () => {
                 let pool = await BionicFundRaising.poolInfo(0);
                 let poolTiers = await BionicFundRaising.poolIdToTiers(0, 0);
+                let pledgeTier = await BionicFundRaising.pledgeTiers(0);
 
                 expect(poolTiers).to.equal(3);
                 expect(pool.rewardToken).to.equal(bionicContract.address);
                 expect(pool.tokenAllocationStartTime).to.equal(tokenAllocationStartTime);
                 expect(pool.pledgingEndTime).to.equal(PLEDGING_END_TIME);
                 expect(pool.targetRaise).to.equal(targetRaise);
-                expect(pool.pledgingAmountPerUser).to.equal(pledgingAmountPerUser);
+                expect(pledgeTier[0].maximumPledge).to.equal(pledgingTiers[0].maximumPledge);
+                expect(pledgeTier[0].minimumPledge).to.equal(pledgingTiers[0].minimumPledge);
             })
 
         });
@@ -246,13 +256,13 @@ describe("e2e", function () {
             it("Should fail if not enough amount pledged", async function () {
                 let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, 0, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(BionicFundRaising.address, 0, raw))
-                    .to.be.revertedWithCustomError(BionicFundRaising, "LPFRWV__NotValidPledgeAmount").withArgs(1000);
+                    .to.be.revertedWithCustomError(BionicFundRaising, "LPFRWV__NotValidPledgeAmount").withArgs(0);
             });
 
             it("Should fail if pledge exceeds the max user share", async function () {
                 let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, 1001, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).executeCall(BionicFundRaising.address, 0, raw))
-                    .to.be.revertedWithCustomError(BionicFundRaising, "LPFRWV__NotValidPledgeAmount").withArgs(1000);
+                    .to.be.revertedWithCustomError(BionicFundRaising, "LPFRWV__NotValidPledgeAmount").withArgs(1001);
             });
             it("Should fail if Not Enough Stake on the account", async function () {
                 let raw = BionicFundRaising.interface.encodeFunctionData("pledge", [0, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
