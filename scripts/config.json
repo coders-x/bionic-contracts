@@ -24,10 +24,10 @@
         "bionicInvestorPass":"0x2c404b6544E75dBA1928bbAE5d5b3f1797462D35",
         "tbaImpl":"0x31B203D5Dea02Dc00B630C6877b9ffa9A49f9EbC",
         "tbaGuardian":"0xF4386C22A1e7D6A730C387f2b7a2cbFE82B38d28",
-        "bionicLaunchPad":"0xdF9BB1C113298A8CF9FAdFA6733BeA127126978b",
+        "bionicLaunchPad":"0xbe918CB82D4bF137F23703BBA9bAC39D513029f8",
         "entryPoint":"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
         "erc6551Reg":"0x02101dfB77FDE026414827Fdc604ddAF224F0921",
-        "utilsAddress":"0xb721d73F972EB5acA257963f5Ed98cbf795ac5dd",
+        "utilsAddress":"0x97834a2aa39C6eA5ddd66cF4ABDFF0944F04c824",
         "subId":5682,
         "cbGasLimit":60000,
         "reqVRFPerWinner":false

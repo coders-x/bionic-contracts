@@ -8,28 +8,21 @@ dotenv.config()
 const CONFIG = config;
 
 async function main() {
-    // const UtilsLib = await ethers.getContractFactory("Utils");
-    // const utils = await UtilsLib.deploy();
-    // await utils.deployed();
-    // console.log(`deployed utils at ${utils.address}`);
+    // let contract = await deployContract({});
 
-    let contract = await deployContract({
-        libraries: {
-            // Utils: utils.address,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
-            // Utils: CONFIG.utilsAddress,//"0x03A1726655bE74aD1430aa30e4A823E14428346c"
-        }
-    })
+    let contract = await ethers.getContractAt("BionicFundRaising", config.bionicLaunchPad);
+
     console.log(`deployed fwv at ${contract.address}`)
-    await verifyContract(contract, utils.address, [
-        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash,
-        CONFIG.subId, CONFIG.reqVRFPerWinner
-    ]);
-
-
-    // await verifyContract("0xf6e470B6A6433880a97f80e7a841644237518259", CONFIG.utilsAddress, [
+    // await verifyContract(contract, utils.address, [
     //     CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator, CONFIG.keyHash,
-    //     CONFIG.subId, CONFIG.cbGasLimit, CONFIG.reqVRFPerWinner
+    //     CONFIG.subId, CONFIG.reqVRFPerWinner
     // ]);
+
+
+    await verifyContract(contract, [
+        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
+        CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner
+    ]);
 }
 
 
@@ -46,19 +39,19 @@ async function deployContract(opt: FactoryOptions) {
     return await funding.deployed();
 }
 
-async function verifyContract(contract: BionicFundRaising, utilsAddress: string, args: any) {
+async function verifyContract(contract: BionicFundRaising, args: any) {
     let res;
 
-    console.log(`Verifying Utils Contract at ${utilsAddress}`);
-    res = await hre.run("verify:verify", {
-        address: utilsAddress,//funding.address,
-    });
+    // console.log(`Verifying Utils Contract at ${utilsAddress}`);
+    // res = await hre.run("verify:verify", {
+    //     address: utilsAddress,//funding.address,
+    // });
 
     let treasuryAddress = await contract.treasury();
     console.log(`Verifying Treasury Contract at ${treasuryAddress}`);
     res = await hre.run("verify:verify", {
         address: treasuryAddress,
-        args: [contract.address],//funding.address,
+        args: [CONFIG.tokenAddress,],//funding.address,
     });
 
     let claimAddress = await contract.claimFund();
@@ -72,7 +65,7 @@ async function verifyContract(contract: BionicFundRaising, utilsAddress: string,
         address: contract.address,//funding.address,
         constructorArguments: args,
         libraries: {
-            Utils: utilsAddress//utils.address
+            // Utils: utilsAddress//utils.address
         }
     });
     console.log("Verified: ", res);
