@@ -51,7 +51,7 @@ async function verifyContract(contract: BionicFundRaising, args: any) {
     console.log(`Verifying Treasury Contract at ${treasuryAddress}`);
     res = await hre.run("verify:verify", {
         address: treasuryAddress,
-        args: [CONFIG.tokenAddress,],//funding.address,
+        args: [contract.address],//funding.address,
     });
 
     let claimAddress = await contract.claimFund();

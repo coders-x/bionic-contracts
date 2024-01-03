@@ -139,7 +139,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
         investingToken = _investingToken;
-        treasury = new Treasury(address(stakingToken));
+        treasury = new Treasury(address(this));
         claimFund = new ClaimFunding();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
