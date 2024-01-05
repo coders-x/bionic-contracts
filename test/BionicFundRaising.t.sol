@@ -119,6 +119,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         pt[1] = BionicStructs.PledgeTier(2, 3000, 3000);
         pt[2] = BionicStructs.PledgeTier(3, 5000, 5000);
         pid = _bionicFundRaising.add(
+            pid,
             _rewardToken,
             block.timestamp,
             block.timestamp + 10 minutes,
