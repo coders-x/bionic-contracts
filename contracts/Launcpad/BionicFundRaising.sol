@@ -12,7 +12,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {ICurrencyPermit, ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
-import {Utils} from "../libs/Utils.sol";
 import {TokenBoundAccount, IERC6551Account} from "../TBA.sol";
 
 import {Treasury} from "./Treasury.sol";
@@ -422,7 +421,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
                     if (tiers[k].members.length < 1) {
                         revert LPFRWV__TiersHaveNotBeenInitialized();
                     }
-                    lastTierMembers = Utils.excludeAddresses(
+                    lastTierMembers = excludeAddresses(
                         lastTierMembers,
                         tiers[k].members
                     );
@@ -454,7 +453,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         ///@notice post lottery refund non-winners
         ///@audit-info gas maybe for gasoptimization move it to dedicated function
         address[] memory losers = userPledge[pid].keys();
-        losers = Utils.excludeAddresses(losers, winners);
+        losers = excludeAddresses(losers, winners);
         for (uint i = 0; i < losers.length; i++) {
             uint256 refund = userPledge[pid].get(losers[i]);
             treasury.withdrawTo(investingToken, losers[i], refund);
@@ -487,6 +486,38 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
                 }
             }
         }
+    }
+
+    function excludeAddresses(
+        address[] memory array1,
+        address[] memory array2
+    ) private pure returns (address[] memory) {
+        // Store addresses from array1 that are not in array2
+        address[] memory exclusionArray = new address[](array1.length);
+        uint count = 0;
+
+        for (uint i = 0; i < array1.length; i++) {
+            address element = array1[i];
+            bool found = false;
+            for (uint j = 0; j < array2.length; j++) {
+                if (element == array2[j]) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                exclusionArray[count] = element;
+                count++;
+            }
+        }
+
+        // Copy exclusionArray into new array of correct length
+        address[] memory result = new address[](count);
+        for (uint i = 0; i < count; i++) {
+            result[i] = exclusionArray[i];
+        }
+
+        return result;
     }
 
     /*///////////////////////////////////////////////////////////////

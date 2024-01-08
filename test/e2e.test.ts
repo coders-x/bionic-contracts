@@ -546,12 +546,8 @@ async function deployBionicFundRaising(tokenAddress: string, bionicInvsestorPass
     // const IterableMappingLib = await ethers.getContractFactory("IterableMapping");
     // const lib = await IterableMappingLib.deploy();
     // await lib.deployed();
-    const UtilsLib = await ethers.getContractFactory("Utils");
-    const utils = await UtilsLib.deploy();
-    await utils.deployed();
     const BionicFundRaisingContract = await ethers.getContractFactory("BionicFundRaising", {
         libraries: {
-            Utils: utils.address
         }
     });
     console.log(`Deploying BionicFundRaising contract...`);

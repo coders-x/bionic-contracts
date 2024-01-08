@@ -32,6 +32,7 @@
     "clean": "npm run clean:hh && npm run clean:forge",
     "clean:forge": "forge clean",
     "clean:hh": "hardhat clean",
+    "deploy:BFC": "hardhat run scripts/deploy_FWV.ts --network mumbai",
     "dev": "ts-node scripts/index.ts"
   }
 }
