@@ -81,7 +81,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     ClaimFunding public claimFund;
 
     /// @notice List of pools that users can stake into
-    BionicStructs.PoolInfo[] public poolInfo;
+    mapping(uint256 => BionicStructs.PoolInfo) public poolInfo;
 
     // Pool to accumulated share counters
     mapping(uint256 => uint256) public poolIdToLastPercentageAllocTime;
@@ -155,10 +155,10 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     //////////////////////////////////////////////////////////////*/
     /// @dev Can only be called by the contract owner
     function add(
+        uint256 pid,
         IERC20 _rewardToken, // Address of the reward token contract.
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
-        // uint256 _pledgingAmountPerUser, // Max. amount of tokens that can be staked per account/user
         uint256 _tokenAllocationPerMonth, // the total amount of token will be released to lottery winners per month
         uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
@@ -166,7 +166,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         bool _useRaffle,
         uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
-    ) external onlyRole(BROKER_ROLE) returns (uint256 pid) {
+    ) external onlyRole(BROKER_ROLE) returns (uint256) {
         address rewardTokenAddress = address(_rewardToken);
         if (rewardTokenAddress == address(0)) {
             revert LPFRWV__InvalidRewardToken();
@@ -193,24 +193,21 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
             });
             winnersCount += _tiers[i];
         }
+        BionicStructs.PoolInfo memory pool = BionicStructs.PoolInfo({
+            rewardToken: _rewardToken,
+            pledgingStartTime: _pledgingStartTime,
+            pledgingEndTime: _pledgingEndTime,
+            // pledgingAmountPerUser: _pledgingAmountPerUser,
+            tokenAllocationPerMonth: _tokenAllocationPerMonth,
+            tokenAllocationStartTime: _tokenAllocationStartTime,
+            tokenAllocationMonthCount: _tokenAllocationMonthCount,
+            targetRaise: _targetRaise,
+            pledgeTiers: _pledgeTiers,
+            winnersCount: winnersCount,
+            useRaffle: _useRaffle
+        });
+        poolInfo[pid] = pool;
 
-        poolInfo.push(
-            BionicStructs.PoolInfo({
-                rewardToken: _rewardToken,
-                pledgingStartTime: _pledgingStartTime,
-                pledgingEndTime: _pledgingEndTime,
-                // pledgingAmountPerUser: _pledgingAmountPerUser,
-                tokenAllocationPerMonth: _tokenAllocationPerMonth,
-                tokenAllocationStartTime: _tokenAllocationStartTime,
-                tokenAllocationMonthCount: _tokenAllocationMonthCount,
-                targetRaise: _targetRaise,
-                pledgeTiers: _pledgeTiers,
-                winnersCount: winnersCount,
-                useRaffle: _useRaffle
-            })
-        );
-
-        pid = poolInfo.length.sub(1);
         poolIdToTiers[pid] = tiers;
 
         try
@@ -241,10 +238,10 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         bytes32 r,
         bytes32 s
     ) external nonReentrant onlyBionicAccount {
-        if (pid >= poolInfo.length) {
+        BionicStructs.PoolInfo storage pool = poolInfo[pid];
+        if (pool.targetRaise == 0) {
             revert LPFRWV__InvalidPool();
         }
-        BionicStructs.PoolInfo storage pool = poolInfo[pid];
         (, uint256 pledged) = userPledge[pid].tryGet(_msgSender());
         if (pledged != 0) {
             revert LPFRWV__AlreadyPledgedToThisPool();
@@ -337,8 +334,10 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         onlyRole(SORTER_ROLE)
         returns (uint requestId)
     {
-        if (pid >= poolInfo.length) revert LPFRWV__InvalidPool();
         BionicStructs.PoolInfo memory pool = poolInfo[pid];
+        if (pool.targetRaise == 0) {
+            revert LPFRWV__InvalidPool();
+        }
         if (!pool.useRaffle) revert LPFRWV__PoolRaffleDisabled();
         //solhint-disable-next-line not-rely-on-time
         if (pool.pledgingEndTime > block.timestamp)
@@ -355,11 +354,11 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         emit DrawInitiated(pid, requestId);
     }
 
-    /// @notice Returns the number of pools that have been added by the owner
-    /// @return Number of pools
-    function numberOfPools() external view returns (uint256) {
-        return poolInfo.length;
-    }
+    // /// @notice Returns the number of pools that have been added by the owner
+    // /// @return Number of pools
+    // function numberOfPools() external view returns (uint256) {
+    //     return poolInfo.length;
+    // }
 
     /// @notice Returns the number of pools that have been added by the owner
     /// @return Number of pools
