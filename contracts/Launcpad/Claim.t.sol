@@ -293,7 +293,7 @@ contract ClaimingContractTest is DSTest, Test {
         );
 
         (uint256[] memory total, uint256[] memory poolIds) = claimingContract
-            .aggrigateClaimsForAddress(winners[0]);
+            .aggregateClaimsForAddress(winners[0]);
         assertEq(total.length, 2);
         assertEq(total[0], 2e3);
         assertEq(total[1], 4e3);
@@ -303,7 +303,7 @@ contract ClaimingContractTest is DSTest, Test {
 
         claimingContract.batchClaim();
 
-        (total, poolIds) = claimingContract.aggrigateClaimsForAddress(
+        (total, poolIds) = claimingContract.aggregateClaimsForAddress(
             winners[0]
         );
         assertEq(total.length, 2);

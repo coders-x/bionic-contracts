@@ -154,7 +154,7 @@ contract ClaimFunding is Ownable {
      * @return amount The total amount of claimable tokens for the address.
      * @return claimablePoolIds An array of pool IDs for which the address has claimable tokens.
      */
-    function aggrigateClaimsForAddress(
+    function aggregateClaimsForAddress(
         address user
     )
         external
