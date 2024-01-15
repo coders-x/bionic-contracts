@@ -75,6 +75,9 @@ contract ClaimFunding is Ownable {
         uint256 startMonth,
         uint256 totalMonths
     ) external onlyOwner {
+        if (address(projectTokenAddress) == address(0)) {
+            revert Claim__InvalidProject();
+        }
         s_projectTokens[pid] = ProjectToken(
             IERC20(projectTokenAddress),
             claimAmount,
@@ -91,7 +94,7 @@ contract ClaimFunding is Ownable {
         );
     }
 
-    // Owner can add winning investors
+    // anyone can trigger syncing winning investors
     function addWinningInvestors(uint256 pid) external {
         (uint256 total, address[] memory investors) = BionicFundRaising(owner())
             .getProjectInvestors(pid);
@@ -128,21 +131,12 @@ contract ClaimFunding is Ownable {
         address user
     ) public view returns (uint256 amount, uint256 claimableMonthCount) {
         ProjectToken memory project = s_projectTokens[pid];
-        if (address(project.token) == address(0)) {
-            revert Claim__InvalidProject();
-        }
-        if (project.startMonth > block.timestamp) {
-            // solhint-disable-line not-rely-on-time
-            revert Claim__ClaimingIsNotAllowedYet(project.startMonth);
-        }
         // Calculate the amount to claim for the current month
         claimableMonthCount = _getClaimableMonthsCount(
             s_userClaims[user][pid].lastClaim,
             project.endMonth
         );
-        if (claimableMonthCount == 0) {
-            revert Claim__NothingToClaim();
-        }
+
         // math to calculate tokens of user to be cliamed
         // monthCount*(projectMonthlyAllocation/totalInvestment)*userInvestment
         amount = project
@@ -151,11 +145,30 @@ contract ClaimFunding is Ownable {
             .mul(BionicFundRaising(owner()).userPledgeOnPool(pid, user))
             .mul(claimableMonthCount);
 
-        // Ensure we have enough tokens available for claiming
-        if (project.token.balanceOf(address(this)) < amount) {
-            revert Claim__NotEnoughTokenLeft(pid, address(project.token));
-        }
         return (amount, claimableMonthCount);
+    }
+
+    /**
+     * @dev Retrieves the aggregated claims for a specific address.
+     * @param user The address for which to retrieve the claims.
+     * @return amount The total amount of claimable tokens for the address.
+     * @return claimablePoolIds An array of pool IDs for which the address has claimable tokens.
+     */
+    function aggregateClaimsForAddress(
+        address user
+    )
+        external
+        view
+        returns (uint256[] memory amount, uint256[] memory claimablePoolIds)
+    {
+        amount = new uint256[](s_userProjects[user].length());
+        claimablePoolIds = new uint256[](amount.length);
+        // Loop through all projects the user is signed up for and calculate claimable tokens
+        for (uint256 i = 0; i < amount.length; i++) {
+            (uint256 am, ) = claimableAmount(s_userProjects[user].at(i), user);
+            amount[i] = am;
+            claimablePoolIds[i] = s_userProjects[user].at(i);
+        }
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -179,10 +192,25 @@ contract ClaimFunding is Ownable {
     /// @param pid poolId to claim tokens for.
     function _claim(uint256 pid) internal {
         ProjectToken memory project = s_projectTokens[pid];
+
+        if (address(project.token) == address(0)) {
+            revert Claim__InvalidProject();
+        }
+        if (project.startMonth > block.timestamp) {
+            // solhint-disable-line not-rely-on-time
+            revert Claim__ClaimingIsNotAllowedYet(project.startMonth);
+        }
         (uint256 tokensToClaim, uint256 claimableMonthCount) = claimableAmount(
             pid,
             _msgSender()
         );
+        if (claimableMonthCount == 0) {
+            revert Claim__NothingToClaim();
+        }
+        // Ensure we have enough tokens available for claiming
+        if (project.token.balanceOf(address(this)) < tokensToClaim) {
+            revert Claim__NotEnoughTokenLeft(pid, address(project.token));
+        }
         UserClaim storage userClaim = s_userClaims[_msgSender()][pid];
         if (
             userClaim.lastClaim == 0 || userClaim.lastClaim >= project.endMonth
