@@ -151,7 +151,7 @@ contract ClaimFunding is Ownable {
     /**
      * @dev Retrieves the aggregated claims for a specific address.
      * @param user The address for which to retrieve the claims.
-     * @return amount The total amount of claimable tokens for the address.
+     * @return amounts The total amount of claimable tokens for the address per pool.
      * @return claimablePoolIds An array of pool IDs for which the address has claimable tokens.
      */
     function aggregateClaimsForAddress(
@@ -159,14 +159,14 @@ contract ClaimFunding is Ownable {
     )
         external
         view
-        returns (uint256[] memory amount, uint256[] memory claimablePoolIds)
+        returns (uint256[] memory amounts, uint256[] memory claimablePoolIds)
     {
-        amount = new uint256[](s_userProjects[user].length());
-        claimablePoolIds = new uint256[](amount.length);
+        amounts = new uint256[](s_userProjects[user].length());
+        claimablePoolIds = new uint256[](amounts.length);
         // Loop through all projects the user is signed up for and calculate claimable tokens
-        for (uint256 i = 0; i < amount.length; i++) {
+        for (uint256 i = 0; i < amounts.length; i++) {
             (uint256 am, ) = claimableAmount(s_userProjects[user].at(i), user);
-            amount[i] = am;
+            amounts[i] = am;
             claimablePoolIds[i] = s_userProjects[user].at(i);
         }
     }
