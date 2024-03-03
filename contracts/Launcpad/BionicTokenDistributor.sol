@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {BionicFundRaising} from "./BionicFundRaising.sol";
+import {BionicPoolRegistry} from "./BionicPoolRegistry.sol";
 // import "forge-std/console.sol";
 
 error Distributor__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
@@ -96,7 +96,7 @@ contract BionicTokenDistributor is Ownable {
 
     // anyone can trigger syncing winning investors
     function addWinningInvestors(uint256 pid) external  {
-        (uint256 total, address[] memory investors) = BionicFundRaising(owner())
+        (uint256 total, address[] memory investors) = BionicPoolRegistry(owner())
             .getProjectInvestors(pid);
         if (investors.length == 0) {
             revert Distributor__InvalidProject();
@@ -142,7 +142,7 @@ contract BionicTokenDistributor is Ownable {
         amount = project
             .monthlyAmount
             .div(project.totalRaised)
-            .mul(BionicFundRaising(owner()).userPledgeOnPool(pid, user))
+            .mul(BionicPoolRegistry(owner()).userPledgeOnPool(pid, user))
             .mul(claimableMonthCount);
 
         return (amount, claimableMonthCount);

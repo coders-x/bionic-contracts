@@ -3,14 +3,14 @@ import { ethers } from "hardhat";
 import hre from "hardhat";
 import { FactoryOptions } from 'hardhat/types';
 import { mumbai as config } from './config.json';
-import { BionicFundRaising } from '../typechain-types';
+import { BionicPoolRegistry } from '../typechain-types';
 dotenv.config()
 const CONFIG = config;
 
 async function main() {
     // let contract = await deployContract({});
 
-    let contract = await ethers.getContractAt("BionicFundRaising", config.bionicLaunchPad);
+    let contract = await ethers.getContractAt("BionicPoolRegistry", config.bionicLaunchPad);
 
     console.log(`deployed fwv at ${contract.address}`)
     // await verifyContract(contract, utils.address, [
@@ -28,18 +28,18 @@ async function main() {
 
 async function deployContract(opt: FactoryOptions) {
 
-    console.log(`Deploying BionicFundRaising contract...`);
+    console.log(`Deploying BionicPoolRegistry contract...`);
 
 
-    const BionicFundRaisingContract = await ethers.getContractFactory("BionicFundRaising", opt);
+    const BionicPoolRegistryContract = await ethers.getContractFactory("BionicPoolRegistry", opt);
 
-    let funding = await BionicFundRaisingContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
+    let funding = await BionicPoolRegistryContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
         CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner);
 
     return await funding.deployed();
 }
 
-async function verifyContract(contract: BionicFundRaising, args: any) {
+async function verifyContract(contract: BionicPoolRegistry, args: any) {
     let res;
 
     // console.log(`Verifying Utils Contract at ${utilsAddress}`);

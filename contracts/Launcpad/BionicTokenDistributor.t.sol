@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-import {BionicFundRaising} from "./BionicFundRaising.sol";
+import {BionicPoolRegistry} from "./BionicPoolRegistry.sol";
 
 import "./BionicTokenDistributor.sol";
 
@@ -72,7 +72,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.mockCall(
             address(distributorContract.owner()),
             abi.encodeWithSelector(
-                BionicFundRaising.getProjectInvestors.selector,
+                BionicPoolRegistry.getProjectInvestors.selector,
                 pid
             ),
             abi.encode(1e6, winners)
@@ -93,7 +93,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.mockCall(
             address(distributorContract.owner()),
             abi.encodeWithSelector(
-                BionicFundRaising.userPledgeOnPool.selector,
+                BionicPoolRegistry.userPledgeOnPool.selector,
                 pid,
                 winners[0]
             ),
@@ -165,7 +165,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.mockCall(
             address(distributorContract.owner()),
             abi.encodeWithSelector(
-                BionicFundRaising.userPledgeOnPool.selector,
+                BionicPoolRegistry.userPledgeOnPool.selector,
                 pid,
                 winners[1]
             ),
@@ -245,7 +245,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.mockCall(
             address(distributorContract.owner()),
             abi.encodeWithSelector(
-                BionicFundRaising.getProjectInvestors.selector,
+                BionicPoolRegistry.getProjectInvestors.selector,
                 1
             ),
             abi.encode(1e6, winners)
@@ -253,7 +253,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.mockCall(
             address(distributorContract.owner()),
             abi.encodeWithSelector(
-                BionicFundRaising.getProjectInvestors.selector,
+                BionicPoolRegistry.getProjectInvestors.selector,
                 2
             ),
             abi.encode(1e6, winners)
@@ -275,7 +275,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.mockCall(
             address(distributorContract.owner()),
             abi.encodeWithSelector(
-                BionicFundRaising.userPledgeOnPool.selector,
+                BionicPoolRegistry.userPledgeOnPool.selector,
                 1,
                 winners[0]
             ),
@@ -285,7 +285,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.mockCall(
             address(distributorContract.owner()),
             abi.encodeWithSelector(
-                BionicFundRaising.userPledgeOnPool.selector,
+                BionicPoolRegistry.userPledgeOnPool.selector,
                 2,
                 winners[0]
             ),

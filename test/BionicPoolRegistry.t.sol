@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/Launcpad/BionicFundRaising.sol";
+import "../contracts/Launcpad/BionicPoolRegistry.sol";
 import {VRFCoordinatorV2Mock} from "../contracts/libs/VRFCoordinatorV2Mock.sol";
 import {ERC6551Registry} from "../contracts/libs/ERC6551Registry.sol";
 import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
@@ -17,7 +17,7 @@ import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 
 // import "forge-std/console.sol";
 
-contract BionicFundRaisingTest is DSTest, Test {
+contract BionicPoolRegistryTest is DSTest, Test {
     address public constant ENTRY_POINT =
         0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
     ERC6551Registry public constant erc6551_Registry =
@@ -30,7 +30,7 @@ contract BionicFundRaisingTest is DSTest, Test {
     string constant MNEMONIC =
         "announce room limb pattern dry unit scale effort smooth jazz weasel alcohol";
 
-    BionicFundRaising private _bionicFundRaising;
+    BionicPoolRegistry private _bionicFundRaising;
     Bionic private _bionicToken;
     ERC20Mock private _investingToken;
     BionicInvestorPass private _bipContract;
@@ -85,7 +85,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         _rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
         _rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
 
-        _bionicFundRaising = new BionicFundRaising(
+        _bionicFundRaising = new BionicPoolRegistry(
             IERC20(address(_bionicToken)),
             _investingToken,
             address(_bipContract),
@@ -362,7 +362,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             for (uint256 j = 0; j < tiers[i] * userPerWinner; j++) {
                 accounts[j] = address(accs[k++]);
             }
-            vm.expectRevert(LPFRWV__PoolRaffleDisabled.selector);
+            vm.expectRevert(BPR__PoolRaffleDisabled.selector);
             _bionicFundRaising.addToTier(pid, i, accounts);
         }
 
@@ -371,7 +371,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
 
-        vm.expectRevert(LPFRWV__PoolRaffleDisabled.selector);
+        vm.expectRevert(BPR__PoolRaffleDisabled.selector);
         _bionicFundRaising.draw(pid, 1000000);
 
         address[] memory winners = _bionicFundRaising.getRaffleWinners(pid);
