@@ -11,7 +11,7 @@ import {ERC6551Registry} from "../contracts/libs/ERC6551Registry.sol";
 import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
 import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../contracts/BIP.sol";
 import {TokenBoundAccount, ECDSA} from "../contracts/TBA.sol";
-import "../contracts/Launcpad/Claim.sol";
+import "../contracts/Launcpad/BionicTokenDistributor.sol";
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 
@@ -38,7 +38,7 @@ contract BionicFundRaisingTest is DSTest, Test {
     uint64 private _subId;
     TokenBoundAccount private _accountImplementation;
 
-    ClaimFunding private _claimContract;
+    BionicTokenDistributor private _claimContract;
 
     ERC20Mock private _rewardToken;
     ERC20Mock private _rewardToken2;
@@ -96,7 +96,7 @@ contract BionicFundRaisingTest is DSTest, Test {
         );
         _vrfCoordinatorV2.addConsumer(_subId, address(_bionicFundRaising));
 
-        _claimContract = ClaimFunding(_bionicFundRaising.claimFund());
+        _claimContract = BionicTokenDistributor(_bionicFundRaising.distributor());
 
         _accountImplementation = new TokenBoundAccount(
             address(new AccountGuardian()),
@@ -283,7 +283,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             );
 
             vm.prank(winners[i]);
-            vm.expectRevert(Claim__NothingToClaim.selector);
+            vm.expectRevert(Distributor__NothingToClaim.selector);
             _claimContract.claimTokens(pid);
         }
     }
@@ -411,7 +411,7 @@ contract BionicFundRaisingTest is DSTest, Test {
             );
 
             vm.prank(winners[i]);
-            vm.expectRevert(Claim__NothingToClaim.selector);
+            vm.expectRevert(Distributor__NothingToClaim.selector);
             _claimContract.claimTokens(pid);
         }
     }

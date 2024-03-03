@@ -4,7 +4,8 @@ import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
     IERC20Permit, ERC6551Registry, BionicFundRaising, ERC20Upgradeable, TokenBoundAccount, MockEntryPoint,
-    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding, ERC20
+    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding, ERC20,
+    BionicTokenDistributor
 }
     from "../typechain-types";
 import { BionicStructs } from "../typechain-types/contracts/Launcpad/BionicFundRaising";
@@ -44,7 +45,7 @@ describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, BionicFundRaising: BionicFundRaising,
         tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, AbstractAccounts: TokenBoundAccount[],
         usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock,
-        claimContract: ClaimFunding, mockEntryPoint: MockEntryPoint;
+        claimContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
     let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
@@ -113,7 +114,7 @@ describe("e2e", function () {
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
         BionicFundRaising = await deployBionicFundRaising(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
-        claimContract = await ethers.getContractAt("ClaimFunding", await BionicFundRaising.claimFund())
+        claimContract = await ethers.getContractAt("BionicTokenDistributor", await BionicFundRaising.distributor())
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, BionicFundRaising.address);
 
     });

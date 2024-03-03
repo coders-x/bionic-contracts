@@ -15,7 +15,7 @@ import {BionicStructs} from "../libs/BionicStructs.sol";
 import {TokenBoundAccount, IERC6551Account} from "../TBA.sol";
 
 import {Treasury} from "./Treasury.sol";
-import {ClaimFunding} from "./Claim.sol";
+import {BionicTokenDistributor} from "./BionicTokenDistributor.sol";
 import {Raffle} from "./Raffle.sol";
 
 // import "hardhat/console.sol";
@@ -78,7 +78,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     /// @notice Container for holding all rewards
     Treasury public treasury;
     /// @notice Container for holding all rewards
-    ClaimFunding public claimFund;
+    BionicTokenDistributor public distributor;
 
     /// @notice List of pools that users can stake into
     mapping(uint256 => BionicStructs.PoolInfo) public poolInfo;
@@ -140,7 +140,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         stakingToken = _stakingToken;
         investingToken = _investingToken;
         treasury = new Treasury(address(this));
-        claimFund = new ClaimFunding();
+        distributor = new BionicTokenDistributor();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(BROKER_ROLE, _msgSender());
@@ -211,7 +211,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         poolIdToTiers[pid] = tiers;
 
         try
-            claimFund.registerProjectToken(
+            distributor.registerProjectToken(
                 pid,
                 address(_rewardToken),
                 _tokenAllocationPerMonth,

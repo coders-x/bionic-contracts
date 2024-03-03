@@ -8,13 +8,13 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {BionicFundRaising} from "./BionicFundRaising.sol";
 // import "forge-std/console.sol";
 
-error Claim__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
-error Claim__ClaimingIsNotAllowedYet(uint startAfter); //"Not in the time window for claiming rewards"
-error Claim__NothingToClaim();
-error Claim__NotEligible(); //"User is not assigned claims for this project."
-error Claim__NotEnoughTokenLeft(uint pid, address token); //"Not enough tokens available for claiming. Please try Again"
+error Distributor__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
+error Distributor__ClaimingIsNotAllowedYet(uint startAfter); //"Not in the time window for claiming rewards"
+error Distributor__NothingToClaim();
+error Distributor__NotEligible(); //"User is not assigned claims for this project."
+error Distributor__NotEnoughTokenLeft(uint pid, address token); //"Not enough tokens available for claiming. Please try Again"
 
-contract ClaimFunding is Ownable {
+contract BionicTokenDistributor is Ownable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
     struct UserClaim {
@@ -76,7 +76,7 @@ contract ClaimFunding is Ownable {
         uint256 totalMonths
     ) external onlyOwner {
         if (address(projectTokenAddress) == address(0)) {
-            revert Claim__InvalidProject();
+            revert Distributor__InvalidProject();
         }
         s_projectTokens[pid] = ProjectToken(
             IERC20(projectTokenAddress),
@@ -95,11 +95,11 @@ contract ClaimFunding is Ownable {
     }
 
     // anyone can trigger syncing winning investors
-    function addWinningInvestors(uint256 pid) external {
+    function addWinningInvestors(uint256 pid) external  {
         (uint256 total, address[] memory investors) = BionicFundRaising(owner())
             .getProjectInvestors(pid);
         if (investors.length == 0) {
-            revert Claim__InvalidProject();
+            revert Distributor__InvalidProject();
         }
         for (uint i = 0; i < investors.length; i++) {
             s_userProjects[investors[i]].add(pid);
@@ -194,33 +194,33 @@ contract ClaimFunding is Ownable {
         ProjectToken memory project = s_projectTokens[pid];
 
         if (address(project.token) == address(0)) {
-            revert Claim__InvalidProject();
+            revert Distributor__InvalidProject();
         }
         if (project.startMonth > block.timestamp) {
             // solhint-disable-line not-rely-on-time
-            revert Claim__ClaimingIsNotAllowedYet(project.startMonth);
+            revert Distributor__ClaimingIsNotAllowedYet(project.startMonth);
         }
         (uint256 tokensToClaim, uint256 claimableMonthCount) = claimableAmount(
             pid,
             _msgSender()
         );
         if (claimableMonthCount == 0) {
-            revert Claim__NothingToClaim();
+            revert Distributor__NothingToClaim();
         }
         // Ensure we have enough tokens available for claiming
         if (project.token.balanceOf(address(this)) < tokensToClaim) {
-            revert Claim__NotEnoughTokenLeft(pid, address(project.token));
+            revert Distributor__NotEnoughTokenLeft(pid, address(project.token));
         }
         UserClaim storage userClaim = s_userClaims[_msgSender()][pid];
         if (
             userClaim.lastClaim == 0 || userClaim.lastClaim >= project.endMonth
         ) {
             s_userProjects[_msgSender()].remove(pid);
-            revert Claim__NotEligible();
+            revert Distributor__NotEligible();
         }
         // Ensure we have enough tokens available for claiming
         if (project.token.balanceOf(address(this)) < tokensToClaim) {
-            revert Claim__NotEnoughTokenLeft(pid, address(project.token));
+            revert Distributor__NotEnoughTokenLeft(pid, address(project.token));
         }
 
         // Update user's claim data
@@ -247,13 +247,13 @@ contract ClaimFunding is Ownable {
     //////////////////////////////////////////////////////////////*/
     modifier exsitingProject(uint256 pid) {
         if (address(s_projectTokens[pid].token) == address(0)) {
-            revert Claim__InvalidProject();
+            revert Distributor__InvalidProject();
         }
         _;
     }
     modifier projectDoesNotExists(uint256 pid) {
         if (address(s_projectTokens[pid].token) == address(0)) {
-            revert Claim__InvalidProject();
+            revert Distributor__InvalidProject();
         }
         _;
     }
