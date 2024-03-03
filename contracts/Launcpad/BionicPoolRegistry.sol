@@ -166,7 +166,7 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         bool _useRaffle,
         uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
-    ) external onlyRole(BROKER_ROLE) returns (uint256) {
+    ) external onlyRole(BROKER_ROLE) {
         address rewardTokenAddress = address(_rewardToken);
         if (rewardTokenAddress == address(0)) {
             revert BPR__InvalidRewardToken();
@@ -440,7 +440,7 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         uint256[] memory randomWords
     ) internal override {
         uint pid = requestIdToPoolId[requestId];
-        address[] memory winners = _pickWinners(pid, randomWords);
+        _pickWinners(pid, randomWords);
     }
 
     function refundLosers(uint256 pid) external {

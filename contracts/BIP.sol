@@ -12,9 +12,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Burnab
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
-import "@thirdweb-dev/contracts/extension/LazyMint.sol";
-import "@thirdweb-dev/contracts/extension/DropSinglePhase.sol";
-import "@thirdweb-dev/contracts/lib/CurrencyTransferLib.sol";
+import "./libs/CurrencyTransferLib.sol";
+
 
 error BIP__Deprecated();
 error BIP__AccountRescueSignitureOutDated();
@@ -27,9 +26,7 @@ contract BionicInvestorPass is
     PausableUpgradeable,
     AccessControlUpgradeable,
     ERC721BurnableUpgradeable,
-    UUPSUpgradeable,
-    LazyMint,
-    DropSinglePhase
+    UUPSUpgradeable
 {
     using CountersUpgradeable for CountersUpgradeable.Counter;
 
@@ -199,7 +196,7 @@ contract BionicInvestorPass is
         super._burn(tokenId);
     }
 
-    function _canLazyMint() internal view virtual override returns (bool) {
+    function _canLazyMint() internal view virtual returns (bool) {
         return hasRole(MINTER_ROLE, msg.sender);
     }
 
@@ -209,7 +206,7 @@ contract BionicInvestorPass is
         uint256 _quantityToClaim,
         address _currency,
         uint256 _pricePerToken
-    ) internal virtual override {
+    ) internal virtual {
         if (_pricePerToken == 0) {
             return;
         }
@@ -237,7 +234,7 @@ contract BionicInvestorPass is
     function _transferTokensOnClaim(
         address _to,
         uint256 _quantityBeingClaimed
-    ) internal virtual override returns (uint256 startTokenId) {
+    ) internal virtual returns (uint256 startTokenId) {
         startTokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
         _safeMint(_to, _quantityBeingClaimed);
@@ -247,7 +244,6 @@ contract BionicInvestorPass is
         internal
         view
         virtual
-        override
         returns (bool)
     {
         return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);

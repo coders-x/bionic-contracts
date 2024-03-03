@@ -118,7 +118,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         pt[0] = BionicStructs.PledgeTier(1, 1000, 1000);
         pt[1] = BionicStructs.PledgeTier(2, 3000, 3000);
         pt[2] = BionicStructs.PledgeTier(3, 5000, 5000);
-        pid = _bionicFundRaising.add(
+        _bionicFundRaising.add(
             pid,
             _rewardToken,
             block.timestamp,
