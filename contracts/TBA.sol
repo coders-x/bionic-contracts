@@ -6,12 +6,12 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {AccountV3,IEntryPoint} from "tokenbound/src/AccountV3.sol";
+import "tokenbound/src/utils/Errors.sol";
 import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 import "forge-std/console.sol";
 
-error InvalidInput();
 error InvalidSigniture();
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮

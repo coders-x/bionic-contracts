@@ -11,7 +11,7 @@ dotenv.config()
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.23",
+    version: "0.8.24",
     settings: {
       evmVersion: 'paris', //mumbai doesn't support PUSH0 0.8.20>  https://stackoverflow.com/a/76332341
       viaIR: true,
@@ -28,7 +28,7 @@ const config: HardhatUserConfig = {
       },
       forking: {
         url: process.env.MUMBAI_RPC as string,
-        blockNumber: 39990000
+        blockNumber: 46640000
       }
     },
     goerli: {

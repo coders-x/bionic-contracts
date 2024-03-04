@@ -8,15 +8,15 @@ pragma solidity ^0.8.12;
 /* solhint-disable avoid-low-level-calls */
 /* solhint-disable no-inline-assembly */
 
-import "tokenbound/lib/account-abstraction/contracts/interfaces/IAccount.sol";
-import "tokenbound/lib/account-abstraction/contracts/interfaces/IPaymaster.sol";
-import "tokenbound/lib/account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import "@account-abstraction/contracts/interfaces/IAccount.sol";
+import "@account-abstraction/contracts/interfaces/IPaymaster.sol";
+import "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
-import "tokenbound/lib/account-abstraction/contracts/utils/Exec.sol";
-import "tokenbound/lib/account-abstraction/contracts/core/StakeManager.sol";
-import "tokenbound/lib/account-abstraction/contracts/core/SenderCreator.sol";
-import "tokenbound/lib/account-abstraction/contracts/core/Helpers.sol";
-import "tokenbound/lib/account-abstraction/contracts/core/NonceManager.sol";
+import "@account-abstraction/contracts/utils/Exec.sol";
+import "@account-abstraction/contracts/core/StakeManager.sol";
+import "@account-abstraction/contracts/core/SenderCreator.sol";
+import "@account-abstraction/contracts/core/Helpers.sol";
+import "@account-abstraction/contracts/core/NonceManager.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 contract MockEntryPoint is IEntryPoint, StakeManager, NonceManager, ReentrancyGuard {

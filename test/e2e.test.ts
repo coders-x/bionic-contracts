@@ -4,7 +4,7 @@ import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
     IERC20Permit, ERC6551Registry, BionicPoolRegistry, ERC20Upgradeable, TokenBoundAccount, MockEntryPoint,
-    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ClaimFunding, ERC20,
+    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ERC20,
     BionicTokenDistributor
 }
     from "../typechain-types";
@@ -29,10 +29,10 @@ const NETWORK_CONFIG = {
 };
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-    ERC6551_REGISTERY_ADDR = "0x953cbf74fD8736C97c61fc1c0f2b8A2959e5A328",
+    ERC6551_REGISTRY_ADDR = "0x000000006551c19487814612e58FE06813775758",
     USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
     USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
-    ACCOUNT_ADDRESS = "0x0a54aa8deB3536dD6E3B890C16C18d203e88C0d0",
+    ACCOUNT_ADDRESS = "0xd1ded19fE7B79005259e36a772Fd72D4dD08dF4F",
     CALLBACK_GAS_LIMIT_PER_USER = 90300,
     REQUEST_VRF_PER_WINNER = true,
     PLEDGING_START_TIME = 20000000,
@@ -55,11 +55,8 @@ describe("e2e", function () {
         [owner, client, guardian, ...signers] = await ethers.getSigners();
         bionicContract = await deployBionic();
         bipContract = await deployBIP();
-        let TokenBoundContractRegistryFacory = await ethers.getContractFactory("ERC6551Registry");
-        tokenBoundContractRegistry = await TokenBoundContractRegistryFacory.deploy();
-        let MockEntryPointFactory = await ethers.getContractFactory("MockEntryPoint");
-        mockEntryPoint = await MockEntryPointFactory.deploy();
-        tokenBoundContractRegistry = await TokenBoundContractRegistryFacory.deploy();
+        tokenBoundContractRegistry = await ethers.getContractAt("ERC6551Registry", ERC6551_REGISTRY_ADDR);
+        mockEntryPoint = await ethers.getContractAt("MockEntryPoint", ENTRY_POINT);
         usdtContract = await ethers.getContractAt("ERC20Upgradeable", USDT_ADDR);
         let AccountGuardianFactory = await ethers.getContractFactory("AccountGuardian");
         let accountGuardian = await AccountGuardianFactory.deploy();
@@ -92,9 +89,9 @@ describe("e2e", function () {
             //@ts-ignore
             expect(BigNumber.from(r?.events[0]?.args.tokenId)).to.equal(BigNumber.from(i))
             //create abstracted accounts
-            res = await tokenBoundContractRegistry.createAccount(tokenBoundImpContract.address,
+            res = await tokenBoundContractRegistry.createAccount(tokenBoundImpContract.address, ethers.utils.formatBytes32String('0'),
                 network.config.chainId as number, bipContract.address,
-                i, "0", []);
+                i);
             let newAcc = await res.wait(1);
             let acc = await ethers.getContractAt("TokenBoundAccount", newAcc?.events[0]?.args?.account);
             await usdtContract.connect(whale).transfer(acc.address, HUNDRED_THOUSAND);
@@ -177,16 +174,16 @@ describe("e2e", function () {
 
     describe("TokenBoundAccount", () => {
         it("should Generate an address for SmartWallet", async () => {
-            let res = await tokenBoundContractRegistry.account(tokenBoundImpContract.address,
+            let res = await tokenBoundContractRegistry.account(tokenBoundImpContract.address, ethers.utils.formatBytes32String('0'),
                 network.config.chainId as number, bipContract.address,
-                "10", "0");
+                "10");
             expect(res).to.equal(ACCOUNT_ADDRESS);
         })
         it("should deploy a new address for the user based on their token", async () => {
             await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
-            let res = await tokenBoundContractRegistry.createAccount(tokenBoundImpContract.address,
+            let res = await tokenBoundContractRegistry.createAccount(tokenBoundImpContract.address, ethers.utils.formatBytes32String('0'),
                 network.config.chainId as number, bipContract.address,
-                "10", "0", []);
+                "10");
             let newAcc = await res.wait();
 
 
@@ -251,34 +248,34 @@ describe("e2e", function () {
             // });
             it("Should fail if Pool doesn't Exist", async function () {
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [10000, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
-                await expect(abstractedAccount.connect(client).executeCall(BionicPoolRegistry.address, 0, raw))
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWithCustomError(BionicPoolRegistry, "BPR__InvalidPool")//("pledge: Invalid PID");
             });
             it("Should fail if not enough amount pledged", async function () {
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 0, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
-                await expect(abstractedAccount.connect(client).executeCall(BionicPoolRegistry.address, 0, raw))
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWithCustomError(BionicPoolRegistry, "BPR__NotValidPledgeAmount").withArgs(0);
             });
 
             it("Should fail if pledge exceeds the max user share", async function () {
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 1001, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
-                await expect(abstractedAccount.connect(client).executeCall(BionicPoolRegistry.address, 0, raw))
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWithCustomError(BionicPoolRegistry, "BPR__NotValidPledgeAmount").withArgs(1001);
             });
             it("Should fail if Not Enough Stake on the account", async function () {
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
-                await expect(abstractedAccount.connect(client).executeCall(BionicPoolRegistry.address, 0, raw))
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWithCustomError(BionicPoolRegistry, "BPR__NotEnoughStake");
             });
             it("Should fail if expired deadline", async function () {
                 await bionicContract.transfer(abstractedAccount.address, BionicPoolRegistry.MINIMUM_BIONIC_STAKE());
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
-                await expect(abstractedAccount.connect(client).executeCall(BionicPoolRegistry.address, 0, raw))
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWith("CurrencyPermit: expired deadline");
             });
             it("Should fail on invalid signature", async function () {
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 1000, 32000000000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
-                await expect(abstractedAccount.connect(client).executeCall(BionicPoolRegistry.address, 0, raw))
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWith("ECDSA: invalid signature");
             });
             it("Should pledge user and permit contract to move amount", async function () {
@@ -309,7 +306,7 @@ describe("e2e", function () {
                 )
                 await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
-                await expect(abstractedAccount.connect(client).executeCall(BionicPoolRegistry.address, 0, raw))
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.revertedWithCustomError(BionicPoolRegistry, "BPR__AlreadyPledgedToThisPool");
                 // .to.emit(BionicPoolRegistry, "Pledge").withArgs(abstractedAccount.address, 0, amount)
                 // .to.emit(abstractedAccount, "CurrencyApproval").withArgs(usdtContract.address, BionicPoolRegistry.address, amount)
@@ -369,12 +366,12 @@ describe("e2e", function () {
 
             it("Should Receive Random words and chose winners", async () => {
                 const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
-                const winners = ["0xD4048688ef20f099aF6410f4b7854C66EEaeD3dc",
-                    "0x456DBFaf1504b310dE66FC8c9104024cB88d7B99",
-                    "0xC888860fd040a139A8Ed3Ee51e6910c93e40a119",
-                    "0xb414EE9B78f5dDad334C5b39395Bb36147c95095",
-                    "0x8956039ECA16899Db65732c8175ffa440d481F64",
-                    "0x389B436278b6d136bA0996c3F4a0Afc680fD79ED",]
+                const winners = ["0x93F2f2F067093cFbfc6aA1d1313a68a83f66378e",
+                    "0x029be2e7ea5A4A09DbD5317C71E30e1F48f3c30c",
+                    "0xD613423d5110FFaE4Aa894e97b4de75C57B66Fa6",
+                    "0x3FB53d272e51Ad5e898eB5F60440F5569d426798",
+                    "0x848A675960aA69Db39411eaFD8107A6699E295bC",
+                    "0x1e3c75D365c71e178e28C1240C0f583491c02D35",]
                 expect(await usdtContract.balanceOf(BionicPoolRegistry.address)).to.be.equal(0);
                 expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(1000));
                 await expect(
@@ -474,7 +471,7 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
 }
 async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
-        account.nonce(),
+        account.getNonce(),
         "BionicAccount",
         "1",
         signer.getChainId(),
@@ -543,7 +540,7 @@ async function deployBIP() {
     });
     return await bipContract.deployed();
 }
-async function deployBionicPoolRegistry(tokenAddress: string, bionicInvsestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, reqVRFPerWinner: boolean) {
+async function deployBionicPoolRegistry(tokenAddress: string, bionicInvestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, reqVRFPerWinner: boolean) {
     // const IterableMappingLib = await ethers.getContractFactory("IterableMapping");
     // const lib = await IterableMappingLib.deploy();
     // await lib.deployed();
@@ -552,11 +549,11 @@ async function deployBionicPoolRegistry(tokenAddress: string, bionicInvsestorPas
         }
     });
     console.log(`Deploying BionicPoolRegistry contract...`);
-    return await BionicPoolRegistryContract.deploy(tokenAddress, USDT_ADDR, bionicInvsestorPass, vrfCoordinatorV2, gaslane, subId, reqVRFPerWinner);
+    return await BionicPoolRegistryContract.deploy(tokenAddress, USDT_ADDR, bionicInvestorPass, vrfCoordinatorV2, gaslane, subId, reqVRFPerWinner);
 }
-async function deployTBA(entryPoinAddress: string, guardianAddress: string) {
+async function deployTBA(entryPointAddress: string, guardianAddress: string) {
     const TokenBoundAccountFactory = await ethers.getContractFactory("TokenBoundAccount");
-    let contract = await TokenBoundAccountFactory.deploy(guardianAddress, entryPoinAddress);
+    let contract = await TokenBoundAccountFactory.deploy(entryPointAddress, entryPointAddress, ERC6551_REGISTRY_ADDR, guardianAddress);
 
     console.log(`Deploying TBA contract...`);
 
@@ -604,7 +601,7 @@ async function pledgeBySigner(aac: TokenBoundAccount, signer: SignerWithAddress,
     let treasuryAddress = await BionicPoolRegistry.treasury();
     let oldbalance = await usdtContract.balanceOf(treasuryAddress);
     let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, amount, deadline, v, r, s]);
-    await expect(aac.connect(signer).executeCall(BionicPoolRegistry.address, 0, raw))
+    await expect(aac.connect(signer).execute(BionicPoolRegistry.address, 0, raw, 0))
         .to.emit(BionicPoolRegistry, "Pledge").withArgs(aac.address, 0, amount)
         .to.emit(aac, "CurrencyApproval").withArgs(usdtContract.address, BionicPoolRegistry.address, amount)
         .to.emit(BionicPoolRegistry, "PledgeFunded").withArgs(aac.address, 0, amount);
