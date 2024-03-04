@@ -79,14 +79,14 @@ interface ICurrencyPermit {
         uint256 amount
     ) external returns (bool);
 
-    /**
-     * @dev Returns the current nonce for `owner`. This value must be
-     * included whenever a signature is generated for {permit}.
-     *
-     * Every successful call to {permit} increases ``owner``'s nonce by one. This
-     * prevents a signature from being used multiple times.
-     */
-    function nonce() external view returns (uint256);
+    // /**
+    //  * @dev Returns the current nonce for `owner`. This value must be
+    //  * included whenever a signature is generated for {permit}.
+    //  *
+    //  * Every successful call to {permit} increases ``owner``'s nonce by one. This
+    //  * prevents a signature from being used multiple times.
+    //  */
+    // function nonce() external view returns (uint256);
 
     /**
      * @dev Returns the domain separator used in the encoding of the signature for {permit}, as defined by {EIP712}.

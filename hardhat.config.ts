@@ -11,7 +11,7 @@ dotenv.config()
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.20",
+    version: "0.8.23",
     settings: {
       evmVersion: 'paris', //mumbai doesn't support PUSH0 0.8.20>  https://stackoverflow.com/a/76332341
       viaIR: true,

@@ -7,7 +7,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../contracts/Launcpad/BionicPoolRegistry.sol";
 import {VRFCoordinatorV2Mock} from "../contracts/libs/VRFCoordinatorV2Mock.sol";
-import {ERC6551Registry} from "../contracts/libs/ERC6551Registry.sol";
+import {ERC6551Registry} from "tokenbound/lib/erc6551/src/ERC6551Registry.sol";
 import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
 import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../contracts/BIP.sol";
 import {TokenBoundAccount, ECDSA} from "../contracts/TBA.sol";
@@ -15,13 +15,13 @@ import "../contracts/Launcpad/BionicTokenDistributor.sol";
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 
-// import "forge-std/console.sol";
+import "forge-std/console.sol";
 
 contract BionicPoolRegistryTest is DSTest, Test {
     address public constant ENTRY_POINT =
         0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
     ERC6551Registry public constant erc6551_Registry =
-        ERC6551Registry(0x02101dfB77FDE026414827Fdc604ddAF224F0921);
+        ERC6551Registry(0x000000006551c19487814612e58FE06813775758);
 
     uint256 public constant MONTH_IN_SECONDS = 30 days; // Approx 1 month
     bytes32 public constant GAS_LANE =
@@ -99,8 +99,10 @@ contract BionicPoolRegistryTest is DSTest, Test {
         _claimContract = BionicTokenDistributor(_bionicFundRaising.distributor());
 
         _accountImplementation = new TokenBoundAccount(
-            address(new AccountGuardian()),
-            ENTRY_POINT
+            ENTRY_POINT,
+            address(1),
+            address(erc6551_Registry),
+            address(new AccountGuardian())
         );
     }
 
@@ -180,11 +182,10 @@ contract BionicPoolRegistryTest is DSTest, Test {
             _bipContract.safeMint(user, guardian, "");
             address accountAddress = erc6551_Registry.createAccount(
                 address(_accountImplementation),
+                "",
                 block.chainid,
                 address(_bipContract),
-                i,
-                0,
-                ""
+                i
             );
             _bionicToken.transfer(
                 accountAddress,
@@ -202,7 +203,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
                         _investingToken,
                         address(_bionicFundRaising),
                         amount,
-                        acc.nonce(),
+                        acc.getNonce(),
                         deadline
                     )
                 )
@@ -224,7 +225,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
                 s
             );
             // will call _bionicContract.pledge(pid, amount, deadline, v, r, s).;
-            acc.executeCall(address(_bionicFundRaising), 0, data);
+            acc.execute(address(_bionicFundRaising), 0, data,0);
         }
 
         //2. accounts pledged lets add them to tiers
@@ -299,19 +300,17 @@ contract BionicPoolRegistryTest is DSTest, Test {
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
             .pledgeTiers(pid);
 
-        //1. pledge
+       //1. pledge
         for (uint256 i = 0; i < count; i++) {
             address user = vm.addr(privateKeys[i * 2]);
             address guardian = vm.addr(privateKeys[(i * 2) + 1]);
-
             _bipContract.safeMint(user, guardian, "");
             address accountAddress = erc6551_Registry.createAccount(
                 address(_accountImplementation),
+                "",
                 block.chainid,
                 address(_bipContract),
-                i,
-                0,
-                ""
+                i
             );
             _bionicToken.transfer(
                 accountAddress,
@@ -329,7 +328,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
                         _investingToken,
                         address(_bionicFundRaising),
                         amount,
-                        acc.nonce(),
+                        acc.getNonce(),
                         deadline
                     )
                 )
@@ -351,9 +350,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
                 s
             );
             // will call _bionicContract.pledge(pid, amount, deadline, v, r, s).;
-            acc.executeCall(address(_bionicFundRaising), 0, data);
+            acc.execute(address(_bionicFundRaising), 0, data,0);
         }
-
         //2. shouldn't be added to tierpools for lottery
         uint256 k = 0; //index of account
         uint256 userPerWinner = accs.length / winnersCount;
@@ -365,7 +363,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
             vm.expectRevert(BPR__PoolRaffleDisabled.selector);
             _bionicFundRaising.addToTier(pid, i, accounts);
         }
-
         //3. move time and do draw get the winners
         (, , , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
             .poolInfo(pid);
@@ -413,7 +410,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             vm.prank(winners[i]);
             vm.expectRevert(Distributor__NothingToClaim.selector);
             _claimContract.claimTokens(pid);
-        }
+        } 
     }
 
     function testTransferNFT() public {
