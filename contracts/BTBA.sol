@@ -22,9 +22,8 @@ error InvalidSigniture();
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
 /// @title ERC6551Account Contract
 /// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
-/// @notice Fork of Account.sol from TokenBouand
-/// @dev TokenBoundAccount that gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
-contract TokenBoundAccount is AccountV3,
+/// @dev BionicAccount gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
+contract BionicAccount is AccountV3,
     ICurrencyPermit,
     EIP712
 {

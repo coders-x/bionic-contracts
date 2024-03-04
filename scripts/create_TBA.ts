@@ -36,7 +36,7 @@ async function main() {
 
 
 //     //0x1a2...3b4cd
-//     return tokenBoundAccount
+//     return BionicAccount
 // }
 
 

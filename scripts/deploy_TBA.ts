@@ -7,40 +7,40 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 
 async function main() {
     //deploy with guardian
-    let guardian=await deployGuardian();
-    let contract=await deployContract(guardian.address);
-    verifyContract(contract.address,guardian.address);
-    
+    let guardian = await deployGuardian();
+    let contract = await deployContract(guardian.address);
+    verifyContract(contract.address, guardian.address);
+
     //use existing Guardian
     // let contract=await deployContract(GUARDIAN_ADDRESS);
     // verifyContract(contract.address,GUARDIAN_ADDRESS);
 
-    return ;
+    return;
 }
 
 
-async function deployGuardian(){
+async function deployGuardian() {
     console.log(`Deploying Guardian contract...`);
     const TBAContract = await ethers.getContractFactory("AccountGuardian");
-    let tba=await TBAContract.deploy();
+    let tba = await TBAContract.deploy();
 
     return await tba.deployed();
 }
-async function deployContract(guardian:string){
+async function deployContract(guardian: string) {
     console.log(`Deploying TokenBound contract...`);
-    const TBAContract = await ethers.getContractFactory("TokenBoundAccount");
-    let tba=await TBAContract.deploy(guardian,ENTRY_POINT);
+    const TBAContract = await ethers.getContractFactory("BionicAccount");
+    let tba = await TBAContract.deploy(guardian, ENTRY_POINT);
 
     return await tba.deployed();
 }
 
-async function verifyContract(contractAddress:string,guardianAddress:string){
+async function verifyContract(contractAddress: string, guardianAddress: string) {
     console.log(`Verifying Contract at ${contractAddress}`);
-    let res= await hre.run("verify:verify", {
+    let res = await hre.run("verify:verify", {
         address: contractAddress,//funding.address,
-        constructorArguments: [guardianAddress,ENTRY_POINT],
-      });
-    console.log("Verified: ",res)
+        constructorArguments: [guardianAddress, ENTRY_POINT],
+    });
+    console.log("Verified: ", res)
     return res;
 }
 

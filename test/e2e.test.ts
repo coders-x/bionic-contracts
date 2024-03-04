@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
-    IERC20Permit, ERC6551Registry, BionicPoolRegistry, ERC20Upgradeable, TokenBoundAccount, MockEntryPoint,
+    IERC20Permit, ERC6551Registry, BionicPoolRegistry, ERC20Upgradeable, BionicAccount, MockEntryPoint,
     BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ERC20,
     BionicTokenDistributor
 }
@@ -43,7 +43,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, BionicPoolRegistry: BionicPoolRegistry,
-        tokenBoundImpContract: TokenBoundAccount, abstractedAccount: TokenBoundAccount, AbstractAccounts: TokenBoundAccount[],
+        tokenBoundImpContract: BionicAccount, abstractedAccount: BionicAccount, AbstractAccounts: BionicAccount[],
         usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock,
         claimContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
     let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
@@ -62,7 +62,7 @@ describe("e2e", function () {
         let accountGuardian = await AccountGuardianFactory.deploy();
         tokenBoundImpContract = await deployTBA(mockEntryPoint.address, accountGuardian.address);
         bionicDecimals = await bionicContract.decimals();
-        abstractedAccount = await ethers.getContractAt("TokenBoundAccount", ACCOUNT_ADDRESS);
+        abstractedAccount = await ethers.getContractAt("BionicAccount", ACCOUNT_ADDRESS);
         pledgingTiers = [
             { maximumPledge: PLEDGE_AMOUNT, minimumPledge: PLEDGE_AMOUNT, tierId: 1 },
             { maximumPledge: PLEDGE_AMOUNT * 3, minimumPledge: PLEDGE_AMOUNT * 3, tierId: 2 },
@@ -93,7 +93,7 @@ describe("e2e", function () {
                 network.config.chainId as number, bipContract.address,
                 i);
             let newAcc = await res.wait(1);
-            let acc = await ethers.getContractAt("TokenBoundAccount", newAcc?.events[0]?.args?.account);
+            let acc = await ethers.getContractAt("BionicAccount", newAcc?.events[0]?.args?.account);
             await usdtContract.connect(whale).transfer(acc.address, HUNDRED_THOUSAND);
             expect(await acc.owner()).to.equal(signers[i * 2].address);
 
@@ -172,7 +172,7 @@ describe("e2e", function () {
         });
     });
 
-    describe("TokenBoundAccount", () => {
+    describe("BionicAccount", () => {
         it("should Generate an address for SmartWallet", async () => {
             let res = await tokenBoundContractRegistry.account(tokenBoundImpContract.address, ethers.utils.formatBytes32String('0'),
                 network.config.chainId as number, bipContract.address,
@@ -244,7 +244,7 @@ describe("e2e", function () {
         describe("pledge", function () {
             // it("Should fail if not sent via TBA", async function () {
             //     await expect(BionicPoolRegistry.connect(client).pledge(0, 10, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")))
-            //         .to.be.revertedWith("Contract does not support TokenBoundAccount");
+            //         .to.be.revertedWith("Contract does not support BionicAccount");
             // });
             it("Should fail if Pool doesn't Exist", async function () {
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [10000, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
@@ -469,7 +469,7 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
         )
     )
 }
-async function getCurrencyPermitSignature(signer: SignerWithAddress, account: TokenBoundAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
+async function getCurrencyPermitSignature(signer: SignerWithAddress, account: BionicAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
         account.getNonce(),
         "BionicAccount",
@@ -552,8 +552,8 @@ async function deployBionicPoolRegistry(tokenAddress: string, bionicInvestorPass
     return await BionicPoolRegistryContract.deploy(tokenAddress, USDT_ADDR, bionicInvestorPass, vrfCoordinatorV2, gaslane, subId, reqVRFPerWinner);
 }
 async function deployTBA(entryPointAddress: string, guardianAddress: string) {
-    const TokenBoundAccountFactory = await ethers.getContractFactory("TokenBoundAccount");
-    let contract = await TokenBoundAccountFactory.deploy(entryPointAddress, entryPointAddress, ERC6551_REGISTRY_ADDR, guardianAddress);
+    const BionicAccountFactory = await ethers.getContractFactory("BionicAccount");
+    let contract = await BionicAccountFactory.deploy(entryPointAddress, entryPointAddress, ERC6551_REGISTRY_ADDR, guardianAddress);
 
     console.log(`Deploying TBA contract...`);
 
@@ -583,12 +583,12 @@ async function deployVRFCoordinatorV2Mock() {
 }
 // async function deployERC6551Registry() {
 //     const ERC6551RegContract = await ethers.getContractFactory("ERC6551Registry");
-//     console.log("Deploying TokenBoundAccount contract...");
+//     console.log("Deploying BionicAccount contract...");
 
 //     return await ERC6551RegContract.deploy();
 // }
 
-async function pledgeBySigner(aac: TokenBoundAccount, signer: SignerWithAddress, usdtContract: ERC20, BionicPoolRegistry: BionicPoolRegistry, amount: BigNumber, deadline: BigNumber, alreadyPledged: BigNumber) {
+async function pledgeBySigner(aac: BionicAccount, signer: SignerWithAddress, usdtContract: ERC20, BionicPoolRegistry: BionicPoolRegistry, amount: BigNumber, deadline: BigNumber, alreadyPledged: BigNumber) {
     expect(await aac.owner()).to.equal(signer.address);
     const { v, r, s } = await getCurrencyPermitSignature(
         signer,

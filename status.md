@@ -79,7 +79,7 @@ Test result: ok. 2 passed; 0 failed; 0 skipped; finished in 486.77s
 | transfer                                          | 3010            | 17610 | 24910  | 24910 | 6       |
 
 
-| contracts/TBA.sol:TokenBoundAccount contract |                 |        |        |        |         |
+| contracts/BTBA.sol:BionicAccount contract |                 |        |        |        |         |
 |----------------------------------------------|-----------------|--------|--------|--------|---------|
 | Deployment Cost                              | Deployment Size |        |        |        |         |
 | 2228416                                      | 12714           |        |        |        |         |

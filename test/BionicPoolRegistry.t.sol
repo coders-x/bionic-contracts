@@ -10,7 +10,7 @@ import {VRFCoordinatorV2Mock} from "../contracts/libs/VRFCoordinatorV2Mock.sol";
 import {ERC6551Registry} from "tokenbound/lib/erc6551/src/ERC6551Registry.sol";
 import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
 import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../contracts/BIP.sol";
-import {TokenBoundAccount, ECDSA} from "../contracts/TBA.sol";
+import {BionicAccount, ECDSA} from "../contracts/BTBA.sol";
 import "../contracts/Launcpad/BionicTokenDistributor.sol";
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
@@ -36,7 +36,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
     BionicInvestorPass private _bipContract;
     VRFCoordinatorV2Mock private _vrfCoordinatorV2;
     uint64 private _subId;
-    TokenBoundAccount private _accountImplementation;
+    BionicAccount private _accountImplementation;
 
     BionicTokenDistributor private _claimContract;
 
@@ -98,7 +98,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
 
         _claimContract = BionicTokenDistributor(_bionicFundRaising.distributor());
 
-        _accountImplementation = new TokenBoundAccount(
+        _accountImplementation = new BionicAccount(
             ENTRY_POINT,
             address(1),
             address(erc6551_Registry),
@@ -172,7 +172,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         uint256 count = 1025;
         uint256 winnersCount = 500;
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
-        TokenBoundAccount[] memory accs = new TokenBoundAccount[](count);
+        BionicAccount[] memory accs = new BionicAccount[](count);
         //1. pledge
 
         for (uint256 i = 0; i < count; i++) {
@@ -193,7 +193,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             );
             uint256 amount = 1000;
             _investingToken.mint(accountAddress, amount ** 5);
-            TokenBoundAccount acc = TokenBoundAccount(payable(accountAddress));
+            BionicAccount acc = BionicAccount(payable(accountAddress));
             accs[i] = acc;
             bytes32 structHash = ECDSA.toTypedDataHash(
                 acc.DOMAIN_SEPARATOR(),
@@ -296,7 +296,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         uint256 count = 10;
         uint256 winnersCount = 500;
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
-        TokenBoundAccount[] memory accs = new TokenBoundAccount[](count);
+        BionicAccount[] memory accs = new BionicAccount[](count);
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
             .pledgeTiers(pid);
 
@@ -318,7 +318,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             );
             uint256 amount = pledgeTiers[i % 3].minimumPledge;
             _investingToken.mint(accountAddress, amount ** 5);
-            TokenBoundAccount acc = TokenBoundAccount(payable(accountAddress));
+            BionicAccount acc = BionicAccount(payable(accountAddress));
             accs[i] = acc;
             bytes32 structHash = ECDSA.toTypedDataHash(
                 acc.DOMAIN_SEPARATOR(),

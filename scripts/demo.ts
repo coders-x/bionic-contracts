@@ -3,7 +3,7 @@ import { ethers, network } from "hardhat";
 import { getProviderFromRpcUrl } from "@thirdweb-dev/sdk";
 import { BigNumber, Contract, Signer } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
-import { IERC20, TokenBoundAccount } from "../typechain-types";
+import { IERC20, BionicAccount } from "../typechain-types";
 import { mumbai as configInfo } from './config.json';
 
 dotenv.config();
@@ -45,11 +45,11 @@ async function main(level: number, pid: number = 0) {
     );
     let usdtContract = await ethers.getContractAt("ERC20", USDT_ADDR);
     let bionicContract = await ethers.getContractAt("ERC20", BIONIC_TOKEN_ADDR);
-    // const TBAContract = await ethers.getContractFactory("TokenBoundAccount");
+    // const TBAContract = await ethers.getContractFactory("BionicAccount");
     // let tokenBoundImpContract=await TBAContract.deploy(ENTRY_POINT, ERC6551_REGISTRY_ADDR);
     // await tokenBoundImpContract.deployed();
-    // console.log(`tokenBoundAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
-    let abstractAccounts: TokenBoundAccount[] = [];
+    // console.log(`BionicAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
+    let abstractAccounts: BionicAccount[] = [];
     //goerli
     // const aa_addresses = [
     //     "0xEb061CC58a39483A26089d7Ce514a4CFB50881E5",
@@ -109,7 +109,7 @@ async function main(level: number, pid: number = 0) {
             ERC6551_REGISTRY_ADDR
         );
         let tokenBoundImpContract = await ethers.getContractAt(
-            "TokenBoundAccount",
+            "BionicAccount",
             TOKEN_BOUND_IMP_ADDR
         );
         for (let i = 0; i < users.length; i++) {
@@ -147,7 +147,7 @@ async function main(level: number, pid: number = 0) {
                 `Minted ${u.tokenId
                 } for address ${await u.getAddress()} and assigned ${aa_addr}`
             );
-            let acc = await ethers.getContractAt("TokenBoundAccount", aa_addr);
+            let acc = await ethers.getContractAt("BionicAccount", aa_addr);
             abstractAccounts.push(acc);
         }
         /**
@@ -174,7 +174,7 @@ async function main(level: number, pid: number = 0) {
             */
     } else {
         for (const a of aa_addresses) {
-            let acc = await ethers.getContractAt("TokenBoundAccount", a);
+            let acc = await ethers.getContractAt("BionicAccount", a);
             abstractAccounts.push(acc);
         }
     }
@@ -329,7 +329,7 @@ async function main(level: number, pid: number = 0) {
     //     const { v, r, s } = await getCurrencyPermitSignature(
     //         //@ts-ignore
     //         owner,
-    //         await ethers.getContractAt("TokenBoundAccount","0xEb061CC58a39483A26089d7Ce514a4CFB50881E5"),
+    //         await ethers.getContractAt("BionicAccount","0xEb061CC58a39483A26089d7Ce514a4CFB50881E5"),
     //         bionicContract,
     //         fundingContract.address,
     //         BigNumber.from(pledgeAmount),
@@ -358,7 +358,7 @@ const getSigners = (amount: number): Signer[] => {
 
 async function getCurrencyPermitSignature(
     signer: SignerWithAddress,
-    account: TokenBoundAccount,
+    account: BionicAccount,
     currency: IERC20,
     spender: string,
     value: BigNumber,

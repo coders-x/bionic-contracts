@@ -10,7 +10,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {ICurrencyPermit, ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
-import {TokenBoundAccount} from "../TBA.sol";
+import {BionicAccount} from "../BTBA.sol";
 
 import {Treasury} from "./Treasury.sol";
 import {BionicTokenDistributor} from "./BionicTokenDistributor.sol";
@@ -465,7 +465,7 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         uint256 _amount
     ) private {
         try
-            TokenBoundAccount(payable(account)).transferCurrency(
+            BionicAccount(payable(account)).transferCurrency(
                 address(investingToken),
                 address(treasury),
                 _amount
@@ -526,17 +526,17 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         //     IERC165(_msgSender()).supportsInterface(
         //        type(IERC6551Account).interfaceId
         //     ),
-        //     "Contract does not support TokenBoundAccount"
+        //     "Contract does not support BionicAccount"
         // );
 
-        try TokenBoundAccount(payable(_msgSender())).token() returns (
+        try BionicAccount(payable(_msgSender())).token() returns (
             uint256,
             address tokenContract,
             uint256
         ) {
             require(
                 tokenContract == bionicInvestorPass,
-                "onlyBionicAccount: Invalid Bionic TokenBoundAccount."
+                "onlyBionicAccount: Invalid Bionic BionicAccount."
             ); //check user realy ownes the bionic pass check we have minted and created account
         } catch (bytes memory reason) {
             if (reason.length == 0) {
