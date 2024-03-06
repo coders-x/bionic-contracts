@@ -45,7 +45,7 @@ describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, BionicPoolRegistry: BionicPoolRegistry,
         tokenBoundImpContract: BionicAccount, abstractedAccount: BionicAccount, AbstractAccounts: BionicAccount[],
         usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock,
-        claimContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
+        DistributorContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
     let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
@@ -111,7 +111,8 @@ describe("e2e", function () {
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
         BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
-        claimContract = await ethers.getContractAt("BionicTokenDistributor", await BionicPoolRegistry.distributor())
+
+        DistributorContract = await deployBionicTokenDistributor();
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, BionicPoolRegistry.address);
 
     });
@@ -222,7 +223,6 @@ describe("e2e", function () {
                 expect(await BionicPoolRegistry.hasRole(await BionicPoolRegistry.BROKER_ROLE(), owner.address)).to.be.true;
                 await expect(BionicPoolRegistry.add(0, bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.emit(BionicPoolRegistry, "PoolAdded").withArgs(0)
-                    .to.emit(claimContract, "ProjectAdded").withArgs(0, bionicContract.address, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount);
             });
             it("Should return same Pool upon request", async () => {
                 let pool = await BionicPoolRegistry.poolInfo(0);
@@ -541,15 +541,17 @@ async function deployBIP() {
     return await bipContract.deployed();
 }
 async function deployBionicPoolRegistry(tokenAddress: string, bionicInvestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, reqVRFPerWinner: boolean) {
-    // const IterableMappingLib = await ethers.getContractFactory("IterableMapping");
-    // const lib = await IterableMappingLib.deploy();
-    // await lib.deployed();
     const BionicPoolRegistryContract = await ethers.getContractFactory("BionicPoolRegistry", {
         libraries: {
         }
     });
     console.log(`Deploying BionicPoolRegistry contract...`);
     return await BionicPoolRegistryContract.deploy(tokenAddress, USDT_ADDR, bionicInvestorPass, vrfCoordinatorV2, gaslane, subId, reqVRFPerWinner);
+}
+async function deployBionicTokenDistributor() {
+    const BionicTokenDistributorContract = await ethers.getContractFactory("BionicTokenDistributor");
+    console.log(`Deploying BionicTokenDistributor contract...`);
+    return await BionicTokenDistributorContract.deploy();
 }
 async function deployTBA(entryPointAddress: string, guardianAddress: string) {
     const BionicAccountFactory = await ethers.getContractFactory("BionicAccount");
