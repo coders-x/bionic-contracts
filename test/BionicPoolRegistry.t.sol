@@ -275,7 +275,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         _rewardToken.mint(address(_distrbutorContract), totalBalance);
         assertEq(_rewardToken.balanceOf(address(_distrbutorContract)), totalBalance);
 
-        _distrbutorContract.addWinningInvestors(pid);
+        _distrbutorContract.addWinningInvestors(pid,totalBalance,winners);
         (IERC20 token, uint256 monthShare, uint256 start, , ) = _distrbutorContract
             .s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
@@ -388,7 +388,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
         vm.expectRevert(BPR__PoolRaffleDisabled.selector);
         _bionicFundRaising.draw(pid, 1000000);
 
-        address[] memory winners = _bionicFundRaising.getRaffleWinners(pid);
+        (uint256 total, address[] memory winners) = _bionicFundRaising
+            .getProjectInvestors(pid);
         assertEq(winners.length, count);
 
         //4. add winners to claim
@@ -396,38 +397,38 @@ contract BionicPoolRegistryTest is DSTest, Test {
         _rewardToken.mint(address(_distrbutorContract), totalBalance);
         assertEq(_rewardToken.balanceOf(address(_distrbutorContract)), totalBalance);
 
-        // _distrbutorContract.addWinningInvestors(pid);
-        // (IERC20 token, uint256 monthShare, uint256 start, , ) = _distrbutorContract
-        //     .s_projectTokens(pid);
-        // assertEq(address(token), address(_rewardToken));
+        _distrbutorContract.addWinningInvestors(pid,total,winners);
+        (IERC20 token, uint256 monthShare, uint256 start, , ) = _distrbutorContract
+            .s_projectTokens(pid);
+        assertEq(address(token), address(_rewardToken));
 
-        // uint256 time = start + MONTH_IN_SECONDS * 3;
-        // vm.warp(time);
+        uint256 time = start + MONTH_IN_SECONDS * 3;
+        vm.warp(time);
 
-        // for (uint256 i = 0; i < winners.length; i++) {
-        //     uint256 claimable = 3 *
-        //         ((monthShare / _bionicFundRaising.poolIdToTotalStaked(pid)) *
-        //             pledgeTiers[i % 3].minimumPledge);
+        for (uint256 i = 0; i < winners.length; i++) {
+            uint256 claimable = 3 *
+                ((monthShare / _bionicFundRaising.poolIdToTotalStaked(pid)) *
+                    pledgeTiers[i % 3].minimumPledge);
 
-        //     (uint256 userClaim, ) = _distrbutorContract.claimableAmount(
-        //         pid,
-        //         winners[i]
-        //     );
+            (uint256 userClaim, ) = _distrbutorContract.claimableAmount(
+                pid,
+                winners[i]
+            );
 
-        //     assertEq(userClaim, claimable);
-        //     vm.prank(winners[i]);
-        //     _distrbutorContract.claimTokens(pid);
-        //     totalBalance -= claimable;
-        //     assertEq(_rewardToken.balanceOf(winners[i]), claimable);
-        //     assertEq(
-        //         _rewardToken.balanceOf(address(_distrbutorContract)),
-        //         totalBalance
-        //     );
+            // assertEq(userClaim, claimable);
+            // vm.prank(winners[i]);
+            // _distrbutorContract.claimTokens(pid);
+            // totalBalance -= claimable;
+            // assertEq(_rewardToken.balanceOf(winners[i]), claimable);
+            // assertEq(
+            //     _rewardToken.balanceOf(address(_distrbutorContract)),
+            //     totalBalance
+            // );
 
-        //     vm.prank(winners[i]);
-        //     vm.expectRevert(Distributor__NothingToClaim.selector);
-        //     _distrbutorContract.claimTokens(pid);
-        // } 
+            // vm.prank(winners[i]);
+            // vm.expectRevert(Distributor__NothingToClaim.selector);
+            // _distrbutorContract.claimTokens(pid);
+        } 
     }
 
     function testTransferNFT() public {

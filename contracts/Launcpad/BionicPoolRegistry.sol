@@ -437,6 +437,7 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         for (uint i = 0; i < losers.length; i++) {
             uint256 refund = userPledge[pid].get(losers[i]);
             treasury.withdrawTo(investingToken, losers[i], refund);
+            poolIdToTotalStaked[pid] = poolIdToTotalStaked[pid].sub(refund);
             emit LotteryRefunded(losers[i], pid, refund);
             userPledge[pid].set(losers[i], 0);
         }

@@ -30,7 +30,8 @@ contract DistributorContractTest is DSTest, Test {
             address(rewardToken),
             1e6,
             100,
-            12 // a year
+            12, // a year
+            bytes32(0)
         );
     }
 
@@ -57,7 +58,7 @@ contract DistributorContractTest is DSTest, Test {
 
         //invalid project
         vm.expectRevert(Distributor__InvalidProject.selector);
-        distributorContract.claimTokens(0);
+        distributorContract.claim(pid, winners[0], 0,[bytes32(0)]);(0);
 
         // nothing to claim not winner of project
         vm.expectRevert(
@@ -69,18 +70,18 @@ contract DistributorContractTest is DSTest, Test {
         distributorContract.claimTokens(pid);
 
         //mock raffle
-        vm.mockCall(
-            address(distributorContract.owner()),
-            abi.encodeWithSelector(
-                BionicPoolRegistry.getProjectInvestors.selector,
-                pid
-            ),
-            abi.encode(1e6, winners)
-        );
+        // vm.mockCall(
+        //     address(distributorContract.owner()),
+        //     abi.encodeWithSelector(
+        //         BionicPoolRegistry.getProjectInvestors.selector,
+        //         pid
+        //     ),
+        //     abi.encode(1e6, winners)
+        // );
 
         vm.startPrank(winners[0]);
         //add winners and send transactions as winner0
-        distributorContract.addWinningInvestors(pid);
+        distributorContract.addWinningInvestors(pid, 1e6, winners);
         vm.clearMockedCalls();
 
         //nothing to claim not in the window
@@ -242,24 +243,24 @@ contract DistributorContractTest is DSTest, Test {
         rewardToken2.mint(address(distributorContract), totalBalance);
 
         //add winners and send transactions as winner0
-        vm.mockCall(
-            address(distributorContract.owner()),
-            abi.encodeWithSelector(
-                BionicPoolRegistry.getProjectInvestors.selector,
-                1
-            ),
-            abi.encode(1e6, winners)
-        );
-        vm.mockCall(
-            address(distributorContract.owner()),
-            abi.encodeWithSelector(
-                BionicPoolRegistry.getProjectInvestors.selector,
-                2
-            ),
-            abi.encode(1e6, winners)
-        );
-        distributorContract.addWinningInvestors(1);
-        distributorContract.addWinningInvestors(2);
+        // vm.mockCall(
+        //     address(distributorContract.owner()),
+        //     abi.encodeWithSelector(
+        //         BionicPoolRegistry.getProjectInvestors.selector,
+        //         1
+        //     ),
+        //     abi.encode(1e6, winners)
+        // );
+        // vm.mockCall(
+        //     address(distributorContract.owner()),
+        //     abi.encodeWithSelector(
+        //         BionicPoolRegistry.getProjectInvestors.selector,
+        //         2
+        //     ),
+        //     abi.encode(1e6, winners)
+        // );
+        distributorContract.addWinningInvestors(1,1e6, winners);
+        distributorContract.addWinningInvestors(2,1e6, winners);
         vm.clearMockedCalls();
 
         vm.startPrank(winners[0]);
