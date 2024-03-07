@@ -4,6 +4,7 @@ import "@nomiclabs/hardhat-ethers";
 import "@openzeppelin/hardhat-upgrades";
 import "@nomiclabs/hardhat-etherscan";
 import "@nomicfoundation/hardhat-foundry";
+// import "@nomicfoundation/hardhat-verify"
 import dotenv from "dotenv";
 dotenv.config()
 
@@ -27,8 +28,8 @@ const config: HardhatUserConfig = {
         count: 60,
       },
       forking: {
-        url: process.env.MUMBAI_RPC as string,
-        blockNumber: 46640000
+        url: process.env.ARB_RPC as string,
+        // blockNumber: 20800000
       }
     },
     goerli: {
@@ -41,6 +42,11 @@ const config: HardhatUserConfig = {
       url: process.env.MUMBAI_RPC,
       accounts: [process.env.PRIVATE_KEY || ""],
     },
+    arb_sepolia: {
+      chainId: 421614,
+      url: process.env.ARB_RPC,
+      accounts: [process.env.PRIVATE_KEY || ""],
+    }
 
     // mainnet: {
     //   url: process.env.RPC_URL,
@@ -59,8 +65,21 @@ const config: HardhatUserConfig = {
       kovan: process.env.ETHERSCAN_API_KEY || "",
       //polygon
       polygon: process.env.POLYGONSCAN_API_KEY || "",
-      polygonMumbai: process.env.POLYGONSCAN_API_KEY || ""
-    }
+      polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
+
+      //arbitrum
+      arb_sepolia: process.env.ARBITRUMSCAN_API_KEY || "",
+    },
+    customChains: [
+      {
+        network: "arb_sepolia",
+        chainId: 421614,
+        urls: {
+          apiURL: "https://api-sepolia.arbiscan.io/api",
+          browserURL: "https://sepolia.arbiscan.io"
+        }
+      }
+    ]
   }
 };
 

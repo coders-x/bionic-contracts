@@ -24,7 +24,9 @@ const ENTRY_POINT = configInfo.entryPoint,
 // //goerli
 // let provider = getProviderFromRpcUrl(process.env.RPC_URL || "", {});
 // //mumbai
-let provider = getProviderFromRpcUrl(process.env.MUMBAI_RPC || "", {});
+// let provider = getProviderFromRpcUrl(process.env.MUMBAI_RPC || "", {});
+// arb-sepolia
+let provider = getProviderFromRpcUrl(process.env.ARB_RPC || "", {});
 let owner = new ethers.Wallet(process.env.PRIVATE_KEY || "", provider);
 
 async function main(level: number, pid: number = 0) {

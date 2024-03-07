@@ -65,8 +65,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
         /**
          * set up fork
          */
-        string memory MUMBAI_RPC_URL = vm.envString("MUMBAI_RPC"); //solint-disable-line
-        uint256 mumbaiFork = vm.createFork(MUMBAI_RPC_URL);
+        string memory RPC_ENDPOINT = vm.envString("ARB_RPC"); //solint-disable-line
+        uint256 mumbaiFork = vm.createFork(RPC_ENDPOINT);
         vm.selectFork(mumbaiFork);
         m= new Merkle();
         _bionicToken = Bionic(

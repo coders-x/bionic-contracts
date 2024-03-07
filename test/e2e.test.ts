@@ -14,25 +14,42 @@ import { BytesLike } from "ethers";
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
 
+// const NETWORK_CONFIG = {
+//     name: "mumbai",
+//     linkToken: "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
+//     ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
+//     keyHash: "0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f",
+//     vrfCoordinator: "0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed",
+//     vrfWrapper: "0x99aFAf084eBA697E584501b8Ed2c0B37Dd136693",
+//     oracle: "0x40193c8518BB267228Fc409a613bDbD8eC5a97b3",
+//     jobId: "ca98366cc7314957b8c012c72f05aeeb",
+//     fee: "100000000000000000",
+//     fundAmount: "100000000000000000", // 0.1
+//     usdtAddr : "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
+//     usdtWhale : "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
+//     accountAddress: "0xd1ded19fE7B79005259e36a772Fd72D4dD08dF4F",
+//     automationUpdateInterval: "30",
+// };
+
 const NETWORK_CONFIG = {
     name: "mumbai",
-    linkToken: "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
-    ethUsdPriceFeed: "0x0715A7794a1dc8e42615F059dD6e406A6594651A",
-    keyHash: "0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f",
-    vrfCoordinator: "0x7a1BaC17Ccc5b313516C5E16fb24f7659aA5ebed",
-    vrfWrapper: "0x99aFAf084eBA697E584501b8Ed2c0B37Dd136693",
+    linkToken: "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
+    keyHash: "0x027f94ff1465b3525f9fc03e9ff7d6d2c0953482246dd6ae07570c45d6631414",
+    vrfCoordinator: "0x50d47e4142598E3411aA864e08a44284e471AC6f",
     oracle: "0x40193c8518BB267228Fc409a613bDbD8eC5a97b3",
-    jobId: "ca98366cc7314957b8c012c72f05aeeb",
     fee: "100000000000000000",
     fundAmount: "100000000000000000", // 0.1
+    usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+    usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
+    accountAddress: "0x33F471C5bf68AE94e8603C3200AA0273c4cb0c34",
     automationUpdateInterval: "30",
 };
 
 const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ERC6551_REGISTRY_ADDR = "0x000000006551c19487814612e58FE06813775758",
-    USDT_ADDR = "0x015cCFEe0249836D7C36C10C81a60872c64748bC", // on polygon network
-    USDT_WHALE = "0xd8781f9a20e07ac0539cc0cbc112c65188658816", // on polygon network
-    ACCOUNT_ADDRESS = "0xd1ded19fE7B79005259e36a772Fd72D4dD08dF4F",
+    USDT_ADDR = NETWORK_CONFIG.usdtAddr, // on polygon network
+    USDT_WHALE = NETWORK_CONFIG.usdtWhale, // on polygon network
+    ACCOUNT_ADDRESS = NETWORK_CONFIG.accountAddress,
     CALLBACK_GAS_LIMIT_PER_USER = 90300,
     REQUEST_VRF_PER_WINNER = true,
     PLEDGING_START_TIME = 20000000,
@@ -75,11 +92,9 @@ describe("e2e", function () {
         });
 
         const whale = await ethers.getSigner(USDT_WHALE);
-        let whaleBal = await usdtContract.balanceOf(USDT_WHALE);
         let tokenBoundAccBal = await usdtContract.balanceOf(abstractedAccount.address);
         const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
         await usdtContract.connect(whale).transfer(abstractedAccount.address, HUNDRED_THOUSAND);
-        whaleBal = await usdtContract.balanceOf(USDT_WHALE);
         tokenBoundAccBal = await usdtContract.balanceOf(abstractedAccount.address);
         AbstractAccounts = [abstractedAccount];
         for (let i = 0; i < 10; i++) {
@@ -102,19 +117,13 @@ describe("e2e", function () {
 
 
         // setup VRF_MOCK
-        //replace with FWV contract
         let { VRFCoordinatorV2MockContract, subscriptionId } = await deployVRFCoordinatorV2Mock();
 
-        const keyHash =
-            NETWORK_CONFIG["keyHash"]
-
-
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
-        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
+        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, NETWORK_CONFIG.keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
 
         DistributorContract = await deployBionicTokenDistributor();
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, BionicPoolRegistry.address);
-
     });
 
     describe("Bionic", function () {
@@ -366,12 +375,12 @@ describe("e2e", function () {
 
             it("Should Receive Random words and chose winners", async () => {
                 const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
-                const winners = ["0x93F2f2F067093cFbfc6aA1d1313a68a83f66378e",
-                    "0x029be2e7ea5A4A09DbD5317C71E30e1F48f3c30c",
-                    "0xD613423d5110FFaE4Aa894e97b4de75C57B66Fa6",
-                    "0x3FB53d272e51Ad5e898eB5F60440F5569d426798",
-                    "0x848A675960aA69Db39411eaFD8107A6699E295bC",
-                    "0x1e3c75D365c71e178e28C1240C0f583491c02D35",]
+                const winners = [AbstractAccounts[2].address,
+                AbstractAccounts[4].address,
+                AbstractAccounts[1].address,
+                AbstractAccounts[6].address,
+                AbstractAccounts[5].address,
+                AbstractAccounts[10].address]
                 expect(await usdtContract.balanceOf(BionicPoolRegistry.address)).to.be.equal(0);
                 expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(1000));
                 await expect(
@@ -527,7 +536,7 @@ async function deployBionic() {
     console.log("Deploying Bionic contract...");
     let bionicContract = await upgrades.deployProxy(BionicFTContract, [], {
         initializer: "initialize",
-        unsafeAllow: ['delegatecall']
+        // unsafeAllow: ['delegatecall']
     });
     return await bionicContract.deployed();
 }

@@ -7,7 +7,7 @@ dotenv.config()
 
 async function main() {
     let token: GetAccountParams = { tokenId: '0', tokenContract: "0xfFD890eBB19277f59f9d0810D464Efd2775df08E" }
-    let signer = new ethers.Wallet(process.env.PRIVATE_KEY || "", getProviderFromRpcUrl(process.env.MUMBAI_RPC || ""));
+    let signer = new ethers.Wallet(process.env.PRIVATE_KEY || "", getProviderFromRpcUrl(process.env.ARB_RPC || ""));
 
     // const tokenboundClient = new TokenboundClient({ signer, chainId: Mumbai.chainId, });
     const tokenboundClient = new TokenboundClient({
