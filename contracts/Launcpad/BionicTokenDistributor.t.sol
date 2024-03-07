@@ -42,6 +42,7 @@ contract DistributorContractTest is DSTest, Test {
         uint256 pid = 1;
         bytes32[] memory data = new bytes32[](4);
         data[0] = keccak256(abi.encodePacked(pid,winners[0], pledged));
+        data[1] = keccak256(abi.encodePacked(pid,winners[1], pledged));
         bytes32 merkleRoot = m.getRoot(data);
         registerProject(pid,merkleRoot);
 

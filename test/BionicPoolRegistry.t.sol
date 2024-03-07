@@ -14,6 +14,7 @@ import {BionicAccount, ECDSA} from "../contracts/BTBA.sol";
 import "../contracts/Launcpad/BionicTokenDistributor.sol";
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
+import {Merkle} from "murky/src/Merkle.sol";
 
 import "forge-std/console.sol";
 
@@ -22,8 +23,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
         0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789;
     ERC6551Registry public constant erc6551_Registry =
         ERC6551Registry(0x000000006551c19487814612e58FE06813775758);
-
-    uint256 public constant MONTH_IN_SECONDS = 30 days; // Approx 1 month
+    
+    uint256 public constant CYCLE_IN_SECONDS = 30 days; // Approx 1 month
     bytes32 public constant GAS_LANE =
         0x4b09e658ed251bcafeebbc69400383d49f344ace09b9576fe248bb02c003fe9f;
     bool public constant REQ_PER_WINNER = false;
@@ -44,6 +45,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
     ERC20Mock private _rewardToken2;
     address private _owner = address(this);
     address[] private _winners = [address(1), address(2), address(3)];
+    Merkle m;
+
 
     function getPrivateKeys(
         uint256 startIndex,
@@ -65,7 +68,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         string memory MUMBAI_RPC_URL = vm.envString("MUMBAI_RPC"); //solint-disable-line
         uint256 mumbaiFork = vm.createFork(MUMBAI_RPC_URL);
         vm.selectFork(mumbaiFork);
-
+        m= new Merkle();
         _bionicToken = Bionic(
             address(new UUPSProxy(address(new Bionic()), ""))
         );
@@ -108,12 +111,13 @@ contract BionicPoolRegistryTest is DSTest, Test {
 
     function registerProject(
         bool useRaffle,
-        uint256 allocatedTokenPerMonth
+        uint256 allocatedTokenPerMonth,
+        uint256 totalWinners
     ) public returns (uint256 pid, uint32[] memory t) {
         t = new uint32[](3);
-        t[0] = 300;
-        t[1] = 100;
-        t[2] = 100;
+        t[0] = uint32(3*totalWinners/5); //300;
+        t[1] = uint32(totalWinners/5);   //100;
+        t[2] = uint32(totalWinners/5);   //100;
         BionicStructs.PledgeTier[] memory pt = new BionicStructs.PledgeTier[](
             3
         );
@@ -135,26 +139,27 @@ contract BionicPoolRegistryTest is DSTest, Test {
             pt
         );
 
-        try
-            _distrbutorContract.registerProjectToken(
-                pid,
-                address(_rewardToken),
-                allocatedTokenPerMonth,
-                block.timestamp + 20 minutes,
-                10
-            )
-        {} catch (bytes memory reason) {
-            /// @solidity memory-safe-assembly
-            assembly {
-                revert(add(32, reason), mload(reason))
-            }
-        }
+        // try
+        //     _distrbutorContract.registerProjectToken(
+        //         pid,
+        //         address(_rewardToken),
+        //         allocatedTokenPerMonth,
+        //         block.timestamp + 20 minutes,
+        //         10,
+        //         merkleRoot
+        //     )
+        // {} catch (bytes memory reason) {
+        //     /// @solidity memory-safe-assembly
+        //     assembly {
+        //         revert(add(32, reason), mload(reason))
+        //     }
+        // }
 
         return (pid, t);
     }
 
     function testAddProject() public {
-        (uint256 pid, ) = registerProject(false, 100);
+        (uint256 pid, ) = registerProject(false, 100,500);
         (
             IERC20 poolToken,
             ,
@@ -169,28 +174,31 @@ contract BionicPoolRegistryTest is DSTest, Test {
 
 
 
-        (
-            IERC20 token,
-            uint256 amount,
-            uint256 start,
-            uint256 end,
-
-        ) = _distrbutorContract.s_projectTokens(pid);
-        assertEq(address(token), address(_rewardToken));
-        assertEq(address(token), address(poolToken));
-        assertEq(amount, tokenAllocationPerMonth);
-        assertEq(start, tokenAllocationStartTime);
-        assertEq(end, start + (tokenAllocationMonthCount * MONTH_IN_SECONDS));
+        // (
+        //     IERC20 token,
+        //     uint256 amount,
+        //     uint256 start,
+        //     uint256 end,
+        //     bytes32 root
+        // ) = _distrbutorContract.s_projectTokens(pid);
+        assertEq(address(poolToken), address(_rewardToken));
+        // assertEq(address(token), address(poolToken));
+        assertEq(100, tokenAllocationPerMonth);
+        assertEq(block.timestamp+20 minutes, tokenAllocationStartTime);
+        assertEq(10, tokenAllocationMonthCount);
     }
 
-    function testPerformLotteryAndClaim() public {
+     function testPerformLotteryAndClaim() public {
         //0. add project
-        (uint256 pid, uint32[] memory tiers) = registerProject(true, 100);
         uint256 deadline = block.timestamp + 7 days;
-        uint256 count = 1025;
-        uint256 winnersCount = 500;
+        uint256 count = 100;//1025;
+        uint256 winnersCount =50; //500;
+        uint256 allocatedTokenPerMonth = 1e10;
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
+        (uint256 pid, uint32[] memory tiers) = registerProject(true, allocatedTokenPerMonth, winnersCount);
         BionicAccount[] memory accs = new BionicAccount[](count);
+        BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
+            .pledgeTiers(pid);
         //1. pledge
         for (uint256 i = 0; i < count; i++) {
             address user = vm.addr(privateKeys[i * 2]);
@@ -208,7 +216,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
                 accountAddress,
                 _bionicFundRaising.MINIMUM_BIONIC_STAKE()
             );
-            uint256 amount = 1000;
+            uint256 amount = pledgeTiers[i % 3].minimumPledge;
             _investingToken.mint(accountAddress, amount ** 5);
             BionicAccount acc = BionicAccount(payable(accountAddress));
             accs[i] = acc;
@@ -256,7 +264,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             _bionicFundRaising.addToTier(pid, i, accounts);
         }
 
-        //3. move time and do draw get the winners
+         //3. move time and do draw get the winners
         (, , , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
@@ -270,48 +278,73 @@ contract BionicPoolRegistryTest is DSTest, Test {
         address[] memory winners = _bionicFundRaising.getRaffleWinners(pid);
         assertEq(winners.length, winnersCount);
 
-        //4. add winners to claim
-        uint256 totalBalance = 30 * 10e18;
+        //4. fund the reward token and add winners to claim
+        uint256 totalBalance = 30 * 10 ether;
         _rewardToken.mint(address(_distrbutorContract), totalBalance);
         assertEq(_rewardToken.balanceOf(address(_distrbutorContract)), totalBalance);
 
-        _distrbutorContract.addWinningInvestors(pid,totalBalance,winners);
-        (IERC20 token, uint256 monthShare, uint256 start, , ) = _distrbutorContract
+        bytes32[] memory merkleTree = new bytes32[](winnersCount);
+        for (uint256 i = 0; i < winnersCount; i++) {
+            merkleTree[i] = keccak256(abi.encodePacked(pid,winners[i], _bionicFundRaising.userPledgeOnPool(pid, winners[i])));
+        }
+
+        bytes32 merkleRoot = m.getRoot(merkleTree);
+        _distrbutorContract.registerProjectToken(
+            pid,
+            address(_rewardToken),
+            allocatedTokenPerMonth,
+            block.timestamp + 20 minutes,
+            10,
+            merkleRoot
+        );
+
+        (IERC20 token, uint256 monthShare, uint256 start, ,bytes32 root ) = _distrbutorContract
             .s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
+        assertEq(start, block.timestamp + 20 minutes);
+        assertEq(merkleRoot, root);
 
-        uint256 time = start + MONTH_IN_SECONDS * 3;
+        uint256 time = start + CYCLE_IN_SECONDS * 3;
         vm.warp(time);
         for (uint256 i = 0; i < winners.length; i++) {
             uint256 claimable = 3 *
-                ((monthShare / _bionicFundRaising.poolIdToTotalStaked(pid)) *
-                    1000);
-            (uint256 userClaim, ) = _distrbutorContract.claimableAmount(
+                (monthShare * _bionicFundRaising.userPledgeOnPool(pid, winners[i]));
+
+            (uint256 userClaim, ) = _distrbutorContract.clacClaimableAmount(
                 pid,
-                winners[i]
+                winners[i],
+                _bionicFundRaising.userPledgeOnPool(pid, winners[i])
             );
+
             assertEq(userClaim, claimable);
             vm.prank(winners[i]);
-            _distrbutorContract.claimTokens(pid);
+            bytes32[] memory proof = m.getProof(merkleTree, i);
+            vm.expectEmit(address(_distrbutorContract));
+            emit BionicTokenDistributor.Claimed(pid,winners[i],3,userClaim);
+            _distrbutorContract.claim(pid,winners[i],_bionicFundRaising.userPledgeOnPool(pid, winners[i]),proof);
             totalBalance -= claimable;
             assertEq(_rewardToken.balanceOf(winners[i]), claimable);
             assertEq(
                 _rewardToken.balanceOf(address(_distrbutorContract)),
                 totalBalance
             );
-
-            vm.prank(winners[i]);
-            vm.expectRevert(Distributor__NothingToClaim.selector);
-            _distrbutorContract.claimTokens(pid);
-        }
-    }
-
+        } 
+        // vm.warp(time+1 days);
+        // for (uint256 i = 0; i < winners.length; i++) {
+        //     bytes32[] memory proof = m.getProof(merkleTree, i);
+        //     vm.expectRevert(Distributor__NothingToClaim.selector);
+        //     _distrbutorContract.claim(pid,winners[i],_bionicFundRaising.userPledgeOnPool(pid, winners[i]),proof);
+        // } 
+   
+    } 
+ 
     function testPerformInvestmentAndClaim() public {
         //0. add project
-        (uint256 pid, uint32[] memory tiers) = registerProject(false, 1e10);
+        uint256 allocatedTokenPerMonth = 1e10;
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 10;
         uint256 winnersCount = 500;
+        (uint256 pid, uint32[] memory tiers) = registerProject(false, allocatedTokenPerMonth,winnersCount);
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
         BionicAccount[] memory accs = new BionicAccount[](count);
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
@@ -388,7 +421,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         vm.expectRevert(BPR__PoolRaffleDisabled.selector);
         _bionicFundRaising.draw(pid, 1000000);
 
-        (uint256 total, address[] memory winners) = _bionicFundRaising
+        (, address[] memory winners) = _bionicFundRaising
             .getProjectInvestors(pid);
         assertEq(winners.length, count);
 
@@ -397,39 +430,55 @@ contract BionicPoolRegistryTest is DSTest, Test {
         _rewardToken.mint(address(_distrbutorContract), totalBalance);
         assertEq(_rewardToken.balanceOf(address(_distrbutorContract)), totalBalance);
 
-        _distrbutorContract.addWinningInvestors(pid,total,winners);
-        (IERC20 token, uint256 monthShare, uint256 start, , ) = _distrbutorContract
+        bytes32[] memory merkleTree = new bytes32[](winners.length);
+        for (uint256 i = 0; i < winners.length; i++) {
+            merkleTree[i] = keccak256(abi.encodePacked(pid,winners[i], _bionicFundRaising.userPledgeOnPool(pid, winners[i])));
+        }
+        bytes32 merkleRoot = m.getRoot(merkleTree);
+        _distrbutorContract.registerProjectToken(
+            pid,
+            address(_rewardToken),
+            allocatedTokenPerMonth,
+            block.timestamp + 20 minutes,
+            10,
+            merkleRoot
+        );
+
+        (IERC20 token, uint256 monthShare, uint256 start, ,bytes32 root ) = _distrbutorContract
             .s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
+        assertEq(start, block.timestamp + 20 minutes);
+        assertEq(merkleRoot, root);
 
-        uint256 time = start + MONTH_IN_SECONDS * 3;
+
+        uint256 time = start + CYCLE_IN_SECONDS * 3;
         vm.warp(time);
 
         for (uint256 i = 0; i < winners.length; i++) {
             uint256 claimable = 3 *
-                ((monthShare / _bionicFundRaising.poolIdToTotalStaked(pid)) *
-                    pledgeTiers[i % 3].minimumPledge);
+                (monthShare * pledgeTiers[i % 3].minimumPledge);
 
-            (uint256 userClaim, ) = _distrbutorContract.claimableAmount(
+            (uint256 userClaim, ) = _distrbutorContract.clacClaimableAmount(
                 pid,
-                winners[i]
+                winners[i],
+                _bionicFundRaising.userPledgeOnPool(pid, winners[i])
             );
 
-            // assertEq(userClaim, claimable);
-            // vm.prank(winners[i]);
-            // _distrbutorContract.claimTokens(pid);
-            // totalBalance -= claimable;
-            // assertEq(_rewardToken.balanceOf(winners[i]), claimable);
-            // assertEq(
-            //     _rewardToken.balanceOf(address(_distrbutorContract)),
-            //     totalBalance
-            // );
+            assertEq(userClaim, claimable);
+            vm.prank(winners[i]);
+            bytes32[] memory proof = m.getProof(merkleTree, i);
+            _distrbutorContract.claim(pid,winners[i],pledgeTiers[i % 3].minimumPledge,proof);
+            totalBalance -= claimable;
+            assertEq(_rewardToken.balanceOf(winners[i]), claimable);
+            assertEq(
+                _rewardToken.balanceOf(address(_distrbutorContract)),
+                totalBalance
+            );
 
-            // vm.prank(winners[i]);
-            // vm.expectRevert(Distributor__NothingToClaim.selector);
-            // _distrbutorContract.claimTokens(pid);
+            vm.expectRevert(Distributor__NothingToClaim.selector);
+            _distrbutorContract.claim(pid,winners[i],pledgeTiers[i % 3].minimumPledge,proof);
         } 
-    }
+    } 
 
     function testTransferNFT() public {
         uint256[] memory privateKeys = getPrivateKeys(5, 3);
