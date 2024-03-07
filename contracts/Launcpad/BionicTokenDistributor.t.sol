@@ -6,59 +6,74 @@ import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 import {BionicPoolRegistry} from "./BionicPoolRegistry.sol";
-
+import {Merkle} from "murky/src/Merkle.sol";
 import "./BionicTokenDistributor.sol";
+import "forge-std/console.sol";
+
 
 contract DistributorContractTest is DSTest, Test {
-    uint256 public constant MONTH_IN_SECONDS = 30 days; // Approx 1 month
+    uint256 public constant CYCLE_IN_SECONDS = 30 days; // Approx 1 month
 
     BionicTokenDistributor private distributorContract;
     ERC20Mock private rewardToken;
     ERC20Mock private rewardToken2;
     address private owner = address(this);
     address[] private winners = [address(1), address(2), address(3)];
-
+    Merkle m = new Merkle();
     function setUp() public {
         distributorContract = new BionicTokenDistributor();
         rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
         rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
     }
 
-    function registerProject() public {
+    function registerProject(uint256 pid,bytes32 merkleRoot) public {
         distributorContract.registerProjectToken(
-            1,
+            pid,
             address(rewardToken),
-            1e6,
+            1e2,
             100,
             12, // a year
-            bytes32(0)
+            merkleRoot
         );
     }
 
     function testRegisterProject() public {
-        registerProject();
+        uint256 pledged = 1e3;
+        uint256 pid = 1;
+        bytes32[] memory data = new bytes32[](4);
+        data[0] = keccak256(abi.encodePacked(pid,winners[0], pledged));
+        bytes32 merkleRoot = m.getRoot(data);
+        registerProject(pid,merkleRoot);
 
         (
             IERC20 token,
-            uint256 amount,
-            uint256 start,
-            uint256 end,
-
-        ) = distributorContract.s_projectTokens(1);
+            uint256 monthQuota,
+            uint256 startAt,
+            uint256 totalCycles,
+            bytes32 root
+        ) = distributorContract.s_projectTokens(pid);
         assertEq(address(token), address(rewardToken));
-        assertEq(amount, 1e6);
-        assertEq(start, 100);
-        assertEq(end, start + (12 * MONTH_IN_SECONDS));
+        assertEq(monthQuota, 1e2);
+        assertEq(startAt, 100);
+        assertEq(totalCycles, 12);
+        assertEq(root, merkleRoot);
     }
 
     function testAddUserAndClaim() public {
-        registerProject();
-        uint256 time = 200;
-        uint256 pid = 1;
+        uint256 pid = 0;
+        uint256 pledged = 1e3;
+        bytes32[] memory data = new bytes32[](4);
+        data[0] = keccak256(abi.encodePacked(pid,winners[0], pledged));
+        data[1] = keccak256(abi.encodePacked(pid,winners[1], pledged));
+        data[2] = keccak256(abi.encodePacked(pid,winners[2], pledged));
+        bytes32 merkleRoot = m.getRoot(data);
 
+        registerProject(pid,merkleRoot);
+        uint256 time = 200;
+        bytes32[] memory proof = m.getProof(data, 0); // will get proof for 0x2 value
         //invalid project
         vm.expectRevert(Distributor__InvalidProject.selector);
-        distributorContract.claim(pid, winners[0], 0,[bytes32(0)]);(0);
+        distributorContract.claim(1000, address(100), 0, proof);
 
         // nothing to claim not winner of project
         vm.expectRevert(
@@ -67,44 +82,23 @@ contract DistributorContractTest is DSTest, Test {
                 uint256(100)
             )
         );
-        distributorContract.claimTokens(pid);
+        distributorContract.claim(pid, winners[0], pledged, proof);
 
-        //mock raffle
-        // vm.mockCall(
-        //     address(distributorContract.owner()),
-        //     abi.encodeWithSelector(
-        //         BionicPoolRegistry.getProjectInvestors.selector,
-        //         pid
-        //     ),
-        //     abi.encode(1e6, winners)
-        // );
+
 
         vm.startPrank(winners[0]);
-        //add winners and send transactions as winner0
-        distributorContract.addWinningInvestors(pid, 1e6, winners);
         vm.clearMockedCalls();
 
-        //nothing to claim not in the window
-        vm.expectRevert(
-            abi.encodePacked(Distributor__ClaimingIsNotAllowedYet.selector, uint(100))
-        );
-        distributorContract.claimTokens(pid);
+        // //nothing to claim not in the window
+        vm.expectRevert(Distributor__NotEligible.selector);
+        distributorContract.claim(pid, winners[0], 0,proof);
         vm.warp(time);
 
-        vm.mockCall(
-            address(distributorContract.owner()),
-            abi.encodeWithSelector(
-                BionicPoolRegistry.userPledgeOnPool.selector,
-                pid,
-                winners[0]
-            ),
-            abi.encode(1e3)
-        );
 
         vm.expectRevert(Distributor__NothingToClaim.selector);
-        distributorContract.claimTokens(pid);
+        distributorContract.claim(pid, winners[0], pledged,proof);
 
-        time += MONTH_IN_SECONDS;
+        time += CYCLE_IN_SECONDS;
         vm.warp(time);
 
         vm.expectRevert(
@@ -114,83 +108,67 @@ contract DistributorContractTest is DSTest, Test {
                 address(rewardToken)
             )
         );
-        distributorContract.claimTokens(pid);
+        distributorContract.claim(pid, winners[0], pledged,proof);
         vm.stopPrank();
 
         //Fund The Claiming Contract
-        uint totalBalance = 10000;
+        (uint claimable, ) = distributorContract.clacClaimableAmount(pid, winners[0], pledged);
+        uint totalBalance = claimable*8;
         rewardToken.mint(address(distributorContract), totalBalance);
 
         //claim for a month
         vm.startPrank(winners[0]);
-        (uint claimable, ) = distributorContract.claimableAmount(pid, winners[0]);
-        distributorContract.claimTokens(pid);
+
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid,winners[0],1,claimable);
+        distributorContract.claim(pid, winners[0], pledged,proof);
+        assertEq(rewardToken.balanceOf(winners[0]), claimable);
+        assertEq(rewardToken.balanceOf(address(distributorContract)), totalBalance-=claimable);
+
 
         (uint256 amount, uint256 claimableMonthCount) = distributorContract
-            .claimableAmount(pid, winners[0]);
+            .clacClaimableAmount(pid, winners[0], pledged);
         assertEq(amount, 0);
         assertEq(claimableMonthCount, 0);
 
-        (uint256 lastMonth, uint256 totalTokenClaimed) = distributorContract
-            .s_userClaims(winners[0], pid);
-        assertEq(lastMonth, time - 199);
-        assertEq(totalTokenClaimed, 1000);
-        assertEq(totalTokenClaimed, claimable);
-        assertEq(
-            rewardToken.balanceOf(address(distributorContract)),
-            totalBalance -= totalTokenClaimed
-        );
-        assertEq(rewardToken.balanceOf(address(winners[0])), totalTokenClaimed);
+        assertEq(distributorContract.s_userClaims(winners[0], pid), 1);
+        assertEq(distributorContract.s_userClaims(winners[1], pid), 0);
+
 
         //claim for 3 months
-        time += MONTH_IN_SECONDS * 3;
+        time += CYCLE_IN_SECONDS * 3;
         vm.warp(time);
-        distributorContract.claimTokens(pid);
 
-        (lastMonth, totalTokenClaimed) = distributorContract.s_userClaims(
-            winners[0],
-            pid
-        );
-        assertEq(lastMonth, time - 199);
-        assertEq(totalTokenClaimed, 4000);
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid,winners[0],3,claimable*3);
+        distributorContract.claim(pid, winners[0], pledged,proof);
+
+        assertEq(distributorContract.s_userClaims(winners[0], pid), 4);
+        assertEq(distributorContract.s_userClaims(winners[1], pid), 0);
         assertEq(
             rewardToken.balanceOf(address(distributorContract)),
-            totalBalance -= totalTokenClaimed - 1000
+            totalBalance -= claimable*3
         );
-        assertEq(rewardToken.balanceOf(address(winners[0])), totalTokenClaimed);
+        assertEq(rewardToken.balanceOf(address(winners[0])), claimable*4);
 
         vm.expectRevert(Distributor__NothingToClaim.selector);
-        distributorContract.claimTokens(pid);
+        distributorContract.claim(pid, winners[0], pledged,proof);
 
-        // //claim for other winner 4 month claim
-        vm.mockCall(
-            address(distributorContract.owner()),
-            abi.encodeWithSelector(
-                BionicPoolRegistry.userPledgeOnPool.selector,
-                pid,
-                winners[1]
-            ),
-            abi.encode(1e3)
-        );
+        //claim for other winner 4 month claim
         vm.startPrank(winners[1]);
-        distributorContract.claimTokens(pid);
+        proof = m.getProof(data, 1);
+        distributorContract.claim(pid, winners[1], pledged,proof);
 
-        (lastMonth, totalTokenClaimed) = distributorContract.s_userClaims(
-            winners[1],
-            pid
-        );
-        assertEq(lastMonth, time - 199);
-        assertEq(totalTokenClaimed, 4e3);
+        assertEq(distributorContract.s_userClaims(winners[0], pid), 4);
+        assertEq(distributorContract.s_userClaims(winners[1], pid), 4);
+        assertEq(rewardToken.balanceOf(address(winners[1])), claimable*4);
         assertEq(
             rewardToken.balanceOf(address(distributorContract)),
-            totalBalance -= totalTokenClaimed
+            totalBalance -= claimable*4
         );
-        assertEq(rewardToken.balanceOf(address(winners[1])), totalTokenClaimed);
-
         //claim for remaining months 4-12=8
-        // time+=MONTH_IN_SECONDS*12;
-        vm.warp(time + (MONTH_IN_SECONDS * 12));
-        vm.startPrank(winners[1]);
+        // time+=CYCLE_IN_SECONDS*12;
+        vm.warp(time + (CYCLE_IN_SECONDS * 12));
         vm.expectRevert(
             abi.encodeWithSelector(
                 Distributor__NotEnoughTokenLeft.selector,
@@ -198,30 +176,23 @@ contract DistributorContractTest is DSTest, Test {
                 address(rewardToken)
             )
         );
-        distributorContract.claimTokens(pid);
+        distributorContract.claim(pid, winners[1], pledged,proof);
 
         //Fund The Claiming Contract
-        totalBalance += 1e10;
-        rewardToken.mint(address(distributorContract), 1e10);
-        distributorContract.claimTokens(pid);
-
-        (lastMonth, totalTokenClaimed) = distributorContract.s_userClaims(
-            winners[1],
-            pid
-        );
-        assertEq(lastMonth, (time + (MONTH_IN_SECONDS * 8)) - 199);
-        assertEq(totalTokenClaimed, 12e3);
+        totalBalance += claimable*10;
+        rewardToken.mint(address(distributorContract), claimable*10);
+        distributorContract.claim(pid, winners[1], pledged,proof);
+        assertEq(rewardToken.balanceOf(address(winners[1])), claimable*12);
         assertEq(
             rewardToken.balanceOf(address(distributorContract)),
-            totalBalance -= 8e3
+            totalBalance -= claimable*8
         );
-        assertEq(rewardToken.balanceOf(address(winners[1])), totalTokenClaimed);
 
-        vm.expectRevert(Distributor__NothingToClaim.selector);
-        distributorContract.claimTokens(pid);
-    }
+        vm.expectRevert(Distributor__Done.selector);
+        distributorContract.claim(pid, winners[1], pledged,proof);
+    } 
 
-    function testBatchClaim() public {
+/*     function testBatchClaim() public {
         // vm.warp(100);
         distributorContract.registerProjectToken(
             1,
@@ -270,7 +241,7 @@ contract DistributorContractTest is DSTest, Test {
         );
         distributorContract.batchClaim();
 
-        uint256 time = MONTH_IN_SECONDS * 3;
+        uint256 time = CYCLE_IN_SECONDS * 3;
         vm.warp(time);
 
         vm.mockCall(
@@ -324,7 +295,7 @@ contract DistributorContractTest is DSTest, Test {
             totalBalance - 2e3 * 2
         );
         assertEq(rewardToken2.balanceOf(address(winners[0])), 2e3 * 2);
-    }
+    } */
 }
 
 contract ERC20Mock is ERC20 {

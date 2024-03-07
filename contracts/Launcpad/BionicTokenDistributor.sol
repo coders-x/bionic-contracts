@@ -8,6 +8,8 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 // import "forge-std/console.sol";
 
+
+
 error Distributor__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
 error Distributor__ClaimingIsNotAllowedYet(uint256 startAfter); //"Not in the time window for claiming rewards"
 error Distributor__NothingToClaim();
@@ -42,7 +44,7 @@ contract BionicTokenDistributor is Ownable {
     // pid to Project Reward pool
     mapping(uint256 => ProjectToken) public s_projectTokens; //solhint-disable-line var-name-mixedcase
     //User's Active Projects
-    mapping(address => EnumerableSet.UintSet) internal s_userProjects; // solhint-disable-line var-name-mixedcase
+    // mapping(address => EnumerableSet.UintSet) internal s_userProjects; // solhint-disable-line var-name-mixedcase
 
     /*///////////////////////////////////////////////////////////////
                             Events
@@ -59,8 +61,8 @@ contract BionicTokenDistributor is Ownable {
     );
     // This event is triggered whenever a call to #claim succeeds.
     event Claimed(
-        address indexed user,
         uint256 indexed pid,
+        address indexed user,
         uint256 month,
         uint256 amount
     );
@@ -148,10 +150,9 @@ contract BionicTokenDistributor is Ownable {
         }
 
 
-
-        s_userClaims[account][pid] = s_userClaims[account][pid] + cyclesClaimable;
-        s_projectTokens[pid].token.transfer(account, pledged);
-        emit Claimed(account, pid, s_userClaims[account][pid], pledged);
+        s_userClaims[account][pid] += cyclesClaimable;
+        s_projectTokens[pid].token.transfer(account, amount);
+        emit Claimed(pid,account,  cyclesClaimable, amount);
     }
 
     /// @notice Get the amount of token you can claim before sending claim request.
