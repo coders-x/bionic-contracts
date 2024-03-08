@@ -4,23 +4,22 @@ import { getProviderFromRpcUrl } from "@thirdweb-dev/sdk";
 import { BigNumber, Contract, Signer } from "ethers";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { IERC20, BionicAccount } from "../typechain-types";
-import { mumbai as configInfo } from './config.json';
+import { arbitrum as configInfo } from './config.json';
+import { BionicStructs } from "../typechain-types/contracts/Launchpad/BionicPoolRegistry";
 
 dotenv.config();
 
 interface User extends Signer {
     tokenId?: any;
 }
-// mumbai
 const BIP_CONTRACT = configInfo.bionicInvestorPass,
     TOKEN_BOUND_IMP_ADDR = configInfo.tbaImpl,
     BIONIC_LAUNCH_ADDR = configInfo.bionicLaunchPad,
     BIONIC_TOKEN_ADDR = configInfo.tokenAddress,
-    USDT_ADDR = configInfo.usdtAddress;
-
-
-const ENTRY_POINT = configInfo.entryPoint,
-    ERC6551_REGISTRY_ADDR = configInfo.erc6551Reg;
+    USDT_ADDR = configInfo.usdtAddress,
+    ERC6551_REGISTRY_ADDR = configInfo.erc6551Reg,
+    PLEDGE_AMOUNT = 1000,
+    GUARDIAN_RESCUE_ACCOUNT = "0xC1207Ef2eC9F05166d3cd563cFb17BaEE191b868";
 // //goerli
 // let provider = getProviderFromRpcUrl(process.env.RPC_URL || "", {});
 // //mumbai
@@ -39,7 +38,7 @@ async function main(level: number, pid: number = 0) {
       5. draw for the lottery
       6. go claim 
       */
-    let chainId = network.config.chainId || 80001;
+    let chainId = network.config.chainId || 421614;
     let users: User[] = getSigners(20);
     let fundingContract = await ethers.getContractAt(
         "BionicPoolRegistry",
@@ -47,10 +46,8 @@ async function main(level: number, pid: number = 0) {
     );
     let usdtContract = await ethers.getContractAt("ERC20", USDT_ADDR);
     let bionicContract = await ethers.getContractAt("ERC20", BIONIC_TOKEN_ADDR);
-    // const TBAContract = await ethers.getContractFactory("BionicAccount");
-    // let tokenBoundImpContract=await TBAContract.deploy(ENTRY_POINT, ERC6551_REGISTRY_ADDR);
-    // await tokenBoundImpContract.deployed();
-    // console.log(`BionicAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
+    let tokenBoundImpContract = await ethers.getContractAt("BionicAccount", configInfo.tbaImpl);
+    console.log(`using BionicAccount Implementation Deployed at ${tokenBoundImpContract.address}`);
     let abstractAccounts: BionicAccount[] = [];
     //goerli
     // const aa_addresses = [
@@ -76,27 +73,50 @@ async function main(level: number, pid: number = 0) {
     //     "0x7b42735dc0923eDD8f99f522a38503e1653bc6Ce",
     // ];
     //mumbai
-    const aa_addresses = [
-        "0xEF8A4118c332dA68A8021725b8720823c83EE32b",
-        "0x917e66a24C1cba42E2f296D84cb3DB90919e1931",
-        "0x4ed1036D34E3aA2b74a15884248602C8600e54B6",
-        "0x37D17BaF2435f6148b6B3d720aFa37DCfb71376b",
-        "0xab9cC70492D4D418777fB75C8518D8C19D88b2f2",
-        "0x6EDee3FcEfB5C97194A64794f2F2d2B4BBF80876",
-        "0x2D2F0dA03fF258820DddDBd1db9C0D3B167B6197",
-        "0xF59818808E6474Ac6799db497167A71cE14A348A",
-        "0x50430177170225E450D8f72B04c6E72f910ac612",
-        "0x7cda89f88a24259aCB3c5624ea89Cb09bF9B64f4",
-        "0x07674Ee6C456C556Ac1Ae73f645670638219ce34",
-        "0x2B5b2da3C5d07249AC60dce0D09219eacb0Ad002",
-        "0xEcF899766dc38acC29DBc89922E4a27317fD5e32",
-        "0xCe5Bfb0632C71F33e3D06b3dd90D95B633b70389",
-        "0x03d2D94AfDDEFcfbF339Ec97206Ea2be472b242C",
-        "0xbB5A909a2441B18182f69407035A3ED6a0F0992D",
-        "0x53ACCcF4cf5207F2e8B85B6E41AdcA2eDD6454ca",
-        "0x9A07d707Ae26AEF0B28b3B2481A3184a313Bd8C0",
-        "0xa4F111e2524D3484c5A99816C25348f6b01B73c1",
-        "0xc1F5F6b508259378C5F261C7819A6Df315225550",
+    // const aa_addresses = [
+    //     "0xEF8A4118c332dA68A8021725b8720823c83EE32b",
+    //     "0x917e66a24C1cba42E2f296D84cb3DB90919e1931",
+    //     "0x4ed1036D34E3aA2b74a15884248602C8600e54B6",
+    //     "0x37D17BaF2435f6148b6B3d720aFa37DCfb71376b",
+    //     "0xab9cC70492D4D418777fB75C8518D8C19D88b2f2",
+    //     "0x6EDee3FcEfB5C97194A64794f2F2d2B4BBF80876",
+    //     "0x2D2F0dA03fF258820DddDBd1db9C0D3B167B6197",
+    //     "0xF59818808E6474Ac6799db497167A71cE14A348A",
+    //     "0x50430177170225E450D8f72B04c6E72f910ac612",
+    //     "0x7cda89f88a24259aCB3c5624ea89Cb09bF9B64f4",
+    //     "0x07674Ee6C456C556Ac1Ae73f645670638219ce34",
+    //     "0x2B5b2da3C5d07249AC60dce0D09219eacb0Ad002",
+    //     "0xEcF899766dc38acC29DBc89922E4a27317fD5e32",
+    //     "0xCe5Bfb0632C71F33e3D06b3dd90D95B633b70389",
+    //     "0x03d2D94AfDDEFcfbF339Ec97206Ea2be472b242C",
+    //     "0xbB5A909a2441B18182f69407035A3ED6a0F0992D",
+    //     "0x53ACCcF4cf5207F2e8B85B6E41AdcA2eDD6454ca",
+    //     "0x9A07d707Ae26AEF0B28b3B2481A3184a313Bd8C0",
+    //     "0xa4F111e2524D3484c5A99816C25348f6b01B73c1",
+    //     "0xc1F5F6b508259378C5F261C7819A6Df315225550",
+    // ];
+    // sepoia - arb
+    const aa_addresses: string[] = [
+        "0xa9706A7A5de3fCf596697ac49062453cF4476CeC",
+        "0x195347D9508f5ab6f60Dc282D597E07eaaCd7092",
+        "0x7d7Ca13115b909835f99732206966a7bf6238B2F",
+        "0xaC8d06d58c0b13981F710e996c79753D2BB991Fd",
+        "0xDcf6CE2882F546A64C57f1eC4cD6F5E239D2F6dC",
+        "0x85049588a12dBBebD2A8E1EbbDDfAa70da2E9C55",
+        "0x3fC01781CC809662D281ceeD123eB44Ae348DD97",
+        "0xC283821D4BE4B7752016d3a196b23C2b85788462",
+        "0xaD703B2F35D158e0A54c318e62193062bC7f40FF",
+        "0xb0d416B1061664589Debd411f97195fD034a2F07",
+        "0xf852520AFA52A743a7835E3A5D225878E3507471",
+        "0x8dEc7E62395E5f8cC08112c1d43C0988786749c1",
+        "0x0bDDC16d67b3b0b9fFe347887911606D533dc55d",
+        "0x56a4f7A8fF552f8554b350274948Fbd0062100e8",
+        "0xC6C340dE2C9aE818E7655aC5e6a39C71a404d164",
+        "0x08E3775e2F90349C00EfB5DD5045C81C9bfE4e00",
+        "0x210e5Bf8129E208Ca80E02f22bb1f7465F2f28B4",
+        "0x9cCD9169d9293c0D18c162339F04C97966f9284d",
+        "0x0aAB4DcC6de46873D7BA01cDF6eb305e6fA11A98",
+        "0xa42889Fb2A3F7f263C40fca01b73Cfa535f641A3",
     ];
 
     /*** Mint BIP and Assign SmartWallet */
@@ -114,6 +134,7 @@ async function main(level: number, pid: number = 0) {
             "BionicAccount",
             TOKEN_BOUND_IMP_ADDR
         );
+        console.log(`loaded contracts, BIP: ${bipContract.address}, TBA: ${tokenBoundImpContract.address}, Registry: ${tokenBoundContractRegistry.address}`)
         for (let i = 0; i < users.length; i++) {
             const u = users[i];
             if ((await bipContract.balanceOf(u.getAddress())).lte(0)) {
@@ -121,34 +142,32 @@ async function main(level: number, pid: number = 0) {
                 let res = await (
                     await bipContract
                         .connect(owner)
-                        .safeMint(await u.getAddress(), "https://SomeWHEREWithMETADATA")
+                        .safeMint(await u.getAddress(), GUARDIAN_RESCUE_ACCOUNT, "https://loremflickr.com/320/240?lock=" + i)
                 ).wait(1);
-                u.tokenId = res.events[0]?.args?.tokenId;
+                u.tokenId = res?.events[0]?.args?.tokenId;
             } else {
-                u.tokenId = i;
+                const res = await (await fetch(`https://api-sepolia.arbiscan.io/api?module=account&action=tokennfttx&contractaddress=${configInfo.bionicInvestorPass}&address=${(await users[i].getAddress()).toLocaleLowerCase()}&page=1&apikey=${process.env.ARBITRUMSCAN_API_KEY}`)).json();
+                u.tokenId = await res.result[0].tokenID
             }
+            process.stdout.write(`minted ${u.tokenId} for ${await u.getAddress()}\t`);
             //create abstracted accounts
             let r = await (
                 await tokenBoundContractRegistry.createAccount(
                     tokenBoundImpContract.address,
+                    ethers.utils.formatBytes32String(""),
                     chainId as number,
                     bipContract.address,
-                    u.tokenId,
-                    "0",
-                    []
+                    u.tokenId
                 )
             ).wait(1);
             let aa_addr = await tokenBoundContractRegistry.account(
                 tokenBoundImpContract.address,
+                ethers.utils.formatBytes32String(""),
                 chainId as number,
                 bipContract.address,
                 u.tokenId,
-                "0"
             );
-            console.log(
-                `Minted ${u.tokenId
-                } for address ${await u.getAddress()} and assigned ${aa_addr}`
-            );
+            process.stdout.write(`assigned ${aa_addr}\n`);
             let acc = await ethers.getContractAt("BionicAccount", aa_addr);
             abstractAccounts.push(acc);
         }
@@ -185,34 +204,45 @@ async function main(level: number, pid: number = 0) {
     if (level == 2) {
         level++;
         for (let i = 0; i < abstractAccounts.length; i++) {
-            let res = await (
-                await bionicContract
-                    .connect(owner)
-                    .transfer(abstractAccounts[i].address, 50000)
-            ).wait();
-            res = await (
-                await usdtContract
-                    .connect(owner)
-                    .transfer(abstractAccounts[i].address, 5000)
-            ).wait();
-            await (
-                await owner.sendTransaction({
-                    value: 80000000000000,
-                    to: users[i].getAddress(),
-                })
-            ).wait();
-            console.log(
-                `Transferred ${res.events[0]?.args.amount
-                }USDT+${80000000000000}wei to ${res.events[0]?.args.to}`,
-                res.events[0]?.args.from
-            );
+            let res;
+            if ((await bionicContract.balanceOf(abstractAccounts[i].address)).lte(await fundingContract.MINIMUM_BIONIC_STAKE())) {
+                res = await (
+                    await bionicContract
+                        .connect(owner)
+                        .transfer(abstractAccounts[i].address, await fundingContract.MINIMUM_BIONIC_STAKE())
+                ).wait();
+                process.stdout.write(`${res.events[0]?.args[2]} $BCNX + `);
+            }
+            if ((await usdtContract.balanceOf(abstractAccounts[i].address)).lte(BigNumber.from(0))) {
+                res = await (
+                    await usdtContract
+                        .connect(owner)
+                        .transfer(abstractAccounts[i].address, 5000)
+                ).wait();
+                process.stdout.write(`${res.events[0]?.args[2]} $USDT + `);
+            }
+            if (await (await users[i].getBalance()).lte(BigNumber.from("300000000000000"))) {
+                await (
+                    await owner.sendTransaction({
+                        value: BigNumber.from("300000000000000"),
+                        to: users[i].getAddress(),
+                    })
+                ).wait();
+                process.stdout.write(`[+${300000000000000} $wei ${await users[i].getAddress()}] `);
+            }
+            process.stdout.write(`Funded ${abstractAccounts[i].address}\n`);
         }
     }
 
     /*** Add Project */
     //    level++;
-    let pledgeAmount = 1000,
-        tiers = [4, 3, 2];
+    let pledgeAmount = PLEDGE_AMOUNT,
+        tiers = [4, 3, 2],
+        pledgingTiers: BionicStructs.PledgeTierStruct[] = [
+            { maximumPledge: PLEDGE_AMOUNT, minimumPledge: PLEDGE_AMOUNT, tierId: 1 },
+            { maximumPledge: PLEDGE_AMOUNT * 3, minimumPledge: PLEDGE_AMOUNT * 3, tierId: 2 },
+            { maximumPledge: PLEDGE_AMOUNT * 5, minimumPledge: PLEDGE_AMOUNT * 5, tierId: 3 }
+        ]
     if (level == 3) {
         level++;
         let timeDifference = 10;
@@ -228,19 +258,21 @@ async function main(level: number, pid: number = 0) {
             await fundingContract
                 .connect(owner)
                 .add(
-                    BIONIC_TOKEN_ADDR,
-                    (Date.now() / 1000) | 0,
-                    (pledgeEnding.getTime() / 1000) | 0,
-                    1000,
-                    10,
-                    (tokenAllocationStartTime.getTime() / 1000) | 0,
-                    10,
-                    1e10,
-                    tiers
+                    pid,
+                    bionicContract.address,
+                    (Date.now() / 1000) | 0, //PLEDGING_START_TIME
+                    (pledgeEnding.getTime() / 1000) | 0, //PLEDGING_END_TIME
+                    1000, //tokenAllocationPerMonth
+                    (tokenAllocationStartTime.getTime() / 1000) | 0, //tokenAllocationStartTime
+                    10,//tokenAllocationMonthCount
+                    1e10,//targetRaise
+                    true,//do raffle
+                    tiers,
+                    pledgingTiers,
                 )
         ).wait(1);
-        pid = r?.events[1].args?.pid;
-        console.log(pid);
+        pid = r.events[0]?.args[0];
+        console.log(`added project with Id: ${pid}`)
     }
 
     /*** Pledge */
@@ -269,13 +301,13 @@ async function main(level: number, pid: number = 0) {
                 let res = await (
                     await abstractAccounts[i]
                         .connect(users[i])
-                        .executeCall(fundingContract.address, 0, raw, {
+                        .execute(fundingContract.address, 0, raw, 0, {
                             gasLimit: 3000000,
                             gasPrice: feeData.gasPrice || undefined,
                         })
                 ).wait(1);
                 console.log(
-                    `approved and moved ${res.events[3].args.value} in  ${res.events[3].args.currency} from ${res.events[3].address} to ${res.events[3].args.spender} `
+                    `approved and moved ${res.events[6]} `
                 );
             } catch (err) {
                 console.error(err);
@@ -291,7 +323,7 @@ async function main(level: number, pid: number = 0) {
         let tierUsers: string[][] = [];
         let userIdx = 0;
         for (let i = 0; i < tiers.length - 1; i++) {
-            // leave last teir to be setup by smart contract
+            // leave last tier to be setup by smart contract
             tierUsers[i] = [];
             for (let j = 0; j < tiers[i] * usersPerTier; j++) {
                 tierUsers[i].push(abstractAccounts[userIdx++].address);
@@ -367,7 +399,7 @@ async function getCurrencyPermitSignature(
     deadline: BigNumber = ethers.constants.MaxUint256
 ) {
     const [nonce, name, version, chainId] = await Promise.all([
-        account.nonce(),
+        account.getNonce(),
         "BionicAccount",
         "1",
         signer.getChainId(),
@@ -416,4 +448,4 @@ async function getCurrencyPermitSignature(
     );
 }
 //step, pid
-main(3, 0).then(console.log).catch(console.error);
+main(6, 0).then(console.log).catch(console.error);

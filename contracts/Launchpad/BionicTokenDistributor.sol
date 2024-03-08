@@ -136,7 +136,7 @@ contract BionicTokenDistributor is Ownable {
             revert Distributor__Done();
         }
 
-        (uint256 amount, uint256 cyclesClaimable) = clacClaimableAmount(
+        (uint256 amount, uint256 cyclesClaimable) = calcClaimableAmount(
             pid,
             account,
             pledged
@@ -159,7 +159,7 @@ contract BionicTokenDistributor is Ownable {
     /// @dev it's replica of checks on claimToken but just to let users know how much they owe
     /// @param pid pool Id you are trying to claim from
     /// @return amount to token you will be claiming when calling "claimToken"
-    function clacClaimableAmount(
+    function calcClaimableAmount(
         uint256 pid,
         address account,
         uint256 pledged

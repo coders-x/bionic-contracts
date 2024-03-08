@@ -3,10 +3,11 @@ import { Mumbai } from '@thirdweb-dev/chains'
 import dotenv from 'dotenv';
 import { ethers } from "hardhat";
 import { getProviderFromRpcUrl } from "@thirdweb-dev/sdk";
+import { arbitrum as configInfo } from './config.json';
 dotenv.config()
 
 async function main() {
-    let token: GetAccountParams = { tokenId: '0', tokenContract: "0xfFD890eBB19277f59f9d0810D464Efd2775df08E" }
+    let token: GetAccountParams = { tokenId: '0', tokenContract: configInfo.bionicInvestorPass as any }
     let signer = new ethers.Wallet(process.env.PRIVATE_KEY || "", getProviderFromRpcUrl(process.env.ARB_RPC || ""));
 
     // const tokenboundClient = new TokenboundClient({ signer, chainId: Mumbai.chainId, });
@@ -14,7 +15,7 @@ async function main() {
         signer,
         chainId: Mumbai.chainId,
         //@ts-ignore
-        implementation: 0x34278B198852CCCD6Bd535eb08E45620dcf9ca3b,
+        implementation: configInfo.tbaImpl,
     })
 
     const createAccount = tokenboundClient.getAccount(token);

@@ -38,7 +38,7 @@ Test result: ok. 2 passed; 0 failed; 0 skipped; finished in 486.77s
 | transfer                             | 28328           | 28336  | 28328  | 37128  | 1025    |
 
 
-| contracts/Launcpad/BionicPoolRegistry.sol:BionicPoolRegistry contract |                 |           |           |           |         |
+| contracts/Launchpad/BionicPoolRegistry.sol:BionicPoolRegistry contract |                 |           |           |           |         |
 |---------------------------------------------------------------------|-----------------|-----------|-----------|-----------|---------|
 | Deployment Cost                                                     | Deployment Size |           |           |           |         |
 | 3686799                                                             | 18294           |           |           |           |         |
@@ -54,7 +54,7 @@ Test result: ok. 2 passed; 0 failed; 0 skipped; finished in 486.77s
 | rawFulfillRandomWords                                               | 23812174        | 23812174  | 23812174  | 23812174  | 1       |
 
 
-| contracts/Launcpad/Claim.sol:ClaimFunding contract |                 |         |        |          |         |
+| contracts/Launchpad/Claim.sol:ClaimFunding contract |                 |         |        |          |         |
 |----------------------------------------------------|-----------------|---------|--------|----------|---------|
 | Deployment Cost                                    | Deployment Size |         |        |          |         |
 | 736435                                             | 3657            |         |        |          |         |
@@ -69,7 +69,7 @@ Test result: ok. 2 passed; 0 failed; 0 skipped; finished in 486.77s
 | s_userClaims                                       | 722             | 722     | 722    | 722      | 4       |
 
 
-| contracts/Launcpad/Claim.t.sol:ERC20Mock contract |                 |       |        |       |         |
+| contracts/Launchpad/Claim.t.sol:ERC20Mock contract |                 |       |        |       |         |
 |---------------------------------------------------|-----------------|-------|--------|-------|---------|
 | Deployment Cost                                   | Deployment Size |       |        |       |         |
 | 632576                                            | 4077            |       |        |       |         |

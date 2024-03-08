@@ -5,13 +5,13 @@ import {Test} from "forge-std/Test.sol";
 import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../contracts/Launcpad/BionicPoolRegistry.sol";
+import "../contracts/Launchpad/BionicPoolRegistry.sol";
 import {VRFCoordinatorV2Mock} from "../contracts/libs/VRFCoordinatorV2Mock.sol";
 import {ERC6551Registry} from "tokenbound/lib/erc6551/src/ERC6551Registry.sol";
 import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
 import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../contracts/BIP.sol";
 import {BionicAccount, ECDSA} from "../contracts/BTBA.sol";
-import "../contracts/Launcpad/BionicTokenDistributor.sol";
+import "../contracts/Launchpad/BionicTokenDistributor.sol";
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 import {Merkle} from "murky/src/Merkle.sol";
@@ -310,7 +310,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             uint256 claimable = 3 *
                 (monthShare * _bionicFundRaising.userPledgeOnPool(pid, winners[i]));
 
-            (uint256 userClaim, ) = _distrbutorContract.clacClaimableAmount(
+            (uint256 userClaim, ) = _distrbutorContract.calcClaimableAmount(
                 pid,
                 winners[i],
                 _bionicFundRaising.userPledgeOnPool(pid, winners[i])
@@ -458,7 +458,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             uint256 claimable = 3 *
                 (monthShare * pledgeTiers[i % 3].minimumPledge);
 
-            (uint256 userClaim, ) = _distrbutorContract.clacClaimableAmount(
+            (uint256 userClaim, ) = _distrbutorContract.calcClaimableAmount(
                 pid,
                 winners[i],
                 _bionicFundRaising.userPledgeOnPool(pid, winners[i])

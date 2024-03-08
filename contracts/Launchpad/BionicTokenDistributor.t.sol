@@ -113,7 +113,7 @@ contract DistributorContractTest is DSTest, Test {
         vm.stopPrank();
 
         //Fund The Claiming Contract
-        (uint claimable, ) = distributorContract.clacClaimableAmount(pid, winners[0], pledged);
+        (uint claimable, ) = distributorContract.calcClaimableAmount(pid, winners[0], pledged);
         uint totalBalance = claimable*8;
         rewardToken.mint(address(distributorContract), totalBalance);
 
@@ -128,7 +128,7 @@ contract DistributorContractTest is DSTest, Test {
 
 
         (uint256 amount, uint256 claimableMonthCount) = distributorContract
-            .clacClaimableAmount(pid, winners[0], pledged);
+            .calcClaimableAmount(pid, winners[0], pledged);
         assertEq(amount, 0);
         assertEq(claimableMonthCount, 0);
 

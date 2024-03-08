@@ -8,7 +8,7 @@ import {
     BionicTokenDistributor
 }
     from "../typechain-types";
-import { BionicStructs } from "../typechain-types/contracts/Launcpad/BionicPoolRegistry";
+import { BionicStructs } from "../typechain-types/contracts/Launchpad/BionicPoolRegistry";
 import { BytesLike } from "ethers";
 
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
@@ -32,7 +32,7 @@ const helpers = require("@nomicfoundation/hardhat-network-helpers");
 // };
 
 const NETWORK_CONFIG = {
-    name: "mumbai",
+    name: "arbitrum",
     linkToken: "0xb1D4538B4571d411F07960EF2838Ce337FE1E80E",
     keyHash: "0x027f94ff1465b3525f9fc03e9ff7d6d2c0953482246dd6ae07570c45d6631414",
     vrfCoordinator: "0x50d47e4142598E3411aA864e08a44284e471AC6f",
@@ -41,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x33F471C5bf68AE94e8603C3200AA0273c4cb0c34",
+    accountAddress: "0x8f8d3671cad36A5bd551A62D457f955F6F61580a",
     automationUpdateInterval: "30",
 };
 
