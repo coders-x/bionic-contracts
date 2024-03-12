@@ -1,47 +1,44 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import {SafeERC20, IERC20, Address} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {AccessControl, IERC165} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {ICurrencyPermit, ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
-import {TokenBoundAccount, IERC6551Account} from "../TBA.sol";
+import {BionicAccount} from "../BTBA.sol";
 
 import {Treasury} from "./Treasury.sol";
-import {ClaimFunding} from "./Claim.sol";
 import {Raffle} from "./Raffle.sol";
 
 // import "hardhat/console.sol";
 // import "forge-std/console.sol";
 
 /* Errors */
-error LPFRWV__NotDefinedError();
-error LPFRWV__PoolRaffleDisabled();
-error LPFRWV__InvalidPool();
-error LPFRWV__NotValidPledgeAmount(uint amount);
-error LPFRWV__InvalidRewardToken(); //"constructor: _stakingToken must not be zero address"
-error LPFRWV__InvalidStackingToken(); //"constructor: _investingToken must not be zero address"
-error LPFRWV__InvalidInvestingToken(); //"constructor: _investingToken must not be zero address"
-error LPFRWV__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should be before _pledgingEndTime"
-error LPFRWV__AllocationShouldBeAfterPledgingEnd(); //"add: _tokenAllocationStartTime must be after pledging end"
-error LPFRWV__TargetToBeRaisedMustBeMoreThanZero();
-error LPFRWV__PledgingHasClosed();
-error LPFRWV__NotEnoughStake();
-error LPFRWV__PoolIsOnPledgingPhase(uint retryAgainAt);
-error LPFRWV__DrawForThePoolHasAlreadyStarted(uint requestId);
-error LPFRWV__NotEnoughRandomWordsForLottery();
-error LPFRWV__FundingPledgeFailed(address user, uint pid);
-error LPFRWV__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
-error LPFRWV__TiersHaveNotBeenInitialized();
-error LPFRWV__AlreadyPledgedToThisPool();
-error LPFRWV__LotteryIsPending();
+error BPR__NotDefinedError();
+error BPR__PoolRaffleDisabled();
+error BPR__InvalidPool();
+error BPR__NotValidPledgeAmount(uint amount);
+error BPR__InvalidRewardToken(); //"constructor: _stakingToken must not be zero address"
+error BPR__InvalidStackingToken(); //"constructor: _investingToken must not be zero address"
+error BPR__InvalidInvestingToken(); //"constructor: _investingToken must not be zero address"
+error BPR__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should be before _pledgingEndTime"
+error BPR__AllocationShouldBeAfterPledgingEnd(); //"add: _tokenAllocationStartTime must be after pledging end"
+error BPR__TargetToBeRaisedMustBeMoreThanZero();
+error BPR__PledgingHasClosed();
+error BPR__NotEnoughStake();
+error BPR__PoolIsOnPledgingPhase(uint retryAgainAt);
+error BPR__DrawForThePoolHasAlreadyStarted(uint requestId);
+error BPR__NotEnoughRandomWordsForLottery();
+error BPR__FundingPledgeFailed(address user, uint pid);
+error BPR__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
+error BPR__TiersHaveNotBeenInitialized();
+error BPR__AlreadyPledgedToThisPool();
+error BPR__LotteryIsPending();
 
 // ╭━━╮╭━━┳━━━┳━╮╱╭┳━━┳━━━╮
 // ┃╭╮┃╰┫┣┫╭━╮┃┃╰╮┃┣┫┣┫╭━╮┃
@@ -50,10 +47,10 @@ error LPFRWV__LotteryIsPending();
 // ┃╰━╯┣┫┣┫╰━╯┃┃╱┃┃┣┫┣┫╰━╯┃
 // ╰━━━┻━━┻━━━┻╯╱╰━┻━━┻━━━╯
 
-/// @title Fund raising platform facilitated by launch pool
+/// @title Bionic Pool Registry Contract for Bionic DAO
 /// @author Coders-x
 /// @dev Only the owner can add new pools
-contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
+contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -77,8 +74,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
 
     /// @notice Container for holding all rewards
     Treasury public treasury;
-    /// @notice Container for holding all rewards
-    ClaimFunding public claimFund;
+
 
     /// @notice List of pools that users can stake into
     mapping(uint256 => BionicStructs.PoolInfo) public poolInfo;
@@ -127,20 +123,19 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         bool requestVRFPerWinner
     ) Raffle(vrfCoordinatorV2, gasLane, subscriptionId, requestVRFPerWinner) {
         if (address(_stakingToken) == address(0)) {
-            revert LPFRWV__InvalidRewardToken();
+            revert BPR__InvalidRewardToken();
         }
         if (address(_investingToken) == address(0)) {
-            revert LPFRWV__InvalidStackingToken();
+            revert BPR__InvalidStackingToken();
         }
         if (address(_bionicInvestorPass) == address(0)) {
-            revert LPFRWV__InvalidInvestingToken();
+            revert BPR__InvalidInvestingToken();
         }
 
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
         investingToken = _investingToken;
         treasury = new Treasury(address(this));
-        claimFund = new ClaimFunding();
 
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(BROKER_ROLE, _msgSender());
@@ -166,20 +161,20 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         bool _useRaffle,
         uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
-    ) external onlyRole(BROKER_ROLE) returns (uint256) {
+    ) external onlyRole(BROKER_ROLE) {
         address rewardTokenAddress = address(_rewardToken);
         if (rewardTokenAddress == address(0)) {
-            revert LPFRWV__InvalidRewardToken();
+            revert BPR__InvalidRewardToken();
         }
         if (_pledgingStartTime >= _pledgingEndTime) {
-            revert LPFRWV__PledgeStartAndPledgeEndNotValid();
+            revert BPR__PledgeStartAndPledgeEndNotValid();
         }
         if (_tokenAllocationStartTime <= _pledgingEndTime) {
-            revert LPFRWV__AllocationShouldBeAfterPledgingEnd();
+            revert BPR__AllocationShouldBeAfterPledgingEnd();
         }
 
         if (_targetRaise == 0) {
-            revert LPFRWV__TargetToBeRaisedMustBeMoreThanZero();
+            revert BPR__TargetToBeRaisedMustBeMoreThanZero();
         }
 
         uint32 winnersCount = 0;
@@ -210,20 +205,6 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
 
         poolIdToTiers[pid] = tiers;
 
-        try
-            claimFund.registerProjectToken(
-                pid,
-                address(_rewardToken),
-                _tokenAllocationPerMonth,
-                _tokenAllocationStartTime,
-                _tokenAllocationMonthCount
-            )
-        {} catch (bytes memory reason) {
-            /// @solidity memory-safe-assembly
-            assembly {
-                revert(add(32, reason), mload(reason))
-            }
-        }
 
         emit PoolAdded(pid);
     }
@@ -240,23 +221,23 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     ) external nonReentrant onlyBionicAccount {
         BionicStructs.PoolInfo storage pool = poolInfo[pid];
         if (pool.targetRaise == 0) {
-            revert LPFRWV__InvalidPool();
+            revert BPR__InvalidPool();
         }
         (, uint256 pledged) = userPledge[pid].tryGet(_msgSender());
         if (pledged != 0) {
-            revert LPFRWV__AlreadyPledgedToThisPool();
+            revert BPR__AlreadyPledgedToThisPool();
         }
         if (!_isValidPledge(pledged.add(amount), pool.pledgeTiers)) {
-            revert LPFRWV__NotValidPledgeAmount(amount);
+            revert BPR__NotValidPledgeAmount(amount);
         }
         if (
             IERC20(stakingToken).balanceOf(_msgSender()) < MINIMUM_BIONIC_STAKE
         ) {
-            revert LPFRWV__NotEnoughStake();
+            revert BPR__NotEnoughStake();
         }
         if (block.timestamp > pool.pledgingEndTime) {
             // solhint-disable-line not-rely-on-time
-            revert LPFRWV__PledgingHasClosed();
+            revert BPR__PledgingHasClosed();
         }
 
         userPledge[pid].set(_msgSender(), pledged.add(amount));
@@ -308,7 +289,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         if (poolInfo[pid].useRaffle) {
             for (uint i = 0; i < members.length; i++) {
                 if (!userPledge[pid].contains(members[i])) {
-                    revert LPFRWV__TierMembersShouldHaveAlreadyPledged(
+                    revert BPR__TierMembersShouldHaveAlreadyPledged(
                         pid,
                         tierId
                     );
@@ -317,7 +298,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
 
             _addToTier(pid, tierId, members);
         } else {
-            revert LPFRWV__PoolRaffleDisabled();
+            revert BPR__PoolRaffleDisabled();
         }
     }
 
@@ -336,14 +317,14 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
     {
         BionicStructs.PoolInfo memory pool = poolInfo[pid];
         if (pool.targetRaise == 0) {
-            revert LPFRWV__InvalidPool();
+            revert BPR__InvalidPool();
         }
-        if (!pool.useRaffle) revert LPFRWV__PoolRaffleDisabled();
+        if (!pool.useRaffle) revert BPR__PoolRaffleDisabled();
         //solhint-disable-next-line not-rely-on-time
         if (pool.pledgingEndTime > block.timestamp)
-            revert LPFRWV__PoolIsOnPledgingPhase(pool.pledgingEndTime);
+            revert BPR__PoolIsOnPledgingPhase(pool.pledgingEndTime);
         if (poolIdToRequestId[pid] != 0)
-            revert LPFRWV__DrawForThePoolHasAlreadyStarted(
+            revert BPR__DrawForThePoolHasAlreadyStarted(
                 poolIdToRequestId[pid]
             );
 
@@ -418,7 +399,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
                 address[] memory lastTierMembers = userPledge[pid].keys();
                 for (uint k = 0; k < tiers.length - 1; k++) {
                     if (tiers[k].members.length < 1) {
-                        revert LPFRWV__TiersHaveNotBeenInitialized();
+                        revert BPR__TiersHaveNotBeenInitialized();
                     }
                     lastTierMembers = excludeAddresses(
                         lastTierMembers,
@@ -440,13 +421,13 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256[] memory randomWords
     ) internal override {
         uint pid = requestIdToPoolId[requestId];
-        address[] memory winners = _pickWinners(pid, randomWords);
+        _pickWinners(pid, randomWords);
     }
 
     function refundLosers(uint256 pid) external {
         address[] memory winners = poolLotteryWinners[pid].values();
         if (winners.length == 0) {
-            revert LPFRWV__LotteryIsPending();
+            revert BPR__LotteryIsPending();
         }
         ///@dev find losers and refund them their pledge.
         ///@notice post lottery refund non-winners
@@ -456,6 +437,7 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         for (uint i = 0; i < losers.length; i++) {
             uint256 refund = userPledge[pid].get(losers[i]);
             treasury.withdrawTo(investingToken, losers[i], refund);
+            poolIdToTotalStaked[pid] = poolIdToTotalStaked[pid].sub(refund);
             emit LotteryRefunded(losers[i], pid, refund);
             userPledge[pid].set(losers[i], 0);
         }
@@ -467,14 +449,14 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         uint256 _amount
     ) private {
         try
-            TokenBoundAccount(payable(account)).transferCurrency(
+            BionicAccount(payable(account)).transferCurrency(
                 address(investingToken),
                 address(treasury),
                 _amount
             )
         returns (bool res) {
             if (res) emit PledgeFunded(account, pid, _amount);
-            else revert LPFRWV__FundingPledgeFailed(account, pid);
+            else revert BPR__FundingPledgeFailed(account, pid);
         } catch (bytes memory reason) {
             if (reason.length == 0) {
                 revert ICurrencyPermit__NoReason();
@@ -528,21 +510,21 @@ contract BionicFundRaising is ReentrancyGuard, Raffle, AccessControl {
         //     IERC165(_msgSender()).supportsInterface(
         //        type(IERC6551Account).interfaceId
         //     ),
-        //     "Contract does not support TokenBoundAccount"
+        //     "Contract does not support BionicAccount"
         // );
 
-        try TokenBoundAccount(payable(_msgSender())).token() returns (
+        try BionicAccount(payable(_msgSender())).token() returns (
             uint256,
             address tokenContract,
             uint256
         ) {
             require(
                 tokenContract == bionicInvestorPass,
-                "onlyBionicAccount: Invalid Bionic TokenBoundAccount."
+                "onlyBionicAccount: Invalid Bionic BionicAccount."
             ); //check user realy ownes the bionic pass check we have minted and created account
         } catch (bytes memory reason) {
             if (reason.length == 0) {
-                revert LPFRWV__NotDefinedError();
+                revert BPR__NotDefinedError();
             } else {
                 /// @solidity memory-safe-assembly
                 assembly {

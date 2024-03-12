@@ -31,5 +31,22 @@
         "subId":5682,
         "cbGasLimit":60000,
         "reqVRFPerWinner":false
+    },
+    "arbitrum":{
+        "name": "arbitrum",
+        "keyHash": "0x027f94ff1465b3525f9fc03e9ff7d6d2c0953482246dd6ae07570c45d6631414",
+        "vrfCoordinator": "0x50d47e4142598E3411aA864e08a44284e471AC6f",
+        "tokenAddress":"0xf6BE8224dD649997F36D0316101a7b31675b9d4E",
+        "usdtAddress":"0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
+        "bionicInvestorPass":"0xB233138Ad30ff5be4ee1127598Af0d7f8cd705ED",
+        "tbaImpl":"0xfFD890eBB19277f59f9d0810D464Efd2775df08E",
+        "tbaGuardian":"0xF4386C22A1e7D6A730C387f2b7a2cbFE82B38d28",
+        "bionicLaunchPad":"0xd067B6f7c02950f6427eF007C255fA1F0574370e",
+        "entryPoint":"0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
+        "bionicDistributor":"0x66A54cF1c875837c84e126ef69AC1F1a7Dc061Ec",
+        "erc6551Reg":"0x000000006551c19487814612e58FE06813775758",
+        "subId":153,
+        "cbGasLimit":60000,
+        "reqVRFPerWinner":false
     }
 }
