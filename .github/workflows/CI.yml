@@ -10,10 +10,8 @@ env:
   MUMBAI_RPC: "${{ secrets.MUMBAI_RPC }}"
   RPC_URL: "${{ secrets.RPC_URL }}"
   ARB_RPC: "${{ secrets.ARB_RPC }}"
-  THIRDWEB_API_KEY: "${{ secrets.THIRDWEB_API_KEY }}"
   ETHERSCAN_API_KEY: "${{ secrets.ETHERSCAN_API_KEY }}"
   POLYGONSCAN_API_KEY: "${{ secrets.POLYGONSCAN_API_KEY }}"
-  CHAIN: "${{ secrets.CHAIN }}"
 jobs:
   Test:
     runs-on: ubuntu-latest
