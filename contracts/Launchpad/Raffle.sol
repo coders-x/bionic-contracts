@@ -2,10 +2,11 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import {VRFCoordinatorV2Interface} from "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import {VRFConsumerBaseV2} from "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import {BionicStructs} from "../libs/BionicStructs.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {BionicStructs} from "../libs/BionicStructs.sol";
+import {VRFConsumerBaseV2Upgradeable} from "../libs/VRFConsumerBaseV2Upgradable.sol";
 
 /* Errors */
 error Raffle__TransferFailed();
@@ -27,7 +28,8 @@ error Raffle__MembersOnlyPermittedInOneTier(
  *  @notice This contract performs raffles for a lottery and keeps track of the tiering system.
  *  @dev This contract implements Chainlink VRF Version 2.
  */
-abstract contract Raffle is VRFConsumerBaseV2 {
+///@custom:oz-upgrades-unsafe-allow state-variable-immutable
+abstract contract Raffle is Initializable, VRFConsumerBaseV2Upgradeable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -43,13 +45,13 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     /*solhint-disable var-name-mixedcase*/
     /* State variables */
     // Chainlink VRF Variables
-    VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
-    uint64 private immutable i_subscriptionId;
-    bytes32 private immutable i_gasLane;
+    VRFCoordinatorV2Interface private _vrfCoordinator;
+    uint64 private _subscriptionId;
+    bytes32 private _gasLane;
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
 
     // Lottery Variables
-    bool private immutable i_requestVRFPerWinner;
+    bool private _requestVRFPerWinner;
 
     ///@notice requestId of vrf request on the pool
     mapping(uint256 => uint256) public poolIdToRequestId;
@@ -71,16 +73,38 @@ abstract contract Raffle is VRFConsumerBaseV2 {
     /*///////////////////////////////////////////////////////////////
                             Constructor
     //////////////////////////////////////////////////////////////*/
-    constructor(
-        address vrfCoordinatorV2,
-        bytes32 gasLane,
-        uint64 subscriptionId,
-        bool requestVRFPerWinner
-    ) VRFConsumerBaseV2(vrfCoordinatorV2) {
-        i_vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2);
-        i_gasLane = gasLane;
-        i_subscriptionId = subscriptionId;
-        i_requestVRFPerWinner = requestVRFPerWinner;
+
+    /**
+     * @dev Sets the values for {vrfCorrdinator}, {gasLane}, {subId}, and {perWinnerRequest}.
+     *
+     * All two of these values are immutable: they can only be set once during
+     * construction.
+     */
+    function __Raffle_init(
+        address vrfCoordinatorV2_,
+        bytes32 gasLane_,
+        uint64 subscriptionId_,
+        bool requestVRFPerWinner_
+    ) internal onlyInitializing {
+        __Raffle_init_unchained(
+            vrfCoordinatorV2_,
+            gasLane_,
+            subscriptionId_,
+            requestVRFPerWinner_
+        );
+    }
+
+    function __Raffle_init_unchained(
+        address vrfCoordinatorV2_,
+        bytes32 gasLane_,
+        uint64 subscriptionId_,
+        bool requestVRFPerWinner_
+    ) internal onlyInitializing {
+        __VRFConsumerBaseV2Upgradeable_init(vrfCoordinatorV2_);
+        _vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorV2_);
+        _gasLane = gasLane_;
+        _subscriptionId = subscriptionId_;
+        _requestVRFPerWinner = requestVRFPerWinner_;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -141,12 +165,12 @@ abstract contract Raffle is VRFConsumerBaseV2 {
         if (poolIdToRequestId[pid] != 0) {
             revert Raffle__RaffleAlreadyInProgressOrDone();
         }
-        requestId = i_vrfCoordinator.requestRandomWords(
-            i_gasLane,
-            i_subscriptionId,
+        requestId = _vrfCoordinator.requestRandomWords(
+            _gasLane,
+            _subscriptionId,
             REQUEST_CONFIRMATIONS,
             callbackGasPerUser * winnersCount,
-            i_requestVRFPerWinner
+            _requestVRFPerWinner
                 ? winnersCount
                 : uint32(poolIdToTiers[pid].length)
         );
@@ -170,7 +194,7 @@ abstract contract Raffle is VRFConsumerBaseV2 {
             address[] memory tierMembers = tiers[i].members;
             uint memberCount = tierMembers.length;
             for (uint j = 0; j < tiers[i].count; ) {
-                if (i_requestVRFPerWinner) {
+                if (_requestVRFPerWinner) {
                     rand = randomWords[poolLotteryWinners[pid].length()];
                 } else {
                     rand = uint256(

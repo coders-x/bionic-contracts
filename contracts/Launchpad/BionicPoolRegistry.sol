@@ -2,12 +2,13 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import {SafeERC20, IERC20, Address} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ICurrencyPermit, ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
 import {BionicAccount} from "../BTBA.sol";
@@ -49,7 +50,13 @@ error BPR__LotteryIsPending();
 /// @title Bionic Pool Registry Contract for Bionic DAO
 /// @author Coders-x
 /// @dev Only the owner can add new pools
-contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
+contract BionicPoolRegistry is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    Raffle,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -109,9 +116,10 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
     /*///////////////////////////////////////////////////////////////
                                 Constructor
     //////////////////////////////////////////////////////////////*/
+
     /// @param _stakingToken Address of the staking token for all pools
-    /// @param _investingToken Address of the staking token for all pools
-    constructor(
+    /// @param _investingToken Address of the invesment token for all pools
+    function initialize(
         IERC20 _stakingToken,
         IERC20 _investingToken,
         address _bionicInvestorPass,
@@ -119,7 +127,7 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         bytes32 gasLane, // keyHash
         uint64 subscriptionId,
         bool requestVRFPerWinner
-    ) Raffle(vrfCoordinatorV2, gasLane, subscriptionId, requestVRFPerWinner) {
+    ) public initializer {
         if (address(_stakingToken) == address(0)) {
             revert BPR__InvalidStackingToken();
         }
@@ -129,6 +137,16 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         if (address(_bionicInvestorPass) == address(0)) {
             revert BPR__InvalidInvestingToken();
         }
+
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+        __Raffle_init(
+            vrfCoordinatorV2,
+            gasLane,
+            subscriptionId,
+            requestVRFPerWinner
+        );
+        __ReentrancyGuard_init();
 
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
@@ -141,6 +159,11 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         _grantRole(SORTER_ROLE, _msgSender());
 
         emit ContractDeployed(address(treasury));
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -524,4 +547,12 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
 
         _;
     }
+
+    /*///////////////////////////////////////////////////////////////
+                            UPGRADABILITY
+    //////////////////////////////////////////////////////////////*/
+    // Upgradeability-related functions
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

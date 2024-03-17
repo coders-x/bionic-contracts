@@ -120,7 +120,7 @@ describe("e2e", function () {
         let { VRFCoordinatorV2MockContract, subscriptionId } = await deployVRFCoordinatorV2Mock();
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
-        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, NETWORK_CONFIG.keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
+        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, usdtContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, NETWORK_CONFIG.keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
 
         DistributorContract = await deployBionicTokenDistributor();
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, BionicPoolRegistry.address);
@@ -549,13 +549,19 @@ async function deployBIP() {
     });
     return await bipContract.deployed();
 }
-async function deployBionicPoolRegistry(tokenAddress: string, bionicInvestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, reqVRFPerWinner: boolean) {
+async function deployBionicPoolRegistry(...args: any) {
     const BionicPoolRegistryContract = await ethers.getContractFactory("BionicPoolRegistry", {
         libraries: {
         }
     });
+    let BRPContract = await upgrades.deployProxy(BionicPoolRegistryContract, args, {
+        initializer: "initialize",
+        unsafeAllow: ['delegatecall']
+    });
+    await BRPContract.deployed();
+
     console.log(`Deploying BionicPoolRegistry contract...`);
-    return await BionicPoolRegistryContract.deploy(tokenAddress, USDT_ADDR, bionicInvestorPass, vrfCoordinatorV2, gaslane, subId, reqVRFPerWinner);
+    return BRPContract as BionicPoolRegistry;
 }
 async function deployBionicTokenDistributor() {
     const BionicTokenDistributorContract = await ethers.getContractFactory("BionicTokenDistributor");

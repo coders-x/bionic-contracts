@@ -87,7 +87,10 @@ contract BionicPoolRegistryTest is DSTest, Test {
         _rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
         _rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
 
-        _bionicFundRaising = new BionicPoolRegistry(
+        _bionicFundRaising = BionicPoolRegistry(
+            address(new UUPSProxy(address(new BionicPoolRegistry()), ""))
+        );
+        _bionicFundRaising.initialize(
             IERC20(address(_bionicToken)),
             _investingToken,
             address(_bipContract),
@@ -96,6 +99,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             _subId,
             REQ_PER_WINNER
         );
+
         _vrfCoordinatorV2.addConsumer(_subId, address(_bionicFundRaising));
 
         _distrbutorContract = new BionicTokenDistributor();
