@@ -259,7 +259,6 @@ async function main(level: number, pid: number = 0) {
                 .connect(owner)
                 .add(
                     pid,
-                    bionicContract.address,
                     (Date.now() / 1000) | 0, //PLEDGING_START_TIME
                     (pledgeEnding.getTime() / 1000) | 0, //PLEDGING_END_TIME
                     1000, //tokenAllocationPerMonth
@@ -448,4 +447,4 @@ async function getCurrencyPermitSignature(
     );
 }
 //step, pid
-main(6, 0).then(console.log).catch(console.error);
+main(2, 0).then(console.log).catch(console.error);

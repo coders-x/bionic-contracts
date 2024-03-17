@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import hre from "hardhat";
 import { FactoryOptions } from 'hardhat/types';
 import { arbitrum as CONFIG } from './config.json';
@@ -26,16 +26,16 @@ async function main() {
 
 
 async function deployContract(opt: FactoryOptions) {
-
     console.log(`Deploying BionicPoolRegistry contract...`);
-
-
     const BionicPoolRegistryContract = await ethers.getContractFactory("BionicPoolRegistry", opt);
+    const args = [
+        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator,
+        CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner
+    ];
+    let BRPContract = await upgrades.upgradeProxy(CONFIG.bionicLaunchPad, BionicPoolRegistryContract);
 
-    let funding = await BionicPoolRegistryContract.deploy(CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
-        CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner);
 
-    return await funding.deployed();
+    return await BRPContract.deployed() as BionicPoolRegistry;
 }
 
 async function verifyContract(contract: BionicPoolRegistry, args: any) {
@@ -58,7 +58,8 @@ async function verifyContract(contract: BionicPoolRegistry, args: any) {
     console.log(`Verifying BPR Contract at ${contract.address}`);
     res = await hre.run("verify:verify", {
         address: contract.address,//funding.address,
-        constructorArguments: args,
+        // constructorArguments: args,
+
         libraries: {
             // Utils: utilsAddress//utils.address
         }
