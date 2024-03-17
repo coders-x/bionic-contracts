@@ -42,6 +42,7 @@
     "clean:forge": "forge clean",
     "clean:hh": "hardhat clean",
     "deploy:BFC": "hardhat run scripts/deploy_FWV.ts --network mumbai",
+    "demo": "hardhat run --network arb_sepolia scripts/demo.ts",
     "dev": "ts-node scripts/index.ts"
   }
 }
