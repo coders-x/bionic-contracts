@@ -23,7 +23,6 @@ error BPR__NotDefinedError();
 error BPR__PoolRaffleDisabled();
 error BPR__InvalidPool();
 error BPR__NotValidPledgeAmount(uint amount);
-error BPR__InvalidRewardToken(); //"constructor: _stakingToken must not be zero address"
 error BPR__InvalidStackingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__InvalidInvestingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should be before _pledgingEndTime"
@@ -75,7 +74,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
     /// @notice Container for holding all rewards
     Treasury public treasury;
 
-
     /// @notice List of pools that users can stake into
     mapping(uint256 => BionicStructs.PoolInfo) public poolInfo;
 
@@ -123,10 +121,10 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         bool requestVRFPerWinner
     ) Raffle(vrfCoordinatorV2, gasLane, subscriptionId, requestVRFPerWinner) {
         if (address(_stakingToken) == address(0)) {
-            revert BPR__InvalidRewardToken();
+            revert BPR__InvalidStackingToken();
         }
         if (address(_investingToken) == address(0)) {
-            revert BPR__InvalidStackingToken();
+            revert BPR__InvalidInvestingToken();
         }
         if (address(_bionicInvestorPass) == address(0)) {
             revert BPR__InvalidInvestingToken();
@@ -151,7 +149,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
     /// @dev Can only be called by the contract owner
     function add(
         uint256 pid,
-        IERC20 _rewardToken, // Address of the reward token contract.
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
         uint256 _tokenAllocationPerMonth, // the total amount of token will be released to lottery winners per month
@@ -162,10 +159,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
     ) external onlyRole(BROKER_ROLE) {
-        address rewardTokenAddress = address(_rewardToken);
-        if (rewardTokenAddress == address(0)) {
-            revert BPR__InvalidRewardToken();
-        }
         if (_pledgingStartTime >= _pledgingEndTime) {
             revert BPR__PledgeStartAndPledgeEndNotValid();
         }
@@ -189,7 +182,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
             winnersCount += _tiers[i];
         }
         BionicStructs.PoolInfo memory pool = BionicStructs.PoolInfo({
-            rewardToken: _rewardToken,
             pledgingStartTime: _pledgingStartTime,
             pledgingEndTime: _pledgingEndTime,
             // pledgingAmountPerUser: _pledgingAmountPerUser,
@@ -204,7 +196,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         poolInfo[pid] = pool;
 
         poolIdToTiers[pid] = tiers;
-
 
         emit PoolAdded(pid);
     }
@@ -324,9 +315,7 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         if (pool.pledgingEndTime > block.timestamp)
             revert BPR__PoolIsOnPledgingPhase(pool.pledgingEndTime);
         if (poolIdToRequestId[pid] != 0)
-            revert BPR__DrawForThePoolHasAlreadyStarted(
-                poolIdToRequestId[pid]
-            );
+            revert BPR__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[pid]);
 
         _preDraw(pid);
 

@@ -125,7 +125,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
         pt[2] = BionicStructs.PledgeTier(3, 5000, 5000);
         _bionicFundRaising.add(
             pid,
-            _rewardToken,
             block.timestamp,
             block.timestamp + 10 minutes,
             // 1000, 1k
@@ -160,7 +159,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
     function testAddProject() public {
         (uint256 pid, ) = registerProject(false, 100, 500);
         (
-            IERC20 poolToken,
             ,
             ,
             uint256 tokenAllocationPerMonth,
@@ -178,7 +176,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         //     uint256 end,
         //     bytes32 root
         // ) = _distrbutorContract.s_projectTokens(pid);
-        assertEq(address(poolToken), address(_rewardToken));
+        // assertEq(address(poolToken), address(_rewardToken));
         // assertEq(address(token), address(poolToken));
         assertEq(100, tokenAllocationPerMonth);
         assertEq(block.timestamp + 20 minutes, tokenAllocationStartTime);
@@ -266,7 +264,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         }
 
         //3. move time and do draw get the winners
-        (, , , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
+        (, , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
         uint256 requestId = _bionicFundRaising.draw(pid, 1000000);
@@ -438,7 +436,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             _bionicFundRaising.addToTier(pid, i, accounts);
         }
         // //3. move time and do draw get the winners
-        (, , , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
+        (, , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
 

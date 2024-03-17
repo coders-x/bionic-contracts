@@ -21,7 +21,6 @@ library BionicStructs {
 
     /// @dev Info of each pool.
     struct PoolInfo {
-        IERC20 rewardToken; // Address of the reward token contract.
         uint256 pledgingStartTime; // Pledging will be permitted since this date
         uint256 pledgingEndTime; // Before this Time pledge is permitted
         // uint256 pledgingAmountPerUser; // amount of tokens that can be staked per account/user
