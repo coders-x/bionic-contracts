@@ -23,7 +23,7 @@ import {Raffle} from "./Raffle.sol";
 error BPR__NotDefinedError();
 error BPR__PoolRaffleDisabled();
 error BPR__InvalidPool();
-error BPR__NotValidPledgeAmount(uint amount);
+error BPR__NotValidPledgeAmount(uint256 amount);
 error BPR__InvalidStackingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__InvalidInvestingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should be before _pledgingEndTime"
@@ -31,11 +31,11 @@ error BPR__AllocationShouldBeAfterPledgingEnd(); //"add: _tokenAllocationStartTi
 error BPR__TargetToBeRaisedMustBeMoreThanZero();
 error BPR__PledgingHasClosed();
 error BPR__NotEnoughStake();
-error BPR__PoolIsOnPledgingPhase(uint retryAgainAt);
-error BPR__DrawForThePoolHasAlreadyStarted(uint requestId);
+error BPR__PoolIsOnPledgingPhase(uint256 retryAgainAt);
+error BPR__DrawForThePoolHasAlreadyStarted(uint256 requestId);
 error BPR__NotEnoughRandomWordsForLottery();
-error BPR__FundingPledgeFailed(address user, uint pid);
-error BPR__TierMembersShouldHaveAlreadyPledged(uint pid, uint tierId);
+error BPR__FundingPledgeFailed(address user, uint256 pid);
+error BPR__TierMembersShouldHaveAlreadyPledged(uint256 pid, uint256 tierId);
 error BPR__TiersHaveNotBeenInitialized();
 error BPR__AlreadyPledgedToThisPool();
 error BPR__LotteryIsPending();
@@ -75,7 +75,7 @@ contract BionicPoolRegistry is
     IERC20 public stakingToken;
     /// @notice investing token is fixed for all pools (e.g. USDT)
     IERC20 public investingToken;
-    /// @notice investing token is fixed for all pools (e.g. USDT)
+    /// @notice BIP Contract Address to allow owners to pledge and invest
     address public bionicInvestorPass;
 
     /// @notice Container for holding all rewards
@@ -84,12 +84,10 @@ contract BionicPoolRegistry is
     /// @notice List of pools that users can stake into
     mapping(uint256 => BionicStructs.PoolInfo) public poolInfo;
 
-    // Pool to accumulated share counters
-    mapping(uint256 => uint256) public poolIdToLastPercentageAllocTime;
     // Total amount staked into the pool
-    mapping(uint256 => uint256) public poolIdToTotalStaked;
+    mapping(uint256 => uint256) public poolIdToTotalPledged;
     /// @notice Per pool, info of each user that stakes ERC20 tokens.
-    /// @notice Pool ID => User Address => User Info
+    /// @notice Pool ID => User Address => amount user has pledged
     mapping(uint256 => EnumerableMap.AddressToUintMap) internal userPledge; //todo maybe optimize it more
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
@@ -197,7 +195,7 @@ contract BionicPoolRegistry is
         BionicStructs.Tier[] memory tiers = new BionicStructs.Tier[](
             _tiers.length
         );
-        for (uint i = 0; i < _tiers.length; i++) {
+        for (uint256 i = 0; i < _tiers.length; i++) {
             tiers[i] = BionicStructs.Tier({
                 count: _tiers[i],
                 members: new address[](0)
@@ -259,7 +257,7 @@ contract BionicPoolRegistry is
             amount
         );
 
-        poolIdToTotalStaked[pid] = poolIdToTotalStaked[pid].add(amount);
+        poolIdToTotalPledged[pid] = poolIdToTotalPledged[pid].add(amount);
 
         try
             ICurrencyPermit(_msgSender()).permit(
@@ -301,7 +299,7 @@ contract BionicPoolRegistry is
         address[] memory members
     ) external nonReentrant onlyRole(SORTER_ROLE) {
         if (poolInfo[pid].useRaffle) {
-            for (uint i = 0; i < members.length; i++) {
+            for (uint256 i = 0; i < members.length; i++) {
                 if (!userPledge[pid].contains(members[i])) {
                     revert BPR__TierMembersShouldHaveAlreadyPledged(
                         pid,
@@ -327,7 +325,7 @@ contract BionicPoolRegistry is
         payable
         nonReentrant
         onlyRole(SORTER_ROLE)
-        returns (uint requestId)
+        returns (uint256 requestId)
     {
         BionicStructs.PoolInfo memory pool = poolInfo[pid];
         if (pool.targetRaise == 0) {
@@ -377,9 +375,9 @@ contract BionicPoolRegistry is
     /// @param pid id for the pool winners are requested from
     /// @return address[] array of winners for the raffle
     function getProjectInvestors(
-        uint pid
+        uint256 pid
     ) public view returns (uint256, address[] memory) {
-        return (poolIdToTotalStaked[pid], poolLotteryWinners[pid].values());
+        return (poolIdToTotalPledged[pid], poolLotteryWinners[pid].values());
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -390,7 +388,7 @@ contract BionicPoolRegistry is
         uint256 amount,
         BionicStructs.PledgeTier[] memory tiers
     ) internal pure returns (bool) {
-        for (uint i = 0; i < tiers.length; i++) {
+        for (uint256 i = 0; i < tiers.length; i++) {
             if (
                 tiers[i].minimumPledge <= amount &&
                 amount <= tiers[i].maximumPledge
@@ -409,7 +407,7 @@ contract BionicPoolRegistry is
             if (tiers[tiers.length - 1].members.length < 1) {
                 //check all tiers except last(all other users) has members
                 address[] memory lastTierMembers = userPledge[pid].keys();
-                for (uint k = 0; k < tiers.length - 1; k++) {
+                for (uint256 k = 0; k < tiers.length - 1; k++) {
                     if (tiers[k].members.length < 1) {
                         revert BPR__TiersHaveNotBeenInitialized();
                     }
@@ -432,7 +430,7 @@ contract BionicPoolRegistry is
         uint256 requestId,
         uint256[] memory randomWords
     ) internal override {
-        uint pid = requestIdToPoolId[requestId];
+        uint256 pid = requestIdToPoolId[requestId];
         _pickWinners(pid, randomWords);
     }
 
@@ -446,10 +444,10 @@ contract BionicPoolRegistry is
         ///@audit-info gas maybe for gasoptimization move it to dedicated function
         address[] memory losers = userPledge[pid].keys();
         losers = excludeAddresses(losers, winners);
-        for (uint i = 0; i < losers.length; i++) {
+        for (uint256 i = 0; i < losers.length; i++) {
             uint256 refund = userPledge[pid].get(losers[i]);
             treasury.withdrawTo(investingToken, losers[i], refund);
-            poolIdToTotalStaked[pid] = poolIdToTotalStaked[pid].sub(refund);
+            poolIdToTotalPledged[pid] = poolIdToTotalPledged[pid].sub(refund);
             emit LotteryRefunded(losers[i], pid, refund);
             userPledge[pid].set(losers[i], 0);
         }
@@ -487,12 +485,12 @@ contract BionicPoolRegistry is
     ) private pure returns (address[] memory) {
         // Store addresses from array1 that are not in array2
         address[] memory exclusionArray = new address[](array1.length);
-        uint count = 0;
+        uint256 count = 0;
 
-        for (uint i = 0; i < array1.length; i++) {
+        for (uint256 i = 0; i < array1.length; i++) {
             address element = array1[i];
             bool found = false;
-            for (uint j = 0; j < array2.length; j++) {
+            for (uint256 j = 0; j < array2.length; j++) {
                 if (element == array2[j]) {
                     found = true;
                     break;
@@ -506,7 +504,7 @@ contract BionicPoolRegistry is
 
         // Copy exclusionArray into new array of correct length
         address[] memory result = new address[](count);
-        for (uint i = 0; i < count; i++) {
+        for (uint256 i = 0; i < count; i++) {
             result[i] = exclusionArray[i];
         }
 
