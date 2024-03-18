@@ -347,11 +347,28 @@ contract BionicPoolRegistry is
         emit DrawInitiated(pid, requestId);
     }
 
-    // /// @notice Returns the number of pools that have been added by the owner
-    // /// @return Number of pools
-    // function numberOfPools() external view returns (uint256) {
-    //     return poolInfo.length;
-    // }
+    /**
+     * @dev Withdraws a specified amount of tokens from the treasury to the specified address.
+     * Only the address with the `TREASURY_ROLE` can call this function.
+     * If the specified amount is greater than the available treasury withdrawable balance,
+     * it reverts with a `BPR__NotEnoughStake` error.
+     * @param to The address to which the tokens will be withdrawn.
+     * @param amount The amount of tokens to be withdrawn.
+     */
+    function withdraw(
+        address to,
+        uint256 amount
+    ) external nonReentrant onlyRole(TREASURY_ROLE) {
+        if (amount > treasuryWithdrawable) {
+            revert BPR__NotEnoughStake();
+        }
+        treasuryWithdrawable -= amount;
+        treasury.withdrawTo(investingToken, to, amount);
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                            Public/External View Functions
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the number of pools that have been added by the owner
     /// @return Number of pools
@@ -370,9 +387,6 @@ contract BionicPoolRegistry is
         return userPledge[poolId].get(user);
     }
 
-    /*///////////////////////////////////////////////////////////////
-                            Public/External Functions
-    //////////////////////////////////////////////////////////////*/
     /// @notice Get Winners for a particular poolId
     /// @param pid id for the pool winners are requested from
     /// @return address[] array of winners for the raffle

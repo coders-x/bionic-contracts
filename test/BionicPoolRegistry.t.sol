@@ -40,6 +40,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
     VRFCoordinatorV2Mock private _vrfCoordinatorV2;
     uint64 private _subId;
     BionicAccount private _accountImplementation;
+    Treasury private _treasuryContract;
 
     BionicTokenDistributor private _distrbutorContract;
 
@@ -101,6 +102,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             _subId,
             REQ_PER_WINNER
         );
+        _treasuryContract = Treasury(_bionicFundRaising.treasury());
 
         _vrfCoordinatorV2.addConsumer(_subId, address(_bionicFundRaising));
 
@@ -301,16 +303,27 @@ contract BionicPoolRegistryTest is DSTest, Test {
         }
         bytes32 merkleRoot = m.getRoot(merkleTree);
 
-        //4. refund losers
+        //4. refund losers and treasury withdraw
         _bionicFundRaising.refundLosers(pid);
-        uint256 treasureBalance = Treasury(_bionicFundRaising.treasury())
-            .tokenBalance(IERC20(_bionicFundRaising.investingToken()));
+        uint256 treasureBalance = _treasuryContract.tokenBalance(
+            IERC20(_bionicFundRaising.investingToken())
+        );
         assertEq(_bionicFundRaising.treasuryWithdrawable(), totalInvested);
         assertEq(_bionicFundRaising.treasuryWithdrawable(), treasureBalance);
-        //shouldn't refund already refunded losssers;
+        //4.1. shouldn't refund already refunded losssers;
         _bionicFundRaising.refundLosers(pid);
         assertEq(_bionicFundRaising.treasuryWithdrawable(), totalInvested);
         assertEq(_bionicFundRaising.treasuryWithdrawable(), treasureBalance);
+
+        //4.2 withdraw
+        vm.expectRevert(BPR__NotEnoughStake.selector);
+        _bionicFundRaising.withdraw(_owner, treasureBalance * 2);
+
+        _bionicFundRaising.withdraw(_owner, treasureBalance / 2);
+        assertEq(
+            _bionicFundRaising.treasuryWithdrawable(),
+            treasureBalance / 2
+        );
 
         //5. add winners to claim and fund the reward token
         _distrbutorContract.registerProjectToken(
