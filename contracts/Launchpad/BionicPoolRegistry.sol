@@ -17,7 +17,7 @@ import {Treasury} from "./Treasury.sol";
 import {Raffle} from "./Raffle.sol";
 
 // import "hardhat/console.sol";
-// import "forge-std/console.sol";
+import "forge-std/console.sol";
 
 /* Errors */
 error BPR__NotDefinedError();
@@ -80,11 +80,12 @@ contract BionicPoolRegistry is
 
     /// @notice Container for holding all rewards
     Treasury public treasury;
+    uint256 public treasuryWithdrawable;
 
     /// @notice List of pools that users can stake into
     mapping(uint256 => BionicStructs.PoolInfo) public poolInfo;
 
-    // Total amount staked into the pool
+    // Total amount pledged by users in a pool
     mapping(uint256 => uint256) public poolIdToTotalPledged;
     /// @notice Per pool, info of each user that stakes ERC20 tokens.
     /// @notice Pool ID => User Address => amount user has pledged
@@ -109,7 +110,7 @@ contract BionicPoolRegistry is
         uint256 indexed pid,
         uint256 amount
     );
-    event Invested(uint256 pid, address winner);
+    event Invested(uint256 pid, address winner, uint256 amount);
 
     /*///////////////////////////////////////////////////////////////
                                 Constructor
@@ -284,7 +285,8 @@ contract BionicPoolRegistry is
         _stackPledge(_msgSender(), pid, amount);
         if (!pool.useRaffle) {
             poolLotteryWinners[pid].add(_msgSender());
-            emit Invested(pid, _msgSender());
+            emit Invested(pid, _msgSender(), amount);
+            treasuryWithdrawable += amount;
         }
     }
 
@@ -444,12 +446,18 @@ contract BionicPoolRegistry is
         ///@audit-info gas maybe for gasoptimization move it to dedicated function
         address[] memory losers = userPledge[pid].keys();
         losers = excludeAddresses(losers, winners);
+        uint256 totalInvestment = poolIdToTotalPledged[pid];
         for (uint256 i = 0; i < losers.length; i++) {
             uint256 refund = userPledge[pid].get(losers[i]);
+            if (refund == 0) continue;
             treasury.withdrawTo(investingToken, losers[i], refund);
             poolIdToTotalPledged[pid] = poolIdToTotalPledged[pid].sub(refund);
             emit LotteryRefunded(losers[i], pid, refund);
             userPledge[pid].set(losers[i], 0);
+        }
+        //hasn't been refuned already
+        if (totalInvestment != poolIdToTotalPledged[pid]) {
+            treasuryWithdrawable += poolIdToTotalPledged[pid];
         }
     }
 
