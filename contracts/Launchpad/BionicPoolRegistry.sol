@@ -2,12 +2,13 @@
 pragma solidity >=0.7.0 <0.9.0;
 
 import {SafeERC20, IERC20, Address} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ICurrencyPermit, ICurrencyPermit__NoReason} from "../libs/ICurrencyPermit.sol";
 import {BionicStructs} from "../libs/BionicStructs.sol";
 import {BionicAccount} from "../BTBA.sol";
@@ -23,7 +24,6 @@ error BPR__NotDefinedError();
 error BPR__PoolRaffleDisabled();
 error BPR__InvalidPool();
 error BPR__NotValidPledgeAmount(uint amount);
-error BPR__InvalidRewardToken(); //"constructor: _stakingToken must not be zero address"
 error BPR__InvalidStackingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__InvalidInvestingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should be before _pledgingEndTime"
@@ -50,7 +50,13 @@ error BPR__LotteryIsPending();
 /// @title Bionic Pool Registry Contract for Bionic DAO
 /// @author Coders-x
 /// @dev Only the owner can add new pools
-contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
+contract BionicPoolRegistry is
+    Initializable,
+    ReentrancyGuardUpgradeable,
+    Raffle,
+    AccessControlUpgradeable,
+    UUPSUpgradeable
+{
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
@@ -74,7 +80,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
 
     /// @notice Container for holding all rewards
     Treasury public treasury;
-
 
     /// @notice List of pools that users can stake into
     mapping(uint256 => BionicStructs.PoolInfo) public poolInfo;
@@ -111,9 +116,10 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
     /*///////////////////////////////////////////////////////////////
                                 Constructor
     //////////////////////////////////////////////////////////////*/
+
     /// @param _stakingToken Address of the staking token for all pools
-    /// @param _investingToken Address of the staking token for all pools
-    constructor(
+    /// @param _investingToken Address of the invesment token for all pools
+    function initialize(
         IERC20 _stakingToken,
         IERC20 _investingToken,
         address _bionicInvestorPass,
@@ -121,16 +127,26 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         bytes32 gasLane, // keyHash
         uint64 subscriptionId,
         bool requestVRFPerWinner
-    ) Raffle(vrfCoordinatorV2, gasLane, subscriptionId, requestVRFPerWinner) {
+    ) public initializer {
         if (address(_stakingToken) == address(0)) {
-            revert BPR__InvalidRewardToken();
+            revert BPR__InvalidStackingToken();
         }
         if (address(_investingToken) == address(0)) {
-            revert BPR__InvalidStackingToken();
+            revert BPR__InvalidInvestingToken();
         }
         if (address(_bionicInvestorPass) == address(0)) {
             revert BPR__InvalidInvestingToken();
         }
+
+        __AccessControl_init();
+        __UUPSUpgradeable_init();
+        __Raffle_init(
+            vrfCoordinatorV2,
+            gasLane,
+            subscriptionId,
+            requestVRFPerWinner
+        );
+        __ReentrancyGuard_init();
 
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
@@ -145,13 +161,17 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         emit ContractDeployed(address(treasury));
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /*///////////////////////////////////////////////////////////////
                         Public/External Functions
     //////////////////////////////////////////////////////////////*/
     /// @dev Can only be called by the contract owner
     function add(
         uint256 pid,
-        IERC20 _rewardToken, // Address of the reward token contract.
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
         uint256 _tokenAllocationPerMonth, // the total amount of token will be released to lottery winners per month
@@ -162,10 +182,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
     ) external onlyRole(BROKER_ROLE) {
-        address rewardTokenAddress = address(_rewardToken);
-        if (rewardTokenAddress == address(0)) {
-            revert BPR__InvalidRewardToken();
-        }
         if (_pledgingStartTime >= _pledgingEndTime) {
             revert BPR__PledgeStartAndPledgeEndNotValid();
         }
@@ -189,7 +205,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
             winnersCount += _tiers[i];
         }
         BionicStructs.PoolInfo memory pool = BionicStructs.PoolInfo({
-            rewardToken: _rewardToken,
             pledgingStartTime: _pledgingStartTime,
             pledgingEndTime: _pledgingEndTime,
             // pledgingAmountPerUser: _pledgingAmountPerUser,
@@ -204,7 +219,6 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         poolInfo[pid] = pool;
 
         poolIdToTiers[pid] = tiers;
-
 
         emit PoolAdded(pid);
     }
@@ -324,9 +338,7 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
         if (pool.pledgingEndTime > block.timestamp)
             revert BPR__PoolIsOnPledgingPhase(pool.pledgingEndTime);
         if (poolIdToRequestId[pid] != 0)
-            revert BPR__DrawForThePoolHasAlreadyStarted(
-                poolIdToRequestId[pid]
-            );
+            revert BPR__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[pid]);
 
         _preDraw(pid);
 
@@ -535,4 +547,12 @@ contract BionicPoolRegistry is ReentrancyGuard, Raffle, AccessControl {
 
         _;
     }
+
+    /*///////////////////////////////////////////////////////////////
+                            UPGRADABILITY
+    //////////////////////////////////////////////////////////////*/
+    // Upgradeability-related functions
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

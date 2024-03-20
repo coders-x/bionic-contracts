@@ -41,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x0cd5B3119874fF62A0D81fa94d06F22898e90E1d",
+    accountAddress: "0xD0Bfe42B8B1af441E3C43D87c9e2AD509BbB499E",
     automationUpdateInterval: "30",
 };
 
@@ -120,7 +120,7 @@ describe("e2e", function () {
         let { VRFCoordinatorV2MockContract, subscriptionId } = await deployVRFCoordinatorV2Mock();
 
         vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
-        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, NETWORK_CONFIG.keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
+        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, usdtContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, NETWORK_CONFIG.keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
 
         DistributorContract = await deployBionicTokenDistributor();
         await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, BionicPoolRegistry.address);
@@ -225,12 +225,12 @@ describe("e2e", function () {
             const tokenAllocationPerMonth = 100, tokenAllocationMonthCount = 10, targetRaise = PLEDGE_AMOUNT * PLEDGE_AMOUNT
             it("Should fail if the not BROKER", async function () {
                 await expect(BionicPoolRegistry.connect(client)
-                    .add(0, bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
+                    .add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.be.reverted;
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await BionicPoolRegistry.hasRole(await BionicPoolRegistry.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(BionicPoolRegistry.add(0, bionicContract.address, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
+                await expect(BionicPoolRegistry.add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.emit(BionicPoolRegistry, "PoolAdded").withArgs(0)
             });
             it("Should return same Pool upon request", async () => {
@@ -239,7 +239,7 @@ describe("e2e", function () {
                 let pledgeTier = await BionicPoolRegistry.pledgeTiers(0);
 
                 expect(poolTiers).to.equal(3);
-                expect(pool.rewardToken).to.equal(bionicContract.address);
+                // expect(pool.rewardToken).to.equal(bionicContract.address);
                 expect(pool.tokenAllocationStartTime).to.equal(tokenAllocationStartTime);
                 expect(pool.pledgingEndTime).to.equal(PLEDGING_END_TIME);
                 expect(pool.targetRaise).to.equal(targetRaise);
@@ -549,13 +549,19 @@ async function deployBIP() {
     });
     return await bipContract.deployed();
 }
-async function deployBionicPoolRegistry(tokenAddress: string, bionicInvestorPass: string, vrfCoordinatorV2: string, gaslane: BytesLike, subId: BigNumber, reqVRFPerWinner: boolean) {
+async function deployBionicPoolRegistry(...args: any) {
     const BionicPoolRegistryContract = await ethers.getContractFactory("BionicPoolRegistry", {
         libraries: {
         }
     });
+    let BRPContract = await upgrades.deployProxy(BionicPoolRegistryContract, args, {
+        initializer: "initialize",
+        unsafeAllow: ['delegatecall']
+    });
+    await BRPContract.deployed();
+
     console.log(`Deploying BionicPoolRegistry contract...`);
-    return await BionicPoolRegistryContract.deploy(tokenAddress, USDT_ADDR, bionicInvestorPass, vrfCoordinatorV2, gaslane, subId, reqVRFPerWinner);
+    return BRPContract as BionicPoolRegistry;
 }
 async function deployBionicTokenDistributor() {
     const BionicTokenDistributorContract = await ethers.getContractFactory("BionicTokenDistributor");
