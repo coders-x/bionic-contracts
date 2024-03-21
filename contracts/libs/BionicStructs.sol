@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 library BionicStructs {
     /// @dev Details about each user in a pool
     struct UserInfo {
@@ -23,7 +21,6 @@ library BionicStructs {
     struct PoolInfo {
         uint256 pledgingStartTime; // Pledging will be permitted since this date
         uint256 pledgingEndTime; // Before this Time pledge is permitted
-        // uint256 pledgingAmountPerUser; // amount of tokens that can be staked per account/user
         uint256 tokenAllocationPerMonth; // the amount of token will be released to lottery winners per month
         uint256 tokenAllocationStartTime; // when users can start claiming their first reward
         uint256 tokenAllocationMonthCount; // number of months tokens will be allocated

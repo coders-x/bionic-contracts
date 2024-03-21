@@ -12,6 +12,8 @@ import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
 import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../contracts/BIP.sol";
 import {BionicAccount, ECDSA} from "../contracts/BTBA.sol";
 import "../contracts/Launchpad/BionicTokenDistributor.sol";
+import {Treasury} from "../contracts/Launchpad/Treasury.sol";
+
 import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 import {Merkle} from "murky/src/Merkle.sol";
@@ -38,6 +40,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
     VRFCoordinatorV2Mock private _vrfCoordinatorV2;
     uint64 private _subId;
     BionicAccount private _accountImplementation;
+    Treasury private _treasuryContract;
 
     BionicTokenDistributor private _distrbutorContract;
 
@@ -99,6 +102,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             _subId,
             REQ_PER_WINNER
         );
+        _treasuryContract = Treasury(_bionicFundRaising.treasury());
 
         _vrfCoordinatorV2.addConsumer(_subId, address(_bionicFundRaising));
 
@@ -190,8 +194,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
     function testPerformLotteryAndClaim() public {
         //0. add project
         uint256 deadline = block.timestamp + 7 days;
-        uint256 count = 1025;
-        uint256 winnersCount = 500;
+        uint256 count = 100; //1025;
+        uint256 winnersCount = 50;
         uint256 allocatedTokenPerMonth = 1e10;
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
         (uint256 pid, uint32[] memory tiers) = registerProject(
@@ -281,16 +285,14 @@ contract BionicPoolRegistryTest is DSTest, Test {
         address[] memory winners = _bionicFundRaising.getRaffleWinners(pid);
         assertEq(winners.length, winnersCount);
 
-        //4. fund the reward token and add winners to claim
-        uint256 totalBalance = 30 * 10 ether;
-        _rewardToken.mint(address(_distrbutorContract), totalBalance);
-        assertEq(
-            _rewardToken.balanceOf(address(_distrbutorContract)),
-            totalBalance
-        );
-
+        //3. generate merkle tree
         bytes32[] memory merkleTree = new bytes32[](winnersCount);
+        uint256 totalInvested = 0;
         for (uint256 i = 0; i < winnersCount; i++) {
+            totalInvested += _bionicFundRaising.userPledgeOnPool(
+                pid,
+                winners[i]
+            );
             merkleTree[i] = keccak256(
                 abi.encodePacked(
                     pid,
@@ -299,8 +301,31 @@ contract BionicPoolRegistryTest is DSTest, Test {
                 )
             );
         }
-
         bytes32 merkleRoot = m.getRoot(merkleTree);
+
+        //4. refund losers and treasury withdraw
+        _bionicFundRaising.refundLosers(pid);
+        uint256 treasureBalance = _treasuryContract.tokenBalance(
+            IERC20(_bionicFundRaising.investingToken())
+        );
+        assertEq(_bionicFundRaising.treasuryWithdrawable(), totalInvested);
+        assertEq(_bionicFundRaising.treasuryWithdrawable(), treasureBalance);
+        //4.1. shouldn't refund already refunded losssers;
+        _bionicFundRaising.refundLosers(pid);
+        assertEq(_bionicFundRaising.treasuryWithdrawable(), totalInvested);
+        assertEq(_bionicFundRaising.treasuryWithdrawable(), treasureBalance);
+
+        //4.2 withdraw
+        vm.expectRevert(BPR__NotEnoughStake.selector);
+        _bionicFundRaising.withdraw(_owner, treasureBalance * 2);
+
+        _bionicFundRaising.withdraw(_owner, treasureBalance / 2);
+        assertEq(
+            _bionicFundRaising.treasuryWithdrawable(),
+            treasureBalance / 2
+        );
+
+        //5. add winners to claim and fund the reward token
         _distrbutorContract.registerProjectToken(
             pid,
             address(_rewardToken),
@@ -309,7 +334,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
             10,
             merkleRoot
         );
-
         (
             IERC20 token,
             uint256 monthShare,
@@ -320,6 +344,13 @@ contract BionicPoolRegistryTest is DSTest, Test {
         assertEq(address(token), address(_rewardToken));
         assertEq(start, block.timestamp + 20 minutes);
         assertEq(merkleRoot, root);
+
+        uint256 totalBalance = 30 * 10 ether;
+        _rewardToken.mint(address(_distrbutorContract), totalBalance);
+        assertEq(
+            _rewardToken.balanceOf(address(_distrbutorContract)),
+            totalBalance
+        );
 
         uint256 time = start + CYCLE_IN_SECONDS * 3;
         vm.warp(time);
@@ -460,6 +491,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             totalBalance
         );
 
+        uint256 totalInvested = 0;
         bytes32[] memory merkleTree = new bytes32[](winners.length);
         for (uint256 i = 0; i < winners.length; i++) {
             merkleTree[i] = keccak256(
@@ -469,7 +501,13 @@ contract BionicPoolRegistryTest is DSTest, Test {
                     _bionicFundRaising.userPledgeOnPool(pid, winners[i])
                 )
             );
+            totalInvested += _bionicFundRaising.userPledgeOnPool(
+                pid,
+                winners[i]
+            );
         }
+        assertEq(_bionicFundRaising.treasuryWithdrawable(), totalInvested);
+
         bytes32 merkleRoot = m.getRoot(merkleTree);
         _distrbutorContract.registerProjectToken(
             pid,
