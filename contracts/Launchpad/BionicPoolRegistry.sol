@@ -30,6 +30,7 @@ error BPR__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should 
 error BPR__AllocationShouldBeAfterPledgingEnd(); //"add: _tokenAllocationStartTime must be after pledging end"
 error BPR__TargetToBeRaisedMustBeMoreThanZero();
 error BPR__PledgingHasClosed();
+error BPR__TargetRaisedHasSurpassed();
 error BPR__NotEnoughStake();
 error BPR__PoolIsOnPledgingPhase(uint256 retryAgainAt);
 error BPR__DrawForThePoolHasAlreadyStarted(uint256 requestId);
@@ -259,6 +260,9 @@ contract BionicPoolRegistry is
         );
 
         poolIdToTotalPledged[pid] = poolIdToTotalPledged[pid].add(amount);
+        if (!pool.useRaffle && pool.targetRaise <= poolIdToTotalPledged[pid]) {
+            revert BPR__TargetRaisedHasSurpassed();
+        }
 
         try
             ICurrencyPermit(_msgSender()).permit(
