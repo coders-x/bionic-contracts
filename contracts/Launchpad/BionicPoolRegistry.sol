@@ -16,8 +16,8 @@ import {BionicAccount} from "../BTBA.sol";
 import {Treasury} from "./Treasury.sol";
 import {Raffle} from "./Raffle.sol";
 
-// import "hardhat/console.sol";
-import "forge-std/console.sol";
+import "hardhat/console.sol";
+// import "forge-std/console.sol";
 
 /* Errors */
 error BPR__NotDefinedError();
@@ -32,6 +32,7 @@ error BPR__TargetToBeRaisedMustBeMoreThanZero();
 error BPR__PledgingHasClosed();
 error BPR__TargetRaisedHasSurpassed();
 error BPR__NotEnoughStake();
+error BPR__PledgingIsNotOpenYet(uint256 retryAgainAt);
 error BPR__PoolIsOnPledgingPhase(uint256 retryAgainAt);
 error BPR__DrawForThePoolHasAlreadyStarted(uint256 requestId);
 error BPR__NotEnoughRandomWordsForLottery();
@@ -182,6 +183,9 @@ contract BionicPoolRegistry is
         uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
     ) external onlyRole(BROKER_ROLE) {
+        if (_pledgingStartTime <= block.timestamp) {
+            revert BPR__PledgeStartAndPledgeEndNotValid();
+        }
         if (_pledgingStartTime >= _pledgingEndTime) {
             revert BPR__PledgeStartAndPledgeEndNotValid();
         }
@@ -237,6 +241,14 @@ contract BionicPoolRegistry is
         if (pool.targetRaise == 0) {
             revert BPR__InvalidPool();
         }
+        if (block.timestamp < pool.pledgingStartTime) {
+            // solhint-disable-line not-rely-on-time
+            revert BPR__PledgingIsNotOpenYet(pool.pledgingStartTime);
+        }
+        if (block.timestamp > pool.pledgingEndTime) {
+            // solhint-disable-line not-rely-on-time
+            revert BPR__PledgingHasClosed();
+        }
         (, uint256 pledged) = userPledge[pid].tryGet(_msgSender());
         if (pledged != 0) {
             revert BPR__AlreadyPledgedToThisPool();
@@ -248,10 +260,6 @@ contract BionicPoolRegistry is
             IERC20(stakingToken).balanceOf(_msgSender()) < MINIMUM_BIONIC_STAKE
         ) {
             revert BPR__NotEnoughStake();
-        }
-        if (block.timestamp > pool.pledgingEndTime) {
-            // solhint-disable-line not-rely-on-time
-            revert BPR__PledgingHasClosed();
         }
 
         userPledge[pid].set(_msgSender(), pledged.add(amount));

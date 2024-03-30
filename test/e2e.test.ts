@@ -9,7 +9,6 @@ import {
 }
     from "../typechain-types";
 import { BionicStructs } from "../typechain-types/contracts/Launchpad/BionicPoolRegistry";
-import { BytesLike } from "ethers";
 
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
@@ -41,7 +40,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0xD0Bfe42B8B1af441E3C43D87c9e2AD509BbB499E",
+    accountAddress: "0x26798C81227e81d9cb5491E373c94128f74Df32C",
     automationUpdateInterval: "30",
 };
 
@@ -52,8 +51,8 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ACCOUNT_ADDRESS = NETWORK_CONFIG.accountAddress,
     CALLBACK_GAS_LIMIT_PER_USER = 90300,
     REQUEST_VRF_PER_WINNER = true,
-    PLEDGING_START_TIME = 20000000,
-    PLEDGING_END_TIME = 2694616991,
+    PLEDGING_START_TIME = 1810704849,
+    PLEDGING_END_TIME = 2710704849,
     tokenAllocationStartTime = PLEDGING_END_TIME + 1000,
     PLEDGE_AMOUNT = 1000,
     TIER_ALLOCATION = [3, 2, 1];
@@ -228,6 +227,11 @@ describe("e2e", function () {
                     .add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
                     .to.be.reverted;
             });
+            it("Should fail if the time is less than now", async function () {
+                const t = Math.floor(Date.now() / 10000);
+                await expect(BionicPoolRegistry.add(0, t, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
+                    .to.revertedWithCustomError(BionicPoolRegistry, "BPR__PledgeStartAndPledgeEndNotValid");
+            });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await BionicPoolRegistry.hasRole(await BionicPoolRegistry.BROKER_ROLE(), owner.address)).to.be.true;
                 await expect(BionicPoolRegistry.add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
@@ -260,8 +264,10 @@ describe("e2e", function () {
                 await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWithCustomError(BionicPoolRegistry, "BPR__InvalidPool")//("pledge: Invalid PID");
             });
+
             it("Should fail if not enough amount pledged", async function () {
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 0, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await helpers.time.increaseTo(PLEDGING_START_TIME + 10);
                 await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWithCustomError(BionicPoolRegistry, "BPR__NotValidPledgeAmount").withArgs(0);
             });

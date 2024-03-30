@@ -306,7 +306,7 @@ async function main(level: number, pid: number = 0) {
                         })
                 ).wait(1);
                 console.log(
-                    `approved and moved ${res.events[6]} `
+                    `approved and moved ${JSON.stringify(res.events)} `
                 );
             } catch (err) {
                 console.error(err);
@@ -447,4 +447,4 @@ async function getCurrencyPermitSignature(
     );
 }
 //step, pid
-main(2, 0).then(console.log).catch(console.error);
+main(4, 189).then(console.log).catch(console.error);

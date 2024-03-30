@@ -29,7 +29,7 @@ const config: HardhatUserConfig = {
       },
       forking: {
         url: process.env.ARB_RPC as string,
-        blockNumber: 24200000
+        blockNumber: 28200000
       }
     },
     goerli: {

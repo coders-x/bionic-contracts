@@ -18,7 +18,7 @@ import {Bionic} from "../contracts/Bionic.sol";
 import {BionicStructs} from "../contracts/libs/BionicStructs.sol";
 import {Merkle} from "murky/src/Merkle.sol";
 
-import "forge-std/console.sol";
+// import "forge-std/console.sol";
 
 contract BionicPoolRegistryTest is DSTest, Test {
     address public constant ENTRY_POINT =
@@ -133,7 +133,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         pt[2] = BionicStructs.PledgeTier(3, 5000, 5000);
         _bionicFundRaising.add(
             pid,
-            block.timestamp,
+            block.timestamp + 1 minutes,
             block.timestamp + 10 minutes,
             // 1000, 1k
             allocatedTokenPerMonth,
@@ -206,6 +206,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
         BionicAccount[] memory accs = new BionicAccount[](count);
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
             .pledgeTiers(pid);
+
+        vm.warp(block.timestamp + 2 minutes);
         //1. pledge
         for (uint256 i = 0; i < count; i++) {
             address user = vm.addr(privateKeys[i * 2]);
@@ -406,6 +408,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
         BionicAccount[] memory accs = new BionicAccount[](count);
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
             .pledgeTiers(pid);
+
+        vm.warp(block.timestamp + 2 minutes);
 
         //1. pledge
         for (uint256 i = 0; i < count; i++) {
