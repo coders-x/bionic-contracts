@@ -19,8 +19,7 @@ async function main() {
 
 
     await verifyContract(contract, [
-        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass,
-        CONFIG.vrfCoordinator, CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner
+        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass
     ]);
 }
 
@@ -29,8 +28,7 @@ async function deployContract(opt: FactoryOptions) {
     console.log(`Deploying BionicPoolRegistry contract...`);
     const BionicPoolRegistryContract = await ethers.getContractFactory("BionicPoolRegistry", opt);
     const args = [
-        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass, CONFIG.vrfCoordinator,
-        CONFIG.keyHash, CONFIG.subId, CONFIG.reqVRFPerWinner
+        CONFIG.tokenAddress, CONFIG.usdtAddress, CONFIG.bionicInvestorPass
     ];
     let BRPContract = await upgrades.deployProxy(BionicPoolRegistryContract, args, {
         initializer: "initialize",
