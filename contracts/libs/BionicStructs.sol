@@ -36,19 +36,4 @@ library BionicStructs {
         uint256 minimumPledge; // Minimum pledge amount for this tier
         uint256 maximumPledge; // Maximum pledge amount for this tier
     }
-
-    /// @dev Info of each TierInPool.
-    struct Tier {
-        uint32 count;
-        address[] members;
-    }
-
-    // Iterable mapping from address to uint;
-    struct Map {
-        bool isTrue;
-        address[] keys;
-        mapping(address => UserInfo) values;
-        mapping(address => uint) indexOf;
-        mapping(address => bool) inserted;
-    }
 }

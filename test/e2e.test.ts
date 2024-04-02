@@ -4,7 +4,7 @@ import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
     IERC20Permit, ERC6551Registry, BionicPoolRegistry, ERC20Upgradeable, BionicAccount, MockEntryPoint,
-    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ERC20,
+    BionicInvestorPass, Bionic, ERC20,
     BionicTokenDistributor
 }
     from "../typechain-types";
@@ -40,7 +40,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x26798C81227e81d9cb5491E373c94128f74Df32C",
+    accountAddress: "0x74a641b6cAb6C8e753C069cC9942F164d7c8ec15",
     automationUpdateInterval: "30",
 };
 
@@ -60,8 +60,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, BionicPoolRegistry: BionicPoolRegistry,
         tokenBoundImpContract: BionicAccount, abstractedAccount: BionicAccount, AbstractAccounts: BionicAccount[],
-        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock,
-        DistributorContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
+        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, DistributorContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
     let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
@@ -116,13 +115,9 @@ describe("e2e", function () {
 
 
         // setup VRF_MOCK
-        let { VRFCoordinatorV2MockContract, subscriptionId } = await deployVRFCoordinatorV2Mock();
-
-        vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
         BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, usdtContract.address, bipContract.address);
 
         DistributorContract = await deployBionicTokenDistributor();
-        await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, BionicPoolRegistry.address);
     });
 
     describe("Bionic", function () {
