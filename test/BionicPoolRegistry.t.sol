@@ -6,7 +6,6 @@ import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../contracts/Launchpad/BionicPoolRegistry.sol";
-import {VRFCoordinatorV2Mock} from "../contracts/libs/VRFCoordinatorV2Mock.sol";
 import {ERC6551Registry} from "tokenbound/lib/erc6551/src/ERC6551Registry.sol";
 import {AccountGuardian} from "../contracts/libs/AccountGuardian.sol";
 import {BionicInvestorPass, BIP__Deprecated, BIP__InvalidSigniture} from "../contracts/BIP.sol";
@@ -37,7 +36,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
     Bionic private _bionicToken;
     ERC20Mock private _investingToken;
     BionicInvestorPass private _bipContract;
-    VRFCoordinatorV2Mock private _vrfCoordinatorV2;
     uint64 private _subId;
     BionicAccount private _accountImplementation;
     Treasury private _treasuryContract;
@@ -80,12 +78,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
         );
         _bipContract.initialize();
         _investingToken = new ERC20Mock("USD TETHER", "USDT");
-        _vrfCoordinatorV2 = new VRFCoordinatorV2Mock(
-            100000000000000000,
-            1000000000
-        );
-        _subId = _vrfCoordinatorV2.createSubscription();
-        _vrfCoordinatorV2.fundSubscription(_subId, 10e18);
 
         _rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
         _rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
@@ -96,15 +88,9 @@ contract BionicPoolRegistryTest is DSTest, Test {
         _bionicFundRaising.initialize(
             IERC20(address(_bionicToken)),
             _investingToken,
-            address(_bipContract),
-            address(_vrfCoordinatorV2),
-            GAS_LANE,
-            _subId,
-            REQ_PER_WINNER
+            address(_bipContract)
         );
         _treasuryContract = Treasury(_bionicFundRaising.treasury());
-
-        _vrfCoordinatorV2.addConsumer(_subId, address(_bionicFundRaising));
 
         _distrbutorContract = new BionicTokenDistributor();
 
@@ -118,13 +104,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
 
     function registerProject(
         bool useRaffle,
-        uint256 allocatedTokenPerMonth,
-        uint256 totalWinners
-    ) public returns (uint256 pid, uint32[] memory t) {
-        t = new uint32[](3);
-        t[0] = uint32((3 * totalWinners) / 5); //300;
-        t[1] = uint32(totalWinners / 5); //100;
-        t[2] = uint32(totalWinners / 5); //100;
+        uint256 allocatedTokenPerMonth
+    ) public returns (uint256 pid) {
         BionicStructs.PledgeTier[] memory pt = new BionicStructs.PledgeTier[](
             3
         );
@@ -141,7 +122,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
             10,
             10e18,
             useRaffle,
-            t,
             pt
         );
 
@@ -161,11 +141,11 @@ contract BionicPoolRegistryTest is DSTest, Test {
         //     }
         // }
 
-        return (pid, t);
+        return (pid);
     }
 
     function testAddProject() public {
-        (uint256 pid, ) = registerProject(false, 100, 500);
+        uint256 pid = registerProject(false, 100);
         (
             ,
             ,
@@ -191,219 +171,13 @@ contract BionicPoolRegistryTest is DSTest, Test {
         assertEq(10, tokenAllocationMonthCount);
     }
 
-    function testPerformLotteryAndClaim() public {
-        //0. add project
-        uint256 deadline = block.timestamp + 7 days;
-        uint256 count = 100; //1025;
-        uint256 winnersCount = 50;
-        uint256 allocatedTokenPerMonth = 1e10;
-        uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
-        (uint256 pid, uint32[] memory tiers) = registerProject(
-            true,
-            allocatedTokenPerMonth,
-            winnersCount
-        );
-        BionicAccount[] memory accs = new BionicAccount[](count);
-        BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
-            .pledgeTiers(pid);
-
-        vm.warp(block.timestamp + 2 minutes);
-        //1. pledge
-        for (uint256 i = 0; i < count; i++) {
-            address user = vm.addr(privateKeys[i * 2]);
-            address guardian = vm.addr(privateKeys[(i * 2) + 1]);
-
-            _bipContract.safeMint(user, guardian, "");
-            address accountAddress = erc6551_Registry.createAccount(
-                address(_accountImplementation),
-                "",
-                block.chainid,
-                address(_bipContract),
-                i
-            );
-            _bionicToken.transfer(
-                accountAddress,
-                _bionicFundRaising.MINIMUM_BIONIC_STAKE()
-            );
-            uint256 amount = pledgeTiers[i % 3].minimumPledge;
-            _investingToken.mint(accountAddress, amount ** 5);
-            BionicAccount acc = BionicAccount(payable(accountAddress));
-            accs[i] = acc;
-            bytes32 structHash = ECDSA.toTypedDataHash(
-                acc.DOMAIN_SEPARATOR(),
-                keccak256(
-                    abi.encode(
-                        acc.CURRENCY_PERMIT_TYPEHASH(),
-                        _investingToken,
-                        address(_bionicFundRaising),
-                        amount,
-                        acc.getNonce(),
-                        deadline
-                    )
-                )
-            );
-
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(
-                privateKeys[i * 2],
-                structHash
-            );
-
-            vm.prank(user);
-            bytes memory data = abi.encodeWithSelector(
-                _bionicFundRaising.pledge.selector,
-                pid,
-                amount,
-                deadline,
-                v,
-                r,
-                s
-            );
-            // will call _bionicContract.pledge(pid, amount, deadline, v, r, s).;
-            acc.execute(address(_bionicFundRaising), 0, data, 0);
-        }
-
-        //2. accounts pledged lets add them to tiers
-        uint256 k = 0; //index of account
-        uint256 userPerWinner = accs.length / winnersCount;
-        for (uint256 i = 0; i < tiers.length - 1; i++) {
-            address[] memory accounts = new address[](tiers[i] * userPerWinner);
-            for (uint256 j = 0; j < tiers[i] * userPerWinner; j++) {
-                accounts[j] = address(accs[k++]);
-            }
-            _bionicFundRaising.addToTier(pid, i, accounts);
-        }
-
-        //3. move time and do draw get the winners
-        (, , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
-            .poolInfo(pid);
-        vm.warp(tokenAllocationStartTime - 5 minutes);
-        uint256 requestId = _bionicFundRaising.draw(pid, 1000000);
-
-        _vrfCoordinatorV2.fulfillRandomWords(
-            requestId,
-            address(_bionicFundRaising)
-        );
-
-        address[] memory winners = _bionicFundRaising.getRaffleWinners(pid);
-        assertEq(winners.length, winnersCount);
-
-        //3. generate merkle tree
-        bytes32[] memory merkleTree = new bytes32[](winnersCount);
-        uint256 totalInvested = 0;
-        for (uint256 i = 0; i < winnersCount; i++) {
-            totalInvested += _bionicFundRaising.userPledgeOnPool(
-                pid,
-                winners[i]
-            );
-            merkleTree[i] = keccak256(
-                abi.encodePacked(
-                    pid,
-                    winners[i],
-                    _bionicFundRaising.userPledgeOnPool(pid, winners[i])
-                )
-            );
-        }
-        bytes32 merkleRoot = m.getRoot(merkleTree);
-
-        //4. refund losers and treasury withdraw
-        _bionicFundRaising.refundLosers(pid);
-        uint256 treasureBalance = _treasuryContract.tokenBalance(
-            IERC20(_bionicFundRaising.investingToken())
-        );
-        assertEq(_bionicFundRaising.treasuryWithdrawable(), totalInvested);
-        assertEq(_bionicFundRaising.treasuryWithdrawable(), treasureBalance);
-        //4.1. shouldn't refund already refunded losssers;
-        _bionicFundRaising.refundLosers(pid);
-        assertEq(_bionicFundRaising.treasuryWithdrawable(), totalInvested);
-        assertEq(_bionicFundRaising.treasuryWithdrawable(), treasureBalance);
-
-        //4.2 withdraw
-        vm.expectRevert(BPR__NotEnoughStake.selector);
-        _bionicFundRaising.withdraw(_owner, treasureBalance * 2);
-
-        _bionicFundRaising.withdraw(_owner, treasureBalance / 2);
-        assertEq(
-            _bionicFundRaising.treasuryWithdrawable(),
-            treasureBalance / 2
-        );
-
-        //5. add winners to claim and fund the reward token
-        _distrbutorContract.registerProjectToken(
-            pid,
-            address(_rewardToken),
-            allocatedTokenPerMonth,
-            block.timestamp + 20 minutes,
-            10,
-            merkleRoot
-        );
-        (
-            IERC20 token,
-            uint256 monthShare,
-            uint256 start,
-            ,
-            bytes32 root
-        ) = _distrbutorContract.s_projectTokens(pid);
-        assertEq(address(token), address(_rewardToken));
-        assertEq(start, block.timestamp + 20 minutes);
-        assertEq(merkleRoot, root);
-
-        uint256 totalBalance = 30 * 10 ether;
-        _rewardToken.mint(address(_distrbutorContract), totalBalance);
-        assertEq(
-            _rewardToken.balanceOf(address(_distrbutorContract)),
-            totalBalance
-        );
-
-        uint256 time = start + CYCLE_IN_SECONDS * 3;
-        vm.warp(time);
-        for (uint256 i = 0; i < winners.length; i++) {
-            uint256 claimable = 3 *
-                (monthShare *
-                    _bionicFundRaising.userPledgeOnPool(pid, winners[i]));
-
-            (uint256 userClaim, ) = _distrbutorContract.calcClaimableAmount(
-                pid,
-                winners[i],
-                _bionicFundRaising.userPledgeOnPool(pid, winners[i])
-            );
-
-            assertEq(userClaim, claimable);
-            vm.prank(winners[i]);
-            bytes32[] memory proof = m.getProof(merkleTree, i);
-            vm.expectEmit(address(_distrbutorContract));
-            emit BionicTokenDistributor.Claimed(pid, winners[i], 3, userClaim);
-            _distrbutorContract.claim(
-                pid,
-                winners[i],
-                _bionicFundRaising.userPledgeOnPool(pid, winners[i]),
-                proof
-            );
-            totalBalance -= claimable;
-            assertEq(_rewardToken.balanceOf(winners[i]), claimable);
-            assertEq(
-                _rewardToken.balanceOf(address(_distrbutorContract)),
-                totalBalance
-            );
-        }
-        // vm.warp(time+1 days);
-        // for (uint256 i = 0; i < winners.length; i++) {
-        //     bytes32[] memory proof = m.getProof(merkleTree, i);
-        //     vm.expectRevert(Distributor__NothingToClaim.selector);
-        //     _distrbutorContract.claim(pid,winners[i],_bionicFundRaising.userPledgeOnPool(pid, winners[i]),proof);
-        // }
-    }
-
     function testPerformInvestmentAndClaim() public {
         //0. add project
         uint256 allocatedTokenPerMonth = 1e10;
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 10;
-        uint256 winnersCount = 500;
-        (uint256 pid, uint32[] memory tiers) = registerProject(
-            false,
-            allocatedTokenPerMonth,
-            winnersCount
-        );
+        // uint256 winnersCount = 500;
+        uint256 pid = registerProject(false, allocatedTokenPerMonth);
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
         BionicAccount[] memory accs = new BionicAccount[](count);
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
@@ -463,24 +237,11 @@ contract BionicPoolRegistryTest is DSTest, Test {
             // will call _bionicContract.pledge(pid, amount, deadline, v, r, s).;
             acc.execute(address(_bionicFundRaising), 0, data, 0);
         }
-        //2. shouldn't be added to tierpools for lottery
-        uint256 k = 0; //index of account
-        uint256 userPerWinner = accs.length / winnersCount;
-        for (uint256 i = 0; i < tiers.length - 1; i++) {
-            address[] memory accounts = new address[](tiers[i] * userPerWinner);
-            for (uint256 j = 0; j < tiers[i] * userPerWinner; j++) {
-                accounts[j] = address(accs[k++]);
-            }
-            vm.expectRevert(BPR__PoolRaffleDisabled.selector);
-            _bionicFundRaising.addToTier(pid, i, accounts);
-        }
-        // //3. move time and do draw get the winners
+
+        //2. move time and do draw get the winners
         (, , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
-
-        vm.expectRevert(BPR__PoolRaffleDisabled.selector);
-        _bionicFundRaising.draw(pid, 1000000);
 
         (, address[] memory winners) = _bionicFundRaising.getProjectInvestors(
             pid

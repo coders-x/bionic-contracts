@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity ^0.8.0;
 
 library BionicStructs {
     /// @dev Details about each user in a pool
@@ -35,20 +35,5 @@ library BionicStructs {
         uint256 tierId;
         uint256 minimumPledge; // Minimum pledge amount for this tier
         uint256 maximumPledge; // Maximum pledge amount for this tier
-    }
-
-    /// @dev Info of each TierInPool.
-    struct Tier {
-        uint32 count;
-        address[] members;
-    }
-
-    // Iterable mapping from address to uint;
-    struct Map {
-        bool isTrue;
-        address[] keys;
-        mapping(address => UserInfo) values;
-        mapping(address => uint) indexOf;
-        mapping(address => bool) inserted;
     }
 }

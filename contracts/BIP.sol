@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
@@ -13,7 +13,6 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
 import "./libs/CurrencyTransferLib.sol";
-
 
 error BIP__Deprecated();
 error BIP__AccountRescueSignitureOutDated();
@@ -181,7 +180,7 @@ contract BionicInvestorPass is
         uint256 batchSize
     ) internal override whenNotPaused {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
-        require(this.balanceOf(to) == 0, "already have been MINTED Membership");
+        require(balanceOf(to) == 0, "already have been MINTED Membership");
     }
 
     function _authorizeUpgrade(
@@ -194,58 +193,5 @@ contract BionicInvestorPass is
         uint256 tokenId
     ) internal override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
         super._burn(tokenId);
-    }
-
-    function _canLazyMint() internal view virtual returns (bool) {
-        return hasRole(MINTER_ROLE, msg.sender);
-    }
-
-    /// @dev Collects and distributes the primary sale value of NFTs being claimed.
-    function _collectPriceOnClaim(
-        address _primarySaleRecipient,
-        uint256 _quantityToClaim,
-        address _currency,
-        uint256 _pricePerToken
-    ) internal virtual {
-        if (_pricePerToken == 0) {
-            return;
-        }
-
-        address saleRecipient = _primarySaleRecipient == address(0)
-            ? platformFeeRecipient
-            : _primarySaleRecipient;
-
-        uint256 totalPrice = _quantityToClaim * _pricePerToken;
-
-        if (_currency == CurrencyTransferLib.NATIVE_TOKEN) {
-            if (msg.value != totalPrice) {
-                revert("!Price");
-            }
-        }
-
-        CurrencyTransferLib.transferCurrency(
-            _currency,
-            _msgSender(),
-            saleRecipient,
-            totalPrice
-        );
-    }
-
-    function _transferTokensOnClaim(
-        address _to,
-        uint256 _quantityBeingClaimed
-    ) internal virtual returns (uint256 startTokenId) {
-        startTokenId = _tokenIdCounter.current();
-        _tokenIdCounter.increment();
-        _safeMint(_to, _quantityBeingClaimed);
-    }
-
-    function _canSetClaimConditions()
-        internal
-        view
-        virtual
-        returns (bool)
-    {
-        return hasRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 }

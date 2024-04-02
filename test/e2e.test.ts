@@ -4,7 +4,7 @@ import { ethers, upgrades, network } from "hardhat";
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import {
     IERC20Permit, ERC6551Registry, BionicPoolRegistry, ERC20Upgradeable, BionicAccount, MockEntryPoint,
-    BionicInvestorPass, Bionic, VRFCoordinatorV2Mock, ERC20,
+    BionicInvestorPass, Bionic, ERC20,
     BionicTokenDistributor
 }
     from "../typechain-types";
@@ -40,7 +40,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x26798C81227e81d9cb5491E373c94128f74Df32C",
+    accountAddress: "0xC639D856C99948895EA963e89D8161348cfD6A9e",
     automationUpdateInterval: "30",
 };
 
@@ -60,8 +60,7 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, BionicPoolRegistry: BionicPoolRegistry,
         tokenBoundImpContract: BionicAccount, abstractedAccount: BionicAccount, AbstractAccounts: BionicAccount[],
-        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, vrfCoordinatorV2MockContract: VRFCoordinatorV2Mock,
-        DistributorContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
+        usdtContract: ERC20Upgradeable, tokenBoundContractRegistry: ERC6551Registry, DistributorContract: BionicTokenDistributor, mockEntryPoint: MockEntryPoint;
     let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
@@ -116,13 +115,9 @@ describe("e2e", function () {
 
 
         // setup VRF_MOCK
-        let { VRFCoordinatorV2MockContract, subscriptionId } = await deployVRFCoordinatorV2Mock();
-
-        vrfCoordinatorV2MockContract = VRFCoordinatorV2MockContract;
-        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, usdtContract.address, bipContract.address, VRFCoordinatorV2MockContract.address, NETWORK_CONFIG.keyHash, subscriptionId, REQUEST_VRF_PER_WINNER);
+        BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, usdtContract.address, bipContract.address);
 
         DistributorContract = await deployBionicTokenDistributor();
-        await VRFCoordinatorV2MockContract.addConsumer(subscriptionId, BionicPoolRegistry.address);
     });
 
     describe("Bionic", function () {
@@ -224,26 +219,24 @@ describe("e2e", function () {
             const tokenAllocationPerMonth = 100, tokenAllocationMonthCount = 10, targetRaise = PLEDGE_AMOUNT * PLEDGE_AMOUNT
             it("Should fail if the not BROKER", async function () {
                 await expect(BionicPoolRegistry.connect(client)
-                    .add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
+                    .add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
                     .to.be.reverted;
             });
             it("Should fail if the time is less than now", async function () {
                 const t = Math.floor(Date.now() / 10000);
-                await expect(BionicPoolRegistry.add(0, t, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
+                await expect(BionicPoolRegistry.add(0, t, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
                     .to.revertedWithCustomError(BionicPoolRegistry, "BPR__PledgeStartAndPledgeEndNotValid");
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await BionicPoolRegistry.hasRole(await BionicPoolRegistry.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(BionicPoolRegistry.add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, TIER_ALLOCATION, pledgingTiers))
+                await expect(BionicPoolRegistry.add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
                     .to.emit(BionicPoolRegistry, "PoolAdded").withArgs(0)
             });
             it("Should return same Pool upon request", async () => {
                 let pool = await BionicPoolRegistry.poolInfo(0);
-                let poolTiers = await BionicPoolRegistry.poolIdToTiers(0, 0);
+                // let poolTiers = await BionicPoolRegistry.poolIdToTiers(0, 0);
                 let pledgeTier = await BionicPoolRegistry.pledgeTiers(0);
 
-                expect(poolTiers).to.equal(3);
-                // expect(pool.rewardToken).to.equal(bionicContract.address);
                 expect(pool.tokenAllocationStartTime).to.equal(tokenAllocationStartTime);
                 expect(pool.pledgingEndTime).to.equal(PLEDGING_END_TIME);
                 expect(pool.targetRaise).to.equal(targetRaise);
@@ -330,98 +323,6 @@ describe("e2e", function () {
                 // expect(await abstractedAccount.allowance(usdtContract.address, BionicPoolRegistry.address)).to.equal(0).not.equal(amount);
             });
 
-
-            it("Should fail to start lottery with non sorting account", async () => {
-                await expect(BionicPoolRegistry.connect(client).draw(0, CALLBACK_GAS_LIMIT_PER_USER))
-                    .to.be.revertedWith("AccessControl: account 0x70997970c51812dc3a010c7d01b50e0d17dc79c8 is missing role 0xee105fb4f48cea3e27a2ec9b51034ccdeeca8dc739abb494f43b522e54dd924d");
-            })
-            it("Should fail to start if tiers haven't been added", async () => {
-                await helpers.time.increaseTo(tokenAllocationStartTime);
-                await expect(BionicPoolRegistry.draw(0, CALLBACK_GAS_LIMIT_PER_USER))
-                    .to.revertedWithCustomError(BionicPoolRegistry, "BPR__TiersHaveNotBeenInitialized");
-            })
-
-            it("should fail if member hasn't pledged to lottery", async () => {
-                let pid = 0, tierId = 0, members = ["0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"];
-                await expect(BionicPoolRegistry.addToTier(pid, tierId, members))
-                    .to.revertedWithCustomError(BionicPoolRegistry, "BPR__TierMembersShouldHaveAlreadyPledged")
-                    .withArgs(pid, tierId);
-            })
-            it("should add user to tier 1", async () => {
-                let pid = 0, tierId = 0, members = [abstractedAccount.address];
-                await expect(BionicPoolRegistry.addToTier(pid, tierId, members))
-                    .to.emit(BionicPoolRegistry, "TierInitiated").withArgs(pid, tierId, members);
-            })
-            it("should fail to add user to other tier", async () => {
-                let pid = 0, tierId = 1, members = [abstractedAccount.address];
-                await expect(BionicPoolRegistry.addToTier(pid, tierId, members))
-                    .to.revertedWithCustomError(BionicPoolRegistry, "Raffle__MembersOnlyPermittedInOneTier")
-                    .withArgs(members[0], 0, tierId);
-            })
-            it("should add users to tiers except for the last tier.", async () => {
-                let pid = 0, j = 1;
-                for (let tierId = 0; tierId < TIER_ALLOCATION.length - 1; tierId++) {
-                    const members = AbstractAccounts.slice(j, j + TIER_ALLOCATION[tierId] + 1).map((v) => v.address);
-                    j += TIER_ALLOCATION[tierId] + 1
-                    await expect(BionicPoolRegistry.addToTier(pid, tierId, members))
-                        .to.emit(BionicPoolRegistry, "TierInitiated").withArgs(pid, tierId, members);
-                }
-            })
-
-            it("Should request random numbers for the pool Winners Raffle", async () => {
-                await expect(BionicPoolRegistry.draw(100000, CALLBACK_GAS_LIMIT_PER_USER), "invalid poolId")
-                    .to.revertedWithCustomError(BionicPoolRegistry, "BPR__InvalidPool");
-
-                await expect(BionicPoolRegistry.draw(0, CALLBACK_GAS_LIMIT_PER_USER))
-                    .to.emit(BionicPoolRegistry, "DrawInitiated").withArgs(0, 1);
-
-                await expect(BionicPoolRegistry.draw(0, CALLBACK_GAS_LIMIT_PER_USER), "invalid poolId")
-                    .to.revertedWithCustomError(BionicPoolRegistry, "BPR__DrawForThePoolHasAlreadyStarted");
-            });
-
-            it("Should Receive Random words and chose winners", async () => {
-                const HUNDRED_THOUSAND = ethers.utils.parseUnits("100000", 6);
-                const winners = [AbstractAccounts[2].address,
-                AbstractAccounts[4].address,
-                AbstractAccounts[1].address,
-                AbstractAccounts[6].address,
-                AbstractAccounts[5].address,
-                AbstractAccounts[10].address]
-                expect(await usdtContract.balanceOf(BionicPoolRegistry.address)).to.be.equal(0);
-                expect(await usdtContract.balanceOf(abstractedAccount.address)).to.be.equal(HUNDRED_THOUSAND.sub(1000));
-                await expect(
-                    BionicPoolRegistry.refundLosers(
-                        0
-                    )
-                ).to.revertedWithCustomError(BionicPoolRegistry, "BPR__LotteryIsPending");
-
-                // simulate callback from the oracle network
-                await expect(
-                    vrfCoordinatorV2MockContract.fulfillRandomWords(
-                        1,
-                        BionicPoolRegistry.address
-                    )
-                ).to.emit(BionicPoolRegistry, "WinnersPicked").withArgs(0, winners);
-                // simulate callback from the oracle network
-                await expect(
-                    BionicPoolRegistry.refundLosers(
-                        0
-                    )
-                )
-                    .to.emit(BionicPoolRegistry, "LotteryRefunded");
-
-
-                let losers = AbstractAccounts.filter((v, i) => !winners.includes(v.address) && i < 12)
-                expect(losers.length).to.equal(5);
-                for (const w of winners) {
-                    let pledge = await BionicPoolRegistry.userTotalPledge(w)
-                    expect(await usdtContract.balanceOf(w), "winners should have been paid their pledge").to.be.equal(HUNDRED_THOUSAND.sub(pledge));
-                }
-
-                for (const l of losers) {
-                    expect(await usdtContract.balanceOf(l.address), "losers should get back their pledge deposit").to.be.equal(HUNDRED_THOUSAND);
-                }
-            });
         });
     })
 
