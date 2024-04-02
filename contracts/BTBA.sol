@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.7.0 <0.9.0;
-
+pragma solidity ^0.8.0;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {AccountV3,IEntryPoint} from "tokenbound/src/AccountV3.sol";
+import {AccountV3, IEntryPoint} from "tokenbound/src/AccountV3.sol";
 import "tokenbound/src/utils/Errors.sol";
 import {ICurrencyPermit} from "./libs/ICurrencyPermit.sol";
 import {ERC2771Context} from "@openzeppelin/contracts/metatx/ERC2771Context.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
-import "forge-std/console.sol";
+// import "forge-std/console.sol";
 
 error InvalidSigniture();
 
@@ -23,10 +22,7 @@ error InvalidSigniture();
 /// @title ERC6551Account Contract
 /// @author Ali Mahdavi (mailto:ali.mahdavi.dev@gmail.com)
 /// @dev BionicAccount gives Bionic Platform and BionicInvestorPass(BIP) owner certain Access.
-contract BionicAccount is AccountV3,
-    ICurrencyPermit,
-    EIP712
-{
+contract BionicAccount is AccountV3, ICurrencyPermit, EIP712 {
     using ECDSA for bytes32;
     /*///////////////////////////////////////////////////////////////
                             States
@@ -38,7 +34,6 @@ contract BionicAccount is AccountV3,
      */
     mapping(address => mapping(address => uint256)) public allowances;
 
-
     bytes32 public constant CURRENCY_PERMIT_TYPEHASH =
         keccak256(
             "Permit(address currency,address spender,uint256 value,uint256 nonce,uint256 deadline)"
@@ -49,7 +44,10 @@ contract BionicAccount is AccountV3,
         address multicallForwarder,
         address erc6551Registry,
         address guardian
-    ) AccountV3(entryPoint_, multicallForwarder, erc6551Registry, guardian) EIP712("BionicAccount", "1") {}
+    )
+        AccountV3(entryPoint_, multicallForwarder, erc6551Registry, guardian)
+        EIP712("BionicAccount", "1")
+    {}
 
     // function _contextSuffixLength() internal view override(Context, ERC2771Context) returns (uint256) {
     //     // Add your implementation here
@@ -230,5 +228,4 @@ contract BionicAccount is AccountV3,
         _incrementNonce();
         emit CurrencyApproval(currency, spender, amount);
     }
-
 }

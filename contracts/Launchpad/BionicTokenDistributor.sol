@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.7.0 <0.9.0;
+pragma solidity ^0.8.0;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
@@ -7,8 +7,6 @@ import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 // import "forge-std/console.sol";
-
-
 
 error Distributor__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
 error Distributor__ClaimingIsNotAllowedYet(uint256 startAfter); //"Not in the time window for claiming rewards"
@@ -56,8 +54,7 @@ contract BionicTokenDistributor is Ownable {
         uint256 monthQuota,
         uint256 startAt,
         uint64 totalCycles,
-        bytes32 merkleRoot 
-
+        bytes32 merkleRoot
     );
     // This event is triggered whenever a call to #claim succeeds.
     event Claimed(
@@ -100,7 +97,8 @@ contract BionicTokenDistributor is Ownable {
         uint32 totalCycles,
         bytes32 merkleRoot
     ) external onlyOwner {
-        if (address(projectTokenAddress) == address(0)) {//@audit-todo: check for IERC20
+        if (address(projectTokenAddress) == address(0)) {
+            //@audit-todo: check for IERC20
             revert Distributor__InvalidProject();
         }
         s_projectTokens[pid] = ProjectToken(
@@ -121,18 +119,31 @@ contract BionicTokenDistributor is Ownable {
     }
 
     // Claim the given amount of pledge user made to the token to the given address. Reverts if the inputs are invalid.
-    function claim(uint256 pid, address account, uint256 pledged, bytes32[] calldata merkleProof) external{
+    function claim(
+        uint256 pid,
+        address account,
+        uint256 pledged,
+        bytes32[] calldata merkleProof
+    ) external {
         if (address(s_projectTokens[pid].token) == address(0)) {
             revert Distributor__InvalidProject();
         }
-        if(!MerkleProof.verify(merkleProof, s_projectTokens[pid].merkleRoot, keccak256(abi.encodePacked(pid,account, pledged)))){
-            revert Distributor__NotEligible(); 
+        if (
+            !MerkleProof.verify(
+                merkleProof,
+                s_projectTokens[pid].merkleRoot,
+                keccak256(abi.encodePacked(pid, account, pledged))
+            )
+        ) {
+            revert Distributor__NotEligible();
         }
         if (s_projectTokens[pid].startAt > block.timestamp) {
             // solhint-disable-line not-rely-on-time
-            revert Distributor__ClaimingIsNotAllowedYet(s_projectTokens[pid].startAt);
+            revert Distributor__ClaimingIsNotAllowedYet(
+                s_projectTokens[pid].startAt
+            );
         }
-        if(s_userClaims[account][pid] >= s_projectTokens[pid].totalCycles){
+        if (s_userClaims[account][pid] >= s_projectTokens[pid].totalCycles) {
             revert Distributor__Done();
         }
 
@@ -146,13 +157,15 @@ contract BionicTokenDistributor is Ownable {
         }
         // Ensure we have enough tokens available for claiming
         if (s_projectTokens[pid].token.balanceOf(address(this)) < amount) {
-            revert Distributor__NotEnoughTokenLeft(pid, address(s_projectTokens[pid].token));
+            revert Distributor__NotEnoughTokenLeft(
+                pid,
+                address(s_projectTokens[pid].token)
+            );
         }
-
 
         s_userClaims[account][pid] += cyclesClaimable;
         s_projectTokens[pid].token.transfer(account, amount);
-        emit Claimed(pid,account,  cyclesClaimable, amount);
+        emit Claimed(pid, account, cyclesClaimable, amount);
     }
 
     /// @notice Get the amount of token you can claim before sending claim request.
@@ -170,7 +183,8 @@ contract BionicTokenDistributor is Ownable {
 
         // math to calculate tokens of user to be cliamed
         // monthCount*(projectMonthlyAllocation/totalInvestment)*userInvestment
-        amount = s_projectTokens[pid].monthQuota
+        amount = s_projectTokens[pid]
+            .monthQuota
             // .div(s_projectTokens[pid].totalRaised)
             .mul(pledged)
             .mul(cyclesClaimable);
@@ -184,11 +198,13 @@ contract BionicTokenDistributor is Ownable {
     function _getProjectClaimableCyclesCount(
         uint256 pid
     ) internal view returns (uint256) {
-        uint256 claimableMonthCount = block.timestamp.sub(s_projectTokens[pid].startAt).div(CYCLE_IN_SECONDS);
+        uint256 claimableMonthCount = block
+            .timestamp
+            .sub(s_projectTokens[pid].startAt)
+            .div(CYCLE_IN_SECONDS);
         if (claimableMonthCount > s_projectTokens[pid].totalCycles) {
             return s_projectTokens[pid].totalCycles;
         }
         return claimableMonthCount;
     }
-
 }

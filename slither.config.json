@@ -1,5 +1,5 @@
 {
-    "detectors_to_exclude": "naming-convention,external-function,low-level-calls",
+    "detectors_to_exclude": "naming-convention,external-function,low-level-calls,similar-names",
     "exclude_informational": false,
     "exclude_low": false,
     "exclude_medium": false,
