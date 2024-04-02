@@ -226,8 +226,8 @@ contract BionicPoolRegistry is
             // solhint-disable-line not-rely-on-time
             revert BPR__PledgingHasClosed();
         }
-        (, uint256 pledged) = userPledge[pid].tryGet(_msgSender());
-        if (pledged != 0) {
+        (bool found, uint256 pledged) = userPledge[pid].tryGet(_msgSender());
+        if (found || pledged != 0) {
             revert BPR__AlreadyPledgedToThisPool();
         }
         if (!_isValidPledge(pledged.add(amount), pool.pledgeTiers)) {
