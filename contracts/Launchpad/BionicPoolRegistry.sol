@@ -14,9 +14,8 @@ import {BionicStructs} from "../libs/BionicStructs.sol";
 import {BionicAccount} from "../BTBA.sol";
 
 import {Treasury} from "./Treasury.sol";
-import {Raffle} from "./Raffle.sol";
 
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 // import "forge-std/console.sol";
 
 /* Errors */
@@ -55,7 +54,6 @@ error BPR__LotteryIsPending();
 contract BionicPoolRegistry is
     Initializable,
     ReentrancyGuardUpgradeable,
-    Raffle,
     AccessControlUpgradeable,
     UUPSUpgradeable
 {
@@ -94,6 +92,8 @@ contract BionicPoolRegistry is
     mapping(uint256 => EnumerableMap.AddressToUintMap) internal userPledge; //todo maybe optimize it more
     ///@notice user's total pledge accross diffrent pools and programs.
     mapping(address => uint256) public userTotalPledge;
+    ///@notice winners per raffle
+    mapping(uint256 => EnumerableSet.AddressSet) internal poolLotteryWinners;
 
     /*///////////////////////////////////////////////////////////////
                                 Events
@@ -123,11 +123,7 @@ contract BionicPoolRegistry is
     function initialize(
         IERC20 _stakingToken,
         IERC20 _investingToken,
-        address _bionicInvestorPass,
-        address vrfCoordinatorV2,
-        bytes32 gasLane, // keyHash
-        uint64 subscriptionId,
-        bool requestVRFPerWinner
+        address _bionicInvestorPass
     ) public initializer {
         if (address(_stakingToken) == address(0)) {
             revert BPR__InvalidStackingToken();
@@ -141,12 +137,6 @@ contract BionicPoolRegistry is
 
         __AccessControl_init();
         __UUPSUpgradeable_init();
-        __Raffle_init(
-            vrfCoordinatorV2,
-            gasLane,
-            subscriptionId,
-            requestVRFPerWinner
-        );
         __ReentrancyGuard_init();
 
         bionicInvestorPass = _bionicInvestorPass;
@@ -180,7 +170,6 @@ contract BionicPoolRegistry is
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
         bool _useRaffle,
-        uint32[] calldata _tiers,
         BionicStructs.PledgeTier[] memory _pledgeTiers
     ) external onlyRole(BROKER_ROLE) {
         if (_pledgingStartTime <= block.timestamp) {
@@ -198,16 +187,6 @@ contract BionicPoolRegistry is
         }
 
         uint32 winnersCount = 0;
-        BionicStructs.Tier[] memory tiers = new BionicStructs.Tier[](
-            _tiers.length
-        );
-        for (uint256 i = 0; i < _tiers.length; i++) {
-            tiers[i] = BionicStructs.Tier({
-                count: _tiers[i],
-                members: new address[](0)
-            });
-            winnersCount += _tiers[i];
-        }
         BionicStructs.PoolInfo memory pool = BionicStructs.PoolInfo({
             pledgingStartTime: _pledgingStartTime,
             pledgingEndTime: _pledgingEndTime,
@@ -221,8 +200,6 @@ contract BionicPoolRegistry is
             useRaffle: _useRaffle
         });
         poolInfo[pid] = pool;
-
-        poolIdToTiers[pid] = tiers;
 
         emit PoolAdded(pid);
     }
@@ -302,63 +279,6 @@ contract BionicPoolRegistry is
         }
     }
 
-    /// @notice Add user members to Lottery Tiers
-    /// @dev Will need to happen before initiating the raffle it self
-    /// @param pid the poolId of the tier
-    /// @param tierId tierId of the poolId needs to be updated
-    /// @param members members for this tier to be considered in raffle
-    function addToTier(
-        uint256 pid,
-        uint256 tierId,
-        address[] memory members
-    ) external nonReentrant onlyRole(SORTER_ROLE) {
-        if (poolInfo[pid].useRaffle) {
-            for (uint256 i = 0; i < members.length; i++) {
-                if (!userPledge[pid].contains(members[i])) {
-                    revert BPR__TierMembersShouldHaveAlreadyPledged(
-                        pid,
-                        tierId
-                    );
-                }
-            }
-
-            _addToTier(pid, tierId, members);
-        } else {
-            revert BPR__PoolRaffleDisabled();
-        }
-    }
-
-    /**
-     * @dev will get the money out of users wallet into investment wallet
-     */
-    function draw(
-        uint256 pid,
-        uint32 callbackGasPerUser
-    )
-        external
-        payable
-        nonReentrant
-        onlyRole(SORTER_ROLE)
-        returns (uint256 requestId)
-    {
-        BionicStructs.PoolInfo memory pool = poolInfo[pid];
-        if (pool.targetRaise == 0) {
-            revert BPR__InvalidPool();
-        }
-        if (!pool.useRaffle) revert BPR__PoolRaffleDisabled();
-        //solhint-disable-next-line not-rely-on-time
-        if (pool.pledgingEndTime > block.timestamp)
-            revert BPR__PoolIsOnPledgingPhase(pool.pledgingEndTime);
-        if (poolIdToRequestId[pid] != 0)
-            revert BPR__DrawForThePoolHasAlreadyStarted(poolIdToRequestId[pid]);
-
-        _preDraw(pid);
-
-        requestId = _draw(pid, pool.winnersCount, callbackGasPerUser);
-
-        emit DrawInitiated(pid, requestId);
-    }
-
     /**
      * @dev Withdraws a specified amount of tokens from the treasury to the specified address.
      * Only the address with the `TREASURY_ROLE` can call this function.
@@ -425,68 +345,6 @@ contract BionicPoolRegistry is
         return false;
     }
 
-    /**
-     * @dev will do the finall checks on the tiers and init the last tier if not set already by admin to rest of pledged users.
-     */
-    function _preDraw(uint256 pid) internal {
-        if (poolInfo[pid].useRaffle) {
-            BionicStructs.Tier[] storage tiers = poolIdToTiers[pid];
-            //check if last tier is empty add rest of people pledged to the tier
-            if (tiers[tiers.length - 1].members.length < 1) {
-                //check all tiers except last(all other users) has members
-                address[] memory lastTierMembers = userPledge[pid].keys();
-                for (uint256 k = 0; k < tiers.length - 1; k++) {
-                    if (tiers[k].members.length < 1) {
-                        revert BPR__TiersHaveNotBeenInitialized();
-                    }
-                    lastTierMembers = excludeAddresses(
-                        lastTierMembers,
-                        tiers[k].members
-                    );
-                }
-
-                _addToTier(pid, tiers.length - 1, lastTierMembers);
-            }
-        }
-    }
-
-    /**
-     * @dev This is the function that Chainlink VRF node
-     * calls to send the money to the random winner.
-     */
-    function fulfillRandomWords(
-        uint256 requestId,
-        uint256[] memory randomWords
-    ) internal override {
-        uint256 pid = requestIdToPoolId[requestId];
-        _pickWinners(pid, randomWords);
-    }
-
-    function refundLosers(uint256 pid) external {
-        address[] memory winners = poolLotteryWinners[pid].values();
-        if (winners.length == 0) {
-            revert BPR__LotteryIsPending();
-        }
-        ///@dev find losers and refund them their pledge.
-        ///@notice post lottery refund non-winners
-        ///@audit-info gas maybe for gasoptimization move it to dedicated function
-        address[] memory losers = userPledge[pid].keys();
-        losers = excludeAddresses(losers, winners);
-        uint256 totalInvestment = poolIdToTotalPledged[pid];
-        for (uint256 i = 0; i < losers.length; i++) {
-            uint256 refund = userPledge[pid].get(losers[i]);
-            if (refund == 0) continue;
-            treasury.withdrawTo(investingToken, losers[i], refund);
-            poolIdToTotalPledged[pid] = poolIdToTotalPledged[pid].sub(refund);
-            emit LotteryRefunded(losers[i], pid, refund);
-            userPledge[pid].set(losers[i], 0);
-        }
-        //hasn't been refuned already
-        if (totalInvestment != poolIdToTotalPledged[pid]) {
-            treasuryWithdrawable += poolIdToTotalPledged[pid];
-        }
-    }
-
     function _stackPledge(
         address account,
         uint256 pid,
@@ -511,38 +369,6 @@ contract BionicPoolRegistry is
                 }
             }
         }
-    }
-
-    function excludeAddresses(
-        address[] memory array1,
-        address[] memory array2
-    ) private pure returns (address[] memory) {
-        // Store addresses from array1 that are not in array2
-        address[] memory exclusionArray = new address[](array1.length);
-        uint256 count = 0;
-
-        for (uint256 i = 0; i < array1.length; i++) {
-            address element = array1[i];
-            bool found = false;
-            for (uint256 j = 0; j < array2.length; j++) {
-                if (element == array2[j]) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                exclusionArray[count] = element;
-                count++;
-            }
-        }
-
-        // Copy exclusionArray into new array of correct length
-        address[] memory result = new address[](count);
-        for (uint256 i = 0; i < count; i++) {
-            result[i] = exclusionArray[i];
-        }
-
-        return result;
     }
 
     /*///////////////////////////////////////////////////////////////

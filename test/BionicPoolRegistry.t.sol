@@ -96,11 +96,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         _bionicFundRaising.initialize(
             IERC20(address(_bionicToken)),
             _investingToken,
-            address(_bipContract),
-            address(_vrfCoordinatorV2),
-            GAS_LANE,
-            _subId,
-            REQ_PER_WINNER
+            address(_bipContract)
         );
         _treasuryContract = Treasury(_bionicFundRaising.treasury());
 
@@ -118,13 +114,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
 
     function registerProject(
         bool useRaffle,
-        uint256 allocatedTokenPerMonth,
-        uint256 totalWinners
-    ) public returns (uint256 pid, uint32[] memory t) {
-        t = new uint32[](3);
-        t[0] = uint32((3 * totalWinners) / 5); //300;
-        t[1] = uint32(totalWinners / 5); //100;
-        t[2] = uint32(totalWinners / 5); //100;
+        uint256 allocatedTokenPerMonth
+    ) public returns (uint256 pid) {
         BionicStructs.PledgeTier[] memory pt = new BionicStructs.PledgeTier[](
             3
         );
@@ -141,7 +132,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
             10,
             10e18,
             useRaffle,
-            t,
             pt
         );
 
@@ -161,11 +151,11 @@ contract BionicPoolRegistryTest is DSTest, Test {
         //     }
         // }
 
-        return (pid, t);
+        return (pid);
     }
 
     function testAddProject() public {
-        (uint256 pid, ) = registerProject(false, 100, 500);
+        uint256 pid = registerProject(false, 100);
         (
             ,
             ,
@@ -191,7 +181,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         assertEq(10, tokenAllocationMonthCount);
     }
 
-    function testPerformLotteryAndClaim() public {
+    /*     function testPerformLotteryAndClaim() public {
         //0. add project
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 100; //1025;
@@ -391,19 +381,15 @@ contract BionicPoolRegistryTest is DSTest, Test {
         //     vm.expectRevert(Distributor__NothingToClaim.selector);
         //     _distrbutorContract.claim(pid,winners[i],_bionicFundRaising.userPledgeOnPool(pid, winners[i]),proof);
         // }
-    }
+    } */
 
     function testPerformInvestmentAndClaim() public {
         //0. add project
         uint256 allocatedTokenPerMonth = 1e10;
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 10;
-        uint256 winnersCount = 500;
-        (uint256 pid, uint32[] memory tiers) = registerProject(
-            false,
-            allocatedTokenPerMonth,
-            winnersCount
-        );
+        // uint256 winnersCount = 500;
+        uint256 pid = registerProject(false, allocatedTokenPerMonth);
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
         BionicAccount[] memory accs = new BionicAccount[](count);
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising
@@ -463,24 +449,11 @@ contract BionicPoolRegistryTest is DSTest, Test {
             // will call _bionicContract.pledge(pid, amount, deadline, v, r, s).;
             acc.execute(address(_bionicFundRaising), 0, data, 0);
         }
-        //2. shouldn't be added to tierpools for lottery
-        uint256 k = 0; //index of account
-        uint256 userPerWinner = accs.length / winnersCount;
-        for (uint256 i = 0; i < tiers.length - 1; i++) {
-            address[] memory accounts = new address[](tiers[i] * userPerWinner);
-            for (uint256 j = 0; j < tiers[i] * userPerWinner; j++) {
-                accounts[j] = address(accs[k++]);
-            }
-            vm.expectRevert(BPR__PoolRaffleDisabled.selector);
-            _bionicFundRaising.addToTier(pid, i, accounts);
-        }
-        // //3. move time and do draw get the winners
+
+        //2. move time and do draw get the winners
         (, , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
             .poolInfo(pid);
         vm.warp(tokenAllocationStartTime - 5 minutes);
-
-        vm.expectRevert(BPR__PoolRaffleDisabled.selector);
-        _bionicFundRaising.draw(pid, 1000000);
 
         (, address[] memory winners) = _bionicFundRaising.getProjectInvestors(
             pid
