@@ -33,7 +33,7 @@ contract Bionic is
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(SNAPSHOT_ROLE, msg.sender);
-        _mint(msg.sender, 10000000000 * 10 ** decimals());
+        _mint(msg.sender, 10e10 * 10 ** decimals());
         _grantRole(UPGRADER_ROLE, msg.sender);
     }
 
