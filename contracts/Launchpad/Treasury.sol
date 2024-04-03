@@ -10,6 +10,9 @@ contract Treasury {
     address immutable stakingContract;
 
     constructor(address _stakingContract) {
+        if (_stakingContract == address(0)) {
+            revert("Treasury: staking contract is the zero address");
+        }
         stakingContract = _stakingContract;
     }
 
@@ -20,7 +23,7 @@ contract Treasury {
     ) external {
         require(
             msg.sender == stakingContract,
-            "Guild.withdrawTo: Only staking contract"
+            "Treasury.withdrawTo: Only staking contract"
         );
         _token.safeTransfer(_recipient, _amount);
     }
