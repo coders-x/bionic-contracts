@@ -239,7 +239,9 @@ contract BionicPoolRegistry is
             revert BPR__NotEnoughStake();
         }
 
-        userPledge[pid].set(_msgSender(), pledged.add(amount));
+        if (!userPledge[pid].set(_msgSender(), pledged.add(amount))) {
+            revert();
+        }
         userTotalPledge[_msgSender()] = userTotalPledge[_msgSender()].add(
             amount
         );
@@ -260,7 +262,13 @@ contract BionicPoolRegistry is
                 s
             )
         {
-            emit Pledge(_msgSender(), pid, amount);
+            _stackPledge(_msgSender(), pid, amount);
+            if (!pool.useRaffle && poolLotteryWinners[pid].add(_msgSender())) {
+                treasuryWithdrawable += amount;
+                emit Invested(pid, _msgSender(), amount);
+            } else {
+                emit Pledge(_msgSender(), pid, amount);
+            }
         } catch (bytes memory reason) {
             if (reason.length == 0) {
                 revert ICurrencyPermit__NoReason();
@@ -270,12 +278,6 @@ contract BionicPoolRegistry is
                     revert(add(32, reason), mload(reason))
                 }
             }
-        }
-        _stackPledge(_msgSender(), pid, amount);
-        if (!pool.useRaffle) {
-            poolLotteryWinners[pid].add(_msgSender());
-            emit Invested(pid, _msgSender(), amount);
-            treasuryWithdrawable += amount;
         }
     }
 

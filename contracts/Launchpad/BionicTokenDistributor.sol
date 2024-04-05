@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+
 // import "forge-std/console.sol";
 
 error Distributor__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
@@ -15,9 +17,11 @@ error Distributor__Done(); // all claims have been made
 error Distributor__NotEligible(); //"User is not assigned claims for this project."
 error Distributor__NotEnoughTokenLeft(uint256 pid, address token); //"Not enough tokens available for claiming. Please try Again"
 
-contract BionicTokenDistributor is Ownable {
+contract BionicTokenDistributor is Ownable, ReentrancyGuardUpgradeable {
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
+    using SafeERC20 for IERC20;
+
     // struct UserClaim {
     //     uint256 lastClaim; // Month when the user last claimed tokens
     //     uint256 totalTokensClaimed; // Total tokens claimed by the user
@@ -124,7 +128,7 @@ contract BionicTokenDistributor is Ownable {
         address account,
         uint256 pledged,
         bytes32[] calldata merkleProof
-    ) external {
+    ) external nonReentrant {
         if (address(s_projectTokens[pid].token) == address(0)) {
             revert Distributor__InvalidProject();
         }
@@ -152,7 +156,7 @@ contract BionicTokenDistributor is Ownable {
             account,
             pledged
         );
-        if (cyclesClaimable == 0) {
+        if (cyclesClaimable == 0 || amount == 0) {
             revert Distributor__NothingToClaim();
         }
         // Ensure we have enough tokens available for claiming
@@ -164,7 +168,7 @@ contract BionicTokenDistributor is Ownable {
         }
 
         s_userClaims[account][pid] += cyclesClaimable;
-        s_projectTokens[pid].token.transfer(account, amount);
+        s_projectTokens[pid].token.safeTransfer(account, amount);
         emit Claimed(pid, account, cyclesClaimable, amount);
     }
 
