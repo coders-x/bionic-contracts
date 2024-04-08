@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Slither
-        uses: crytic/slither-action@v0.3.0
+        uses: crytic/slither-action@v0.3.2
         id: slither
         with:
           node-version: 20
