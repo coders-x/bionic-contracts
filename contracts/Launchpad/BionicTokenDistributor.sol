@@ -202,6 +202,9 @@ contract BionicTokenDistributor is Ownable, ReentrancyGuardUpgradeable {
     function _getProjectClaimableCyclesCount(
         uint256 pid
     ) internal view returns (uint256) {
+        if (block.timestamp < s_projectTokens[pid].startAt) {
+            return 0;
+        }
         uint256 claimableMonthCount = block
             .timestamp
             .sub(s_projectTokens[pid].startAt)

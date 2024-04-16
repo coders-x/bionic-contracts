@@ -6,5 +6,6 @@
         "nomicfoundation",
         "nomiclabs",
         "thirdweb"
-    ]
+    ],
+    "sarif-viewer.connectToGithubCodeScanning": "off"
 }
