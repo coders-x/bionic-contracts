@@ -40,8 +40,12 @@ contract DistributorContractTest is DSTest, Test {
         uint256 pledged = 1e3;
         uint256 pid = 1;
         bytes32[] memory data = new bytes32[](4);
-        data[0] = keccak256(abi.encodePacked(pid, winners[0], pledged));
-        data[1] = keccak256(abi.encodePacked(pid, winners[1], pledged));
+        data[0] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[0], pledged)))
+        );
+        data[1] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[1], pledged)))
+        );
         bytes32 merkleRoot = m.getRoot(data);
         registerProject(pid, merkleRoot);
 
@@ -63,9 +67,15 @@ contract DistributorContractTest is DSTest, Test {
         uint256 pid = 0;
         uint256 pledged = 1e3;
         bytes32[] memory data = new bytes32[](4);
-        data[0] = keccak256(abi.encodePacked(pid, winners[0], pledged));
-        data[1] = keccak256(abi.encodePacked(pid, winners[1], pledged));
-        data[2] = keccak256(abi.encodePacked(pid, winners[2], pledged));
+        data[0] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[0], pledged)))
+        );
+        data[1] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[1], pledged)))
+        );
+        data[2] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[2], pledged)))
+        );
         bytes32 merkleRoot = m.getRoot(data);
 
         registerProject(pid, merkleRoot);
