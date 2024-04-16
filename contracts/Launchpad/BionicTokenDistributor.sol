@@ -9,6 +9,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 
 // import "forge-std/console.sol";
+// import "hardhat/console.sol";
 
 error Distributor__InvalidProject(); //"Project token not registered. Contact admin to add project tokens"
 error Distributor__ClaimingIsNotAllowedYet(uint256 startAfter); //"Not in the time window for claiming rewards"
@@ -136,7 +137,10 @@ contract BionicTokenDistributor is Ownable, ReentrancyGuardUpgradeable {
             !MerkleProof.verify(
                 merkleProof,
                 s_projectTokens[pid].merkleRoot,
-                keccak256(abi.encodePacked(pid, account, pledged))
+                keccak256(
+                    bytes.concat(keccak256(abi.encode(pid, account, pledged)))
+                )
+                // keccak256(abi.encodePacked(pid, account, pledged))
             )
         ) {
             revert Distributor__NotEligible();
@@ -150,7 +154,6 @@ contract BionicTokenDistributor is Ownable, ReentrancyGuardUpgradeable {
         if (s_userClaims[account][pid] >= s_projectTokens[pid].totalCycles) {
             revert Distributor__Done();
         }
-
         (uint256 amount, uint256 cyclesClaimable) = calcClaimableAmount(
             pid,
             account,
@@ -184,7 +187,6 @@ contract BionicTokenDistributor is Ownable, ReentrancyGuardUpgradeable {
         // Calculate the amount to claim for the current month
         cyclesClaimable = _getProjectClaimableCyclesCount(pid);
         cyclesClaimable = cyclesClaimable - s_userClaims[account][pid];
-
         // math to calculate tokens of user to be cliamed
         // monthCount*(projectMonthlyAllocation/totalInvestment)*userInvestment
         amount = s_projectTokens[pid]

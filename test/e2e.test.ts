@@ -9,6 +9,7 @@ import {
 }
     from "../typechain-types";
 import { BionicStructs } from "../typechain-types/contracts/Launchpad/BionicPoolRegistry";
+import { StandardMerkleTree } from '@openzeppelin/merkle-tree';
 
 const helpers = require("@nomicfoundation/hardhat-network-helpers");
 
@@ -40,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0xD2E1CfD5B7BC8C8C823F86db345931F8056EA05A",
+    accountAddress: "0x5e3cd20A0401E23069F7209694AdB215D23bb830",
     automationUpdateInterval: "30",
 };
 
@@ -64,7 +65,9 @@ describe("e2e", function () {
     let owner: SignerWithAddress, client: SignerWithAddress, guardian: SignerWithAddress;
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
-    let pledgingTiers: BionicStructs.PledgeTierStruct[]
+    let pledgingTiers: BionicStructs.PledgeTierStruct[];
+    let CYCLE_IN_SECONDS: number;
+
 
     before(async () => {
         [owner, client, guardian, ...signers] = await ethers.getSigners();
@@ -118,7 +121,9 @@ describe("e2e", function () {
         BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, usdtContract.address, bipContract.address);
 
         DistributorContract = await deployBionicTokenDistributor();
+        CYCLE_IN_SECONDS = Number(await DistributorContract.CYCLE_IN_SECONDS());
     });
+
 
     describe("Bionic", function () {
         it("Should Mint owner 100000000 token upon deployed", async function () {
@@ -189,7 +194,6 @@ describe("e2e", function () {
                 network.config.chainId as number, bipContract.address,
                 "10");
             let newAcc = await res.wait();
-
 
             expect(newAcc?.events[0]?.args?.account).to.equal(ACCOUNT_ADDRESS);
         })
@@ -327,6 +331,80 @@ describe("e2e", function () {
     })
 
 
+    describe("BionicTokenDistributor", function () {
+        const investors: any = [];
+        let merkleTree: StandardMerkleTree<any[]>;
+        before(async () => {
+            for (let i = 0; i < 10; i++) {
+                investors.push([0, signers[i].address, 2000 * i + 1000]);
+            }
+            merkleTree = StandardMerkleTree.of(investors, ['uint256', 'address', 'uint256']);
+        });
+
+        describe("registerProjectToken", () => {
+            it("Should fail if not owner", async function () {
+                await expect(DistributorContract.connect(client).registerProjectToken(0, bionicContract.address, 0, 0, 0, merkleTree.root))
+                    .to.be.revertedWith("Ownable: caller is not the owner");
+            });
+            it("Should register a new project", async function () {
+                const tx = await DistributorContract.registerProjectToken(0, bionicContract.address, 10, tokenAllocationStartTime, 2, merkleTree.root);
+                const config = await DistributorContract.s_projectTokens(0);
+                expect(config.token).to.equal(bionicContract.address);
+                expect(config.merkleRoot).to.equal(merkleTree.root);
+            });
+        });
+        describe("claim", () => {
+            it("Should fail if not registered", async function () {
+                const investor = investors[0];
+                await expect(DistributorContract.connect(client).claim(1, signers[0].address, investor[2], merkleTree.getProof(investor)))
+                    .to.be.revertedWithCustomError(DistributorContract, "Distributor__InvalidProject");
+            });
+            it("Should fail if not valid proof", async function () {
+                const investor = investors[0];
+                await expect(DistributorContract.claim(0, signers[1].address, investor[2], merkleTree.getProof(investor)))
+                    .to.be.revertedWithCustomError(DistributorContract, "Distributor__NotEligible");
+            });
+            it("Should fail if not enough balance", async function () {
+                const investor = investors[0];
+                await helpers.time.increaseTo(tokenAllocationStartTime + CYCLE_IN_SECONDS + 10);
+                await expect(DistributorContract.claim(0, signers[0].address, investor[2], merkleTree.getProof(investor)))
+                    .to.be.revertedWithCustomError(DistributorContract, "Distributor__NotEnoughTokenLeft");
+            });
+            it("Should claim the investment", async function () {
+                const investor = investors[0];
+                const treasury = 10e10, claimable = investor[2] * 10;
+                await bionicContract.transfer(DistributorContract.address, treasury);
+                await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
+
+                expect(await bionicContract.balanceOf(DistributorContract.address)).to.equal(treasury);
+                expect(await bionicContract.balanceOf(signers[0].address)).to.equal(0);
+
+
+                await expect(DistributorContract.claim(0, signers[0].address, investor[2], merkleTree.getProof(investor)))
+                    .to.emit(DistributorContract, "Claimed").withArgs(0, signers[0].address, 1, claimable);
+
+                expect(await bionicContract.balanceOf(signers[0].address)).to.equal(claimable);
+                expect(await bionicContract.balanceOf(DistributorContract.address)).to.equal(treasury - claimable);
+            });
+            it("Should fail to claim twice", async function () {
+                const investor = investors[0];
+                await expect(DistributorContract.claim(0, signers[0].address, investor[2], merkleTree.getProof(investor)))
+                    .to.be.revertedWithCustomError(DistributorContract, "Distributor__NothingToClaim");
+            });
+            it("Should claim whole revenue ", async function () {
+                const investor = investors[0];
+                const treasury = 10e10, claimable = investor[2] * 10;
+                await helpers.time.increaseTo(tokenAllocationStartTime + CYCLE_IN_SECONDS * 3);
+
+
+                await expect(DistributorContract.claim(0, signers[0].address, investor[2], merkleTree.getProof(investor)))
+                    .to.emit(DistributorContract, "Claimed").withArgs(0, signers[0].address, 1, claimable);
+
+                expect(await bionicContract.balanceOf(signers[0].address)).to.equal(claimable * 2);
+                expect(await bionicContract.balanceOf(DistributorContract.address)).to.equal(treasury - claimable * 2);
+            });
+        });
+    });
 
 
 
