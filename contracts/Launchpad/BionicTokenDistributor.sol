@@ -2,11 +2,13 @@
 pragma solidity ^0.8.0;
 
 import {SafeERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {SafeMath} from "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 // import "forge-std/console.sol";
 // import "hardhat/console.sol";
@@ -18,11 +20,26 @@ error Distributor__Done(); // all claims have been made
 error Distributor__NotEligible(); //"User is not assigned claims for this project."
 error Distributor__NotEnoughTokenLeft(uint256 pid, address token); //"Not enough tokens available for claiming. Please try Again"
 
-contract BionicTokenDistributor is Ownable, ReentrancyGuardUpgradeable {
+contract BionicTokenDistributor is
+    Initializable,
+    OwnableUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeMath for uint256;
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize() public initializer {
+        __Ownable_init();
+        __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+    }
     // struct UserClaim {
     //     uint256 lastClaim; // Month when the user last claimed tokens
     //     uint256 totalTokensClaimed; // Total tokens claimed by the user
@@ -216,4 +233,8 @@ contract BionicTokenDistributor is Ownable, ReentrancyGuardUpgradeable {
         }
         return claimableMonthCount;
     }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

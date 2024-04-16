@@ -550,8 +550,12 @@ async function deployBionicPoolRegistry(...args: any) {
 }
 async function deployBionicTokenDistributor() {
     const BionicTokenDistributorContract = await ethers.getContractFactory("BionicTokenDistributor");
+    let BTDContract = await upgrades.deployProxy(BionicTokenDistributorContract, {
+        initializer: "initialize",
+    });
+    await BTDContract.deployed();
     console.log(`Deploying BionicTokenDistributor contract...`);
-    return await BionicTokenDistributorContract.deploy();
+    return BTDContract as BionicTokenDistributor;
 }
 async function deployTBA(entryPointAddress: string, guardianAddress: string) {
     const BionicAccountFactory = await ethers.getContractFactory("BionicAccount");

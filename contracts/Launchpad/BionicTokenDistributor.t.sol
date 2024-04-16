@@ -4,6 +4,7 @@ pragma solidity >=0.7.0 <0.9.0;
 import {Test} from "forge-std/Test.sol";
 import {DSTest} from "ds-test/test.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 import {BionicPoolRegistry} from "./BionicPoolRegistry.sol";
 import {Merkle} from "murky/src/Merkle.sol";
@@ -20,7 +21,10 @@ contract DistributorContractTest is DSTest, Test {
     address[] private winners = [address(1), address(2), address(3)];
     Merkle m = new Merkle();
     function setUp() public {
-        distributorContract = new BionicTokenDistributor();
+        distributorContract = BionicTokenDistributor(
+            address(new UUPSProxy(address(new BionicTokenDistributor()), ""))
+        );
+        distributorContract.initialize();
         rewardToken = new ERC20Mock("REWARD TOKEN", "RWRD");
         rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
     }
@@ -323,4 +327,11 @@ contract ERC20Mock is ERC20 {
     function burn(address account, uint256 amount) external {
         _burn(account, amount);
     }
+}
+
+contract UUPSProxy is ERC1967Proxy {
+    constructor(
+        address _implementation,
+        bytes memory _data
+    ) ERC1967Proxy(_implementation, _data) {}
 }

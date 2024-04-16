@@ -92,7 +92,10 @@ contract BionicPoolRegistryTest is DSTest, Test {
         );
         _treasuryContract = Treasury(_bionicFundRaising.treasury());
 
-        _distrbutorContract = new BionicTokenDistributor();
+        _distrbutorContract = BionicTokenDistributor(
+            address(new UUPSProxy(address(new BionicTokenDistributor()), ""))
+        );
+        _distrbutorContract.initialize();
 
         _accountImplementation = new BionicAccount(
             ENTRY_POINT,
