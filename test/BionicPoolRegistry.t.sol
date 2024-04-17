@@ -92,7 +92,10 @@ contract BionicPoolRegistryTest is DSTest, Test {
         );
         _treasuryContract = Treasury(_bionicFundRaising.treasury());
 
-        _distrbutorContract = new BionicTokenDistributor();
+        _distrbutorContract = BionicTokenDistributor(
+            address(new UUPSProxy(address(new BionicTokenDistributor()), ""))
+        );
+        _distrbutorContract.initialize();
 
         _accountImplementation = new BionicAccount(
             ENTRY_POINT,
@@ -260,12 +263,17 @@ contract BionicPoolRegistryTest is DSTest, Test {
         bytes32[] memory merkleTree = new bytes32[](winners.length);
         for (uint256 i = 0; i < winners.length; i++) {
             merkleTree[i] = keccak256(
-                abi.encodePacked(
-                    pid,
-                    winners[i],
-                    _bionicFundRaising.userPledgeOnPool(pid, winners[i])
+                bytes.concat(
+                    keccak256(
+                        abi.encode(
+                            pid,
+                            winners[i],
+                            _bionicFundRaising.userPledgeOnPool(pid, winners[i])
+                        )
+                    )
                 )
             );
+
             totalInvested += _bionicFundRaising.userPledgeOnPool(
                 pid,
                 winners[i]

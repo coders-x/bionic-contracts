@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { ethers } from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import hre from "hardhat";
 import { FactoryOptions } from 'hardhat/types';
 import { arbitrum as CONFIG } from './config.json';
@@ -23,14 +23,13 @@ async function deployContract(opt: FactoryOptions) {
 
     const BionicTokenDistributorContract = await ethers.getContractFactory("BionicTokenDistributor", opt);
 
-    let funding = await BionicTokenDistributorContract.deploy();
-
-    return await funding.deployed();
+    let BTDContract = await upgrades.deployProxy(BionicTokenDistributorContract, { initializer: "initialize" });
+    return await BTDContract.deployed() as BionicTokenDistributor;
 }
 
 async function verifyContract(contract: BionicTokenDistributor, args: any) {
     let res;
-    console.log(`Verifying BTB Contract at ${contract.address}`);
+    console.log(`Verifying BTD Contract at ${contract.address}`);
     res = await hre.run("verify:verify", {
         address: contract.address,//funding.address,
         constructorArguments: args,

@@ -3,8 +3,10 @@
         "arbitrum",
         "chainlink",
         "gaslane",
+        "Merkle",
         "nomicfoundation",
         "nomiclabs",
         "thirdweb"
-    ]
+    ],
+    "sarif-viewer.connectToGithubCodeScanning": "off"
 }

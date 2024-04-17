@@ -11,6 +11,7 @@
     "@nomiclabs/hardhat-ethers": "^2.2.2",
     "@nomiclabs/hardhat-etherscan": "^3.0.0",
     "@openzeppelin/hardhat-upgrades": "^1.28.0",
+    "@openzeppelin/merkle-tree": "^1.0.6",
     "@thirdweb-dev/sdk": "^4.0.41",
     "@typechain/ethers-v5": "^10.1.0",
     "@typechain/hardhat": "^6.1.2",
@@ -43,6 +44,7 @@
     "clean:hh": "hardhat clean",
     "deploy:BFC": "hardhat run scripts/deploy_FWV.ts --network mumbai",
     "demo": "hardhat run --network arb_sepolia scripts/demo.ts",
+    "script": "hardhat run --network arb_sepolia ",
     "dev": "ts-node scripts/index.ts"
   }
 }
