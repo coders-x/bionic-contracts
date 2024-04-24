@@ -235,7 +235,6 @@ async function main(level: number, pid: number = 0) {
                         (pledgeStarting.getTime() / 1000) | 0, //PLEDGING_START_TIME
                         (pledgeEnding.getTime() / 1000) | 0, //PLEDGING_END_TIME
                         1000, //tokenAllocationPerMonth
-                        (tokenAllocationStartTime.getTime() / 1000) | 0, //tokenAllocationStartTime
                         10,//tokenAllocationMonthCount
                         1e10,//targetRaise
                         USE_RAFFLE,//do raffle

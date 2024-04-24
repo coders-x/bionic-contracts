@@ -41,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x175f230a5FC92b52db437ba054a58C9307034940",
+    accountAddress: "0x813176E6aDd40e07575231C4AcFC9B63335a45D5",
     automationUpdateInterval: "30",
 };
 
@@ -223,17 +223,17 @@ describe("e2e", function () {
             const tokenAllocationPerMonth = 100, tokenAllocationMonthCount = 10, targetRaise = PLEDGE_AMOUNT * PLEDGE_AMOUNT
             it("Should fail if the not BROKER", async function () {
                 await expect(BionicPoolRegistry.connect(client)
-                    .add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
+                    .add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
                     .to.be.reverted;
             });
             it("Should fail if the time is less than now", async function () {
                 const t = Math.floor(Date.now() / 10000);
-                await expect(BionicPoolRegistry.add(0, t, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
+                await expect(BionicPoolRegistry.add(0, t, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
                     .to.revertedWithCustomError(BionicPoolRegistry, "BPR__PledgeStartAndPledgeEndNotValid");
             });
             it("Should allow BROKER to set new projects", async function () {
                 expect(await BionicPoolRegistry.hasRole(await BionicPoolRegistry.BROKER_ROLE(), owner.address)).to.be.true;
-                await expect(BionicPoolRegistry.add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationStartTime, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
+                await expect(BionicPoolRegistry.add(0, PLEDGING_START_TIME, PLEDGING_END_TIME, tokenAllocationPerMonth, tokenAllocationMonthCount, targetRaise, true, pledgingTiers))
                     .to.emit(BionicPoolRegistry, "PoolAdded").withArgs(0)
             });
             it("Should return same Pool upon request", async () => {
@@ -241,7 +241,6 @@ describe("e2e", function () {
                 // let poolTiers = await BionicPoolRegistry.poolIdToTiers(0, 0);
                 let pledgeTier = await BionicPoolRegistry.pledgeTiers(0);
 
-                expect(pool.tokenAllocationStartTime).to.equal(tokenAllocationStartTime);
                 expect(pool.pledgingEndTime).to.equal(PLEDGING_END_TIME);
                 expect(pool.targetRaise).to.equal(targetRaise);
                 expect(pledgeTier[0].maximumPledge).to.equal(pledgingTiers[0].maximumPledge);

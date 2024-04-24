@@ -26,7 +26,6 @@ error BPR__NotValidPledgeAmount(uint256 amount);
 error BPR__InvalidStackingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__InvalidInvestingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should be before _pledgingEndTime"
-error BPR__AllocationShouldBeAfterPledgingEnd(); //"add: _tokenAllocationStartTime must be after pledging end"
 error BPR__TargetToBeRaisedMustBeMoreThanZero();
 error BPR__PledgingHasClosed();
 error BPR__TargetRaisedHasSurpassed();
@@ -166,7 +165,6 @@ contract BionicPoolRegistry is
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
         uint256 _tokenAllocationPerMonth, // the total amount of token will be released to lottery winners per month
-        uint256 _tokenAllocationStartTime, // when users can start claiming their first reward
         uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
         bool _useRaffle,
@@ -177,9 +175,6 @@ contract BionicPoolRegistry is
         }
         if (_pledgingStartTime >= _pledgingEndTime) {
             revert BPR__PledgeStartAndPledgeEndNotValid();
-        }
-        if (_tokenAllocationStartTime <= _pledgingEndTime) {
-            revert BPR__AllocationShouldBeAfterPledgingEnd();
         }
 
         if (_targetRaise == 0) {
@@ -192,7 +187,6 @@ contract BionicPoolRegistry is
             pledgingEndTime: _pledgingEndTime,
             // pledgingAmountPerUser: _pledgingAmountPerUser,
             tokenAllocationPerMonth: _tokenAllocationPerMonth,
-            tokenAllocationStartTime: _tokenAllocationStartTime,
             tokenAllocationMonthCount: _tokenAllocationMonthCount,
             targetRaise: _targetRaise,
             pledgeTiers: _pledgeTiers,
