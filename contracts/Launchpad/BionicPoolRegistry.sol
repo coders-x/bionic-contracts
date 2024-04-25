@@ -180,6 +180,9 @@ contract BionicPoolRegistry is
         if (_targetRaise == 0) {
             revert BPR__TargetToBeRaisedMustBeMoreThanZero();
         }
+        // if (poolInfo[pid].pledgingStartTime != 0) {
+        //     revert BPR__InvalidPool();
+        // }
 
         uint32 winnersCount = 0;
         BionicStructs.PoolInfo memory pool = BionicStructs.PoolInfo({
