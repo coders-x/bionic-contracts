@@ -235,7 +235,6 @@ async function main(level: number, pid: number = 0) {
                         (pledgeStarting.getTime() / 1000) | 0, //PLEDGING_START_TIME
                         (pledgeEnding.getTime() / 1000) | 0, //PLEDGING_END_TIME
                         1000, //tokenAllocationPerMonth
-                        (tokenAllocationStartTime.getTime() / 1000) | 0, //tokenAllocationStartTime
                         10,//tokenAllocationMonthCount
                         1e10,//targetRaise
                         USE_RAFFLE,//do raffle
@@ -268,7 +267,7 @@ async function main(level: number, pid: number = 0) {
                     ).wait();
                     process.stdout.write(`${res.events[0]?.args[2]} $USDT + `);
                 }
-                const balance = BigNumber.from("600000000000000");
+                const balance = ethers.utils.parseUnits("0.002", 'ether')
                 if (await (await users[i].getBalance()).lte(balance)) {
                     await (
                         await owner.sendTransaction({
@@ -311,7 +310,7 @@ async function main(level: number, pid: number = 0) {
                         await abstractAccounts[i]
                             .connect(users[i])
                             .execute(fundingContract.address, 0, raw, 0, {
-                                // gasLimit: 8000000
+                                gasLimit: 400_000
                             })
                     ).wait(1);
                     console.log(
@@ -459,4 +458,4 @@ async function getCurrencyPermitSignature(
     );
 }
 //step, pid
-main(4, 9).then(console.log).catch(console.error);
+main(4, 0).then(console.log).catch(console.error);

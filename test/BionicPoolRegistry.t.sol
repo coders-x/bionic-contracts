@@ -121,7 +121,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
             block.timestamp + 10 minutes,
             // 1000, 1k
             allocatedTokenPerMonth,
-            block.timestamp + 20 minutes,
             10,
             10e18,
             useRaffle,
@@ -153,7 +152,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
             ,
             ,
             uint256 tokenAllocationPerMonth,
-            uint256 tokenAllocationStartTime,
             uint256 tokenAllocationMonthCount,
             ,
             ,
@@ -170,7 +168,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
         // assertEq(address(poolToken), address(_rewardToken));
         // assertEq(address(token), address(poolToken));
         assertEq(100, tokenAllocationPerMonth);
-        assertEq(block.timestamp + 20 minutes, tokenAllocationStartTime);
         assertEq(10, tokenAllocationMonthCount);
     }
 
@@ -242,9 +239,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         }
 
         //2. move time and do draw get the winners
-        (, , , uint256 tokenAllocationStartTime, , , , ) = _bionicFundRaising
-            .poolInfo(pid);
-        vm.warp(tokenAllocationStartTime - 5 minutes);
+        vm.warp(15 minutes);
 
         (, address[] memory winners) = _bionicFundRaising.getProjectInvestors(
             pid
