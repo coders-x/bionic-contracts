@@ -164,8 +164,6 @@ contract BionicPoolRegistry is
         uint256 pid,
         uint256 _pledgingStartTime, // Pledging will be permitted since this date
         uint256 _pledgingEndTime, // Before this Time pledge is permitted
-        uint256 _tokenAllocationPerMonth, // the total amount of token will be released to lottery winners per month
-        uint256 _tokenAllocationMonthCount, // amount of token will be allocated per investers share(usdt) per month.
         uint256 _targetRaise, // Amount that the project wishes to raise
         bool _useRaffle,
         BionicStructs.PledgeTier[] memory _pledgeTiers
@@ -188,9 +186,6 @@ contract BionicPoolRegistry is
         BionicStructs.PoolInfo memory pool = BionicStructs.PoolInfo({
             pledgingStartTime: _pledgingStartTime,
             pledgingEndTime: _pledgingEndTime,
-            // pledgingAmountPerUser: _pledgingAmountPerUser,
-            tokenAllocationPerMonth: _tokenAllocationPerMonth,
-            tokenAllocationMonthCount: _tokenAllocationMonthCount,
             targetRaise: _targetRaise,
             pledgeTiers: _pledgeTiers,
             winnersCount: winnersCount,

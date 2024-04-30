@@ -21,8 +21,6 @@ library BionicStructs {
     struct PoolInfo {
         uint256 pledgingStartTime; // Pledging will be permitted since this date
         uint256 pledgingEndTime; // Before this Time pledge is permitted
-        uint256 tokenAllocationPerMonth; // the amount of token will be released to lottery winners per month
-        uint256 tokenAllocationMonthCount; // number of months tokens will be allocated
         uint256 targetRaise; // Amount that the project wishes to raise
         uint32 winnersCount;
         bool useRaffle; // New field to indicate whether the pool uses a raffle or not
