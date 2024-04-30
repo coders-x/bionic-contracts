@@ -105,10 +105,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         );
     }
 
-    function registerProject(
-        bool useRaffle,
-        uint256 allocatedTokenPerMonth
-    ) public returns (uint256 pid) {
+    function registerProject(bool useRaffle) public returns (uint256 pid) {
         BionicStructs.PledgeTier[] memory pt = new BionicStructs.PledgeTier[](
             3
         );
@@ -119,9 +116,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
             pid,
             block.timestamp + 1 minutes,
             block.timestamp + 10 minutes,
-            // 1000, 1k
-            allocatedTokenPerMonth,
-            10,
             10e18,
             useRaffle,
             pt
@@ -147,28 +141,10 @@ contract BionicPoolRegistryTest is DSTest, Test {
     }
 
     function testAddProject() public {
-        uint256 pid = registerProject(false, 100);
-        (
-            ,
-            ,
-            uint256 tokenAllocationPerMonth,
-            uint256 tokenAllocationMonthCount,
-            ,
-            ,
+        uint256 pid = registerProject(false);
+        (, , , , bool useRaffle) = _bionicFundRaising.poolInfo(pid);
 
-        ) = _bionicFundRaising.poolInfo(pid);
-
-        // (
-        //     IERC20 token,
-        //     uint256 amount,
-        //     uint256 start,
-        //     uint256 end,
-        //     bytes32 root
-        // ) = _distrbutorContract.s_projectTokens(pid);
-        // assertEq(address(poolToken), address(_rewardToken));
-        // assertEq(address(token), address(poolToken));
-        assertEq(100, tokenAllocationPerMonth);
-        assertEq(10, tokenAllocationMonthCount);
+        assertEq(false, useRaffle);
     }
 
     function testPerformInvestmentAndClaim() public {
@@ -177,7 +153,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         uint256 deadline = block.timestamp + 7 days;
         uint256 count = 10;
         // uint256 winnersCount = 500;
-        uint256 pid = registerProject(false, allocatedTokenPerMonth);
+        uint256 pid = registerProject(false);
         uint256[] memory privateKeys = getPrivateKeys(50, count * 2);
         BionicAccount[] memory accs = new BionicAccount[](count);
         BionicStructs.PledgeTier[] memory pledgeTiers = _bionicFundRaising

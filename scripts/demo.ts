@@ -221,11 +221,9 @@ async function main(level: number, pid: number = 0) {
             pledgeStarting.setMinutes(pledgeStarting.getMinutes() + 1);
             let pledgeEnding = new Date(pledgeStarting.getTime());
             pledgeEnding.setMinutes(pledgeEnding.getMinutes() + timeDifference);
-            let tokenAllocationStartTime = new Date(pledgeEnding.getTime());
-            tokenAllocationStartTime.setMinutes(tokenAllocationStartTime.getMinutes() + timeDifference / 4);
             console.log(
                 `now ${(pledgeStarting.getTime() / 1000) | 0} and ${timeDifference} mins later ${(pledgeEnding.getTime() / 1000) | 0
-                } and token allocation will be at ${(tokenAllocationStartTime.getTime() / 1000) | 0}`
+                }`
             );
             let r = await (
                 await fundingContract
@@ -234,8 +232,6 @@ async function main(level: number, pid: number = 0) {
                         pid,
                         (pledgeStarting.getTime() / 1000) | 0, //PLEDGING_START_TIME
                         (pledgeEnding.getTime() / 1000) | 0, //PLEDGING_END_TIME
-                        1000, //tokenAllocationPerMonth
-                        10,//tokenAllocationMonthCount
                         1e10,//targetRaise
                         USE_RAFFLE,//do raffle
                         // tiers,
@@ -310,7 +306,7 @@ async function main(level: number, pid: number = 0) {
                         await abstractAccounts[i]
                             .connect(users[i])
                             .execute(fundingContract.address, 0, raw, 0, {
-                                gasLimit: 400_000
+                                gasLimit: 500_000
                             })
                     ).wait(1);
                     console.log(
