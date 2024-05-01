@@ -263,7 +263,6 @@ contract DistributorContractTest is DSTest, Test {
             )
         );
         distributorContract.claim(pid, winners[0], pledged, proof);
-        vm.stopPrank();
 
         //Fund The Claiming Contract
         (uint claimable, ) = distributorContract.calcClaimableAmount(
@@ -275,6 +274,32 @@ contract DistributorContractTest is DSTest, Test {
         rewardToken.mint(address(distributorContract), totalBalance);
 
         //claim for a month
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid, winners[0], 1, claimable);
+        distributorContract.claim(pid, winners[0], pledged, proof);
+
+        vm.stopPrank();
+
+        //disable the distribution for 2 months
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.DistrbutionStatusChanged(pid, false);
+        distributorContract.updateDistrbutionStatus(pid, false);
+
+        time += CYCLE_IN_SECONDS * 2;
+        vm.warp(time);
+
+        // reject claim
+        vm.expectRevert(Distributor__InvalidProject.selector);
+        distributorContract.claim(pid, winners[0], pledged, proof);
+
+        //enable the distribution
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.DistrbutionStatusChanged(pid, true);
+        distributorContract.updateDistrbutionStatus(pid, true);
+
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid, winners[0], 2, claimable * 2);
+        distributorContract.claim(pid, winners[0], pledged, proof);
     }
 
     /*     function testBatchClaim() public {
