@@ -267,7 +267,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
             uint256 monthShare,
             uint256 start,
             ,
-            bytes32 root
+            bytes32 root,
+
         ) = _distrbutorContract.s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));
         assertEq(start, block.timestamp + 20 minutes);

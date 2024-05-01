@@ -51,6 +51,7 @@ contract BionicTokenDistributor is
         uint256 startAt; // time stamp of starting Token distribution
         uint64 totalCycles; // number of months allocation will go on
         bytes32 merkleRoot; //use openzappline merkle tree to verify claims
+        bool isActive; //the claim is active or not
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -86,22 +87,20 @@ contract BionicTokenDistributor is
         uint256 amount
     );
 
+    event ClaimStatusChanged(uint256 indexed pid, bool status);
+
     /*///////////////////////////////////////////////////////////////
                             Modifiers
     //////////////////////////////////////////////////////////////*/
-    modifier exsitingProject(uint256 pid) {
+    modifier isValidProject(uint256 pid) {
         if (address(s_projectTokens[pid].token) == address(0)) {
+            revert Distributor__InvalidProject();
+        }
+        if (!s_projectTokens[pid].isActive) {
             revert Distributor__InvalidProject();
         }
         _;
     }
-    modifier projectDoesNotExists(uint256 pid) {
-        if (address(s_projectTokens[pid].token) == address(0)) {
-            revert Distributor__InvalidProject();
-        }
-        _;
-    }
-
     /*///////////////////////////////////////////////////////////////
                             Constructors
     //////////////////////////////////////////////////////////////*/
@@ -128,7 +127,8 @@ contract BionicTokenDistributor is
             monthQuota,
             startAt,
             totalCycles,
-            merkleRoot
+            merkleRoot,
+            true
         );
         emit ProjectAdded(
             pid,
@@ -146,10 +146,7 @@ contract BionicTokenDistributor is
         address account,
         uint256 pledged,
         bytes32[] calldata merkleProof
-    ) external nonReentrant {
-        if (address(s_projectTokens[pid].token) == address(0)) {
-            revert Distributor__InvalidProject();
-        }
+    ) external nonReentrant isValidProject(pid) {
         if (
             !MerkleProof.verify(
                 merkleProof,
@@ -157,7 +154,6 @@ contract BionicTokenDistributor is
                 keccak256(
                     bytes.concat(keccak256(abi.encode(pid, account, pledged)))
                 )
-                // keccak256(abi.encodePacked(pid, account, pledged))
             )
         ) {
             revert Distributor__NotEligible();
