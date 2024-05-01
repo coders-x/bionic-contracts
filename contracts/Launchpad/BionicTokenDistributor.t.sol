@@ -199,7 +199,10 @@ contract DistributorContractTest is DSTest, Test {
         //Fund The Claiming Contract
         totalBalance += claimable * 10;
         rewardToken.mint(address(distributorContract), claimable * 10);
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid, winners[1], 8, claimable * 8);
         distributorContract.claim(pid, winners[1], pledged, proof);
+
         assertEq(rewardToken.balanceOf(address(winners[1])), claimable * 12);
         assertEq(
             rewardToken.balanceOf(address(distributorContract)),
