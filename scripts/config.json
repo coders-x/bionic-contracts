@@ -43,7 +43,7 @@
         "tbaGuardian": "0xF4386C22A1e7D6A730C387f2b7a2cbFE82B38d28",
         "bionicLaunchPad": "0x24FF886CEF152494D30C6A591601c52219306E30",
         "entryPoint": "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
-        "bionicDistributor": "0x66A54cF1c875837c84e126ef69AC1F1a7Dc061Ec",
+        "bionicDistributor": "0x7c401bcd33208fd92816d9c575acebcce4c65b16",
         "erc6551Reg": "0x000000006551c19487814612e58FE06813775758",
         "subId": 153,
         "cbGasLimit": 60000,
