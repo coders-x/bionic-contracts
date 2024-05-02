@@ -139,7 +139,7 @@ contract BionicTokenDistributor is
             merkleRoot
         );
     }
-    function updateDistrbutionStatus(
+    function updateDistributionStatus(
         uint256 pid,
         bool status
     ) external onlyOwner {
