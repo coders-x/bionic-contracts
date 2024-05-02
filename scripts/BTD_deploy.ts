@@ -8,11 +8,7 @@ dotenv.config()
 
 async function main() {
     let contract = await deployContract({});
-
-    // let contract = await ethers.getContractAt("BionicTokenDistributor", CONFIG.bionicDistributor);
-
     console.log(`deployed BTD at ${contract.address}`)
-
     await verifyContract(contract, []);
 }
 
