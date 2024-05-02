@@ -87,7 +87,7 @@ contract BionicTokenDistributor is
         uint256 amount
     );
 
-    event DistrbutionStatusChanged(uint256 indexed pid, bool status);
+    event DistributionStatusChanged(uint256 indexed pid, bool status);
 
     /*///////////////////////////////////////////////////////////////
                             Modifiers
@@ -144,7 +144,7 @@ contract BionicTokenDistributor is
         bool status
     ) external onlyOwner {
         s_projectTokens[pid].isActive = status;
-        emit DistrbutionStatusChanged(pid, status);
+        emit DistributionStatusChanged(pid, status);
     }
 
     // Claim the given amount of pledge user made to the token to the given address. Reverts if the inputs are invalid.

@@ -285,7 +285,7 @@ contract DistributorContractTest is DSTest, Test {
 
         //disable the distribution for 2 months
         vm.expectEmit(address(distributorContract));
-        emit BionicTokenDistributor.DistrbutionStatusChanged(pid, false);
+        emit BionicTokenDistributor.DistributionStatusChanged(pid, false);
         distributorContract.updateDistributionStatus(pid, false);
 
         time += CYCLE_IN_SECONDS * 2;
@@ -297,7 +297,7 @@ contract DistributorContractTest is DSTest, Test {
 
         //enable the distribution
         vm.expectEmit(address(distributorContract));
-        emit BionicTokenDistributor.DistrbutionStatusChanged(pid, true);
+        emit BionicTokenDistributor.DistributionStatusChanged(pid, true);
         distributorContract.updateDistributionStatus(pid, true);
 
         vm.expectEmit(address(distributorContract));
