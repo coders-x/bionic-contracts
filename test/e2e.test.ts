@@ -41,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x94cA304770f78976fBeA1d8c1CA3b8396d677Fe1",
+    accountAddress: "0x092D5bbCf5c9C17C0cd7001FA3042BB45183De3D",
     automationUpdateInterval: "30",
 };
 

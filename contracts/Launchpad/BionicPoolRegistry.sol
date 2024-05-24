@@ -94,6 +94,7 @@ contract BionicPoolRegistry is
     mapping(uint256 => EnumerableSet.AddressSet) internal poolLotteryWinners;
 
     ///@notice Mininmal amount of Bionic to be Stacked on account required to pledge
+    /// @custom:oz-renamed-from minimumBionicStack
     uint256 public minimumBionicStake;
 
     /*///////////////////////////////////////////////////////////////
@@ -140,7 +141,7 @@ contract BionicPoolRegistry is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
-        minimumBionicStake = 10e18;
+        minimumBionicStake = 10e24; //1 BCNX
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
         investingToken = _investingToken;
