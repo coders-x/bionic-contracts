@@ -273,7 +273,7 @@ contract BionicPoolRegistry is
             }
         }
     }
-    function setminimumBionicStake(
+    function setMinimumBionicStake(
         uint256 _minimumBionicStake
     ) external onlyRole(BROKER_ROLE) {
         minimumBionicStake = _minimumBionicStake;
