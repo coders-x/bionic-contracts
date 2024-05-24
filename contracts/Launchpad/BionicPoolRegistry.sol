@@ -23,7 +23,7 @@ error BPR__NotDefinedError();
 error BPR__PoolRaffleDisabled();
 error BPR__InvalidPool();
 error BPR__NotValidPledgeAmount(uint256 amount);
-error BPR__InvalidStackingToken(); //"constructor: _investingToken must not be zero address"
+error BPR__InvalidStakingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__InvalidInvestingToken(); //"constructor: _investingToken must not be zero address"
 error BPR__PledgeStartAndPledgeEndNotValid(); //"add: _pledgingStartTime should be before _pledgingEndTime"
 error BPR__TargetToBeRaisedMustBeMoreThanZero();
@@ -93,7 +93,7 @@ contract BionicPoolRegistry is
     ///@notice winners per raffle
     mapping(uint256 => EnumerableSet.AddressSet) internal poolLotteryWinners;
 
-    ///@notice Mininmal amount of Bionic to be Stacked on account required to pledge
+    ///@notice Mininmal amount of Bionic to be Staked on account required to pledge
     /// @custom:oz-renamed-from minimumBionicStack
     uint256 public minimumBionicStake;
 
@@ -128,7 +128,7 @@ contract BionicPoolRegistry is
         address _bionicInvestorPass
     ) public initializer {
         if (address(_stakingToken) == address(0)) {
-            revert BPR__InvalidStackingToken();
+            revert BPR__InvalidStakingToken();
         }
         if (address(_investingToken) == address(0)) {
             revert BPR__InvalidInvestingToken();
@@ -255,7 +255,7 @@ contract BionicPoolRegistry is
                 s
             )
         {
-            _stackPledge(_msgSender(), pid, amount);
+            _stakePledge(_msgSender(), pid, amount);
             if (!pool.useRaffle && poolLotteryWinners[pid].add(_msgSender())) {
                 treasuryWithdrawable += amount;
                 emit Invested(pid, _msgSender(), amount);
@@ -345,7 +345,7 @@ contract BionicPoolRegistry is
         return false;
     }
 
-    function _stackPledge(
+    function _stakePledge(
         address account,
         uint256 pid,
         uint256 _amount
