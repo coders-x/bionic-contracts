@@ -94,7 +94,7 @@ contract BionicPoolRegistry is
     mapping(uint256 => EnumerableSet.AddressSet) internal poolLotteryWinners;
 
     ///@notice Mininmal amount of Bionic to be Stacked on account required to pledge
-    uint256 public minimumBionicStack;
+    uint256 public minimumBionicStake;
 
     /*///////////////////////////////////////////////////////////////
                                 Events
@@ -140,7 +140,7 @@ contract BionicPoolRegistry is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
-        minimumBionicStack = 10e18;
+        minimumBionicStake = 10e18;
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
         investingToken = _investingToken;
@@ -227,7 +227,7 @@ contract BionicPoolRegistry is
         if (!_isValidPledge(pledged.add(amount), pool.pledgeTiers)) {
             revert BPR__NotValidPledgeAmount(amount);
         }
-        if (IERC20(stakingToken).balanceOf(_msgSender()) < minimumBionicStack) {
+        if (IERC20(stakingToken).balanceOf(_msgSender()) < minimumBionicStake) {
             revert BPR__NotEnoughStake();
         }
 
@@ -272,10 +272,10 @@ contract BionicPoolRegistry is
             }
         }
     }
-    function setMinimumBionicStack(
-        uint256 _minimumBionicStack
+    function setminimumBionicStake(
+        uint256 _minimumBionicStake
     ) external onlyRole(BROKER_ROLE) {
-        minimumBionicStack = _minimumBionicStack;
+        minimumBionicStake = _minimumBionicStake;
     }
 
     /**
