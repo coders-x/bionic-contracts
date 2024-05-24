@@ -41,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x7B3A0d8a199170FebCAf51e065d694FBa0b60f5f",
+    accountAddress: "0x94cA304770f78976fBeA1d8c1CA3b8396d677Fe1",
     automationUpdateInterval: "30",
 };
 
@@ -279,7 +279,7 @@ describe("e2e", function () {
                     .to.be.revertedWithCustomError(BionicPoolRegistry, "BPR__NotEnoughStake");
             });
             it("Should fail if expired deadline", async function () {
-                await bionicContract.transfer(abstractedAccount.address, BionicPoolRegistry.MINIMUM_BIONIC_STAKE());
+                await bionicContract.transfer(abstractedAccount.address, BionicPoolRegistry.minimumBionicStack());
                 let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 1000, 32000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
                 await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWith("CurrencyPermit: expired deadline");
@@ -293,7 +293,7 @@ describe("e2e", function () {
                 const deadline = ethers.constants.MaxUint256;
                 for (let i = 0; i < AbstractAccounts.length; i++) {
                     const aac = AbstractAccounts[i];
-                    await bionicContract.transfer(aac.address, BionicPoolRegistry.MINIMUM_BIONIC_STAKE());
+                    await bionicContract.transfer(aac.address, BionicPoolRegistry.minimumBionicStack());
                     const alreadyPledged = await BionicPoolRegistry.userTotalPledge(aac.address);
                     const amount = BigNumber.from(1000);
                     await pledgeBySigner(aac, i == 0 ? client : signers[(i - 1) * 2], usdtContract, BionicPoolRegistry, amount, deadline, alreadyPledged)

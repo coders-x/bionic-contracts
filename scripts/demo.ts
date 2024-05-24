@@ -43,6 +43,7 @@ async function main(level: number, pid: number = 0) {
           */
         let chainId = network.config.chainId || 421614;
         let users: User[] = getSigners(20);
+        users.push(owner);
         let fundingContract = await ethers.getContractAt(
             "BionicPoolRegistry",
             BIONIC_LAUNCH_ADDR
@@ -120,6 +121,7 @@ async function main(level: number, pid: number = 0) {
             "0x9cCD9169d9293c0D18c162339F04C97966f9284d",
             "0x0aAB4DcC6de46873D7BA01cDF6eb305e6fA11A98",
             "0xa42889Fb2A3F7f263C40fca01b73Cfa535f641A3",
+            "0x389C5759e6d18fBdA633Ab491eFd531Dec7015F0",
         ];
 
         /*** Mint BIP and Assign SmartWallet */
@@ -310,7 +312,7 @@ async function main(level: number, pid: number = 0) {
                             })
                     ).wait(1);
                     console.log(
-                        `approved and moved ${res.events[0].args[2]}$ from ${abstractAccounts[i]} to ${res.events[0].args[1]} `
+                        `approved and moved ${res.events[0].args[2]}$ from ${abstractAccounts[i].address} to ${res.events[0].args[1]} `
                     );
                 } catch (err) {
                     console.error(err);
@@ -454,4 +456,4 @@ async function getCurrencyPermitSignature(
     );
 }
 //step, pid
-main(4, 0).then(console.log).catch(console.error);
+main(4, 11).then(console.log).catch(console.error);

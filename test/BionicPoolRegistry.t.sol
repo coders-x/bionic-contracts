@@ -175,7 +175,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             );
             _bionicToken.transfer(
                 accountAddress,
-                _bionicFundRaising.MINIMUM_BIONIC_STAKE()
+                _bionicFundRaising.minimumBionicStack()
             );
             uint256 amount = pledgeTiers[i % 3].minimumPledge;
             _investingToken.mint(accountAddress, amount ** 5);

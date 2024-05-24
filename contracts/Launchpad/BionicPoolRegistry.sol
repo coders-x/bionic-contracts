@@ -68,7 +68,6 @@ contract BionicPoolRegistry is
     bytes32 public constant BROKER_ROLE = keccak256("BROKER_ROLE");
     bytes32 public constant SORTER_ROLE = keccak256("SORTER_ROLE");
     bytes32 public constant TREASURY_ROLE = keccak256("TREASURY");
-    uint256 public constant MINIMUM_BIONIC_STAKE = 10e18;
 
     /// @notice staking token is fixed for all pools
     IERC20 public stakingToken;
@@ -93,6 +92,9 @@ contract BionicPoolRegistry is
     mapping(address => uint256) public userTotalPledge;
     ///@notice winners per raffle
     mapping(uint256 => EnumerableSet.AddressSet) internal poolLotteryWinners;
+
+    ///@notice Mininmal amount of Bionic to be Stacked on account required to pledge
+    uint256 public minimumBionicStack;
 
     /*///////////////////////////////////////////////////////////////
                                 Events
@@ -138,11 +140,11 @@ contract BionicPoolRegistry is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
+        minimumBionicStack = 10e18;
         bionicInvestorPass = _bionicInvestorPass;
         stakingToken = _stakingToken;
         investingToken = _investingToken;
         treasury = new Treasury(address(this));
-
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(BROKER_ROLE, _msgSender());
         _grantRole(TREASURY_ROLE, _msgSender());
@@ -225,9 +227,7 @@ contract BionicPoolRegistry is
         if (!_isValidPledge(pledged.add(amount), pool.pledgeTiers)) {
             revert BPR__NotValidPledgeAmount(amount);
         }
-        if (
-            IERC20(stakingToken).balanceOf(_msgSender()) < MINIMUM_BIONIC_STAKE
-        ) {
+        if (IERC20(stakingToken).balanceOf(_msgSender()) < minimumBionicStack) {
             revert BPR__NotEnoughStake();
         }
 
@@ -271,6 +271,11 @@ contract BionicPoolRegistry is
                 }
             }
         }
+    }
+    function setMinimumBionicStack(
+        uint256 _minimumBionicStack
+    ) external onlyRole(BROKER_ROLE) {
+        minimumBionicStack = _minimumBionicStack;
     }
 
     /**
