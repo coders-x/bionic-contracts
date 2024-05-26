@@ -25,7 +25,7 @@ contract Bionic is
     }
 
     function initialize() public initializer {
-        __ERC20_init("Bionic", "BIONIC");
+        __ERC20_init("Bionic", "BCNX");
         __ERC20Snapshot_init();
         __AccessControl_init();
         __ERC20Permit_init("Bionic");
