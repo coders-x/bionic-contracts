@@ -41,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x092D5bbCf5c9C17C0cd7001FA3042BB45183De3D",
+    accountAddress: "0x8557A3404470660544992276d75cdf247BD916a2",
     automationUpdateInterval: "30",
 };
 
@@ -365,7 +365,7 @@ describe("e2e", function () {
             });
             it("Should fail if not enough balance", async function () {
                 const investor = investors[0];
-                await helpers.time.increaseTo(tokenAllocationStartTime + CYCLE_IN_SECONDS + 10);
+                await helpers.time.increaseTo(tokenAllocationStartTime + 10);
                 await expect(DistributorContract.claim(0, signers[0].address, investor[2], merkleTree.getProof(investor)))
                     .to.be.revertedWithCustomError(DistributorContract, "Distributor__NotEnoughTokenLeft");
             });
