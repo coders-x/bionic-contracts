@@ -37,8 +37,8 @@ const config: HardhatUserConfig = {
       url: process.env.RPC_URL,
       accounts: [process.env.PRIVATE_KEY || ""],
     },
-    mumbai: {
-      chainId: 80001,
+    anoy: {
+      chainId: 80002,
       url: process.env.MUMBAI_RPC,
       accounts: [process.env.PRIVATE_KEY || ""],
     },
@@ -66,6 +66,7 @@ const config: HardhatUserConfig = {
       //polygon
       polygon: process.env.POLYGONSCAN_API_KEY || "",
       polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
+      anoy: process.env.POLYGONSCAN_API_KEY || "",
 
       //arbitrum
       arb_sepolia: process.env.ARBITRUMSCAN_API_KEY || "",
@@ -77,6 +78,15 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://api-sepolia.arbiscan.io/api",
           browserURL: "https://sepolia.arbiscan.io"
+        }
+      },
+      {
+        network: "anoy",
+        chainId: 80002,
+        urls: {
+          apiURL:
+            "https://www.oklink.com/api/explorer/v1/contract/verify/async/api/polygonAmoy",
+          browserURL: "https://www.oklink.com/polygonAmoy",
         }
       }
     ]

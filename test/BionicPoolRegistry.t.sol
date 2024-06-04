@@ -276,7 +276,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
         assertEq(start, block.timestamp + 20 minutes);
         assertEq(merkleRoot, root);
 
-        uint256 time = start + CYCLE_IN_SECONDS * 3;
+        uint256 time = start + CYCLE_IN_SECONDS * 2;
         vm.warp(time);
 
         for (uint256 i = 0; i < winners.length; i++) {

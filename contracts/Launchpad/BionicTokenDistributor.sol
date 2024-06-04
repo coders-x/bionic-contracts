@@ -235,7 +235,8 @@ contract BionicTokenDistributor is
         uint256 claimableMonthCount = block
             .timestamp
             .sub(s_projectTokens[pid].startAt)
-            .div(s_projectTokens[pid].cycleInSeconds);
+            .div(s_projectTokens[pid].cycleInSeconds)
+            .add(1);
         if (claimableMonthCount > s_projectTokens[pid].totalCycles) {
             return s_projectTokens[pid].totalCycles;
         }
