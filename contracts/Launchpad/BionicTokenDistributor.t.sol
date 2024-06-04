@@ -9,7 +9,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {BionicPoolRegistry} from "./BionicPoolRegistry.sol";
 import {Merkle} from "murky/src/Merkle.sol";
 import "./BionicTokenDistributor.sol";
-// import "forge-std/console.sol";
+import "forge-std/console.sol";
 
 contract DistributorContractTest is DSTest, Test {
     uint256 public constant CYCLE_IN_SECONDS = 30 days; // Approx 1 month
@@ -103,17 +103,11 @@ contract DistributorContractTest is DSTest, Test {
         vm.startPrank(winners[0]);
         vm.clearMockedCalls();
 
-        // //nothing to claim not in the window
+        //not valid proof or claim
         vm.expectRevert(Distributor__NotEligible.selector);
         distributorContract.claim(pid, winners[0], 0, proof);
+
         vm.warp(time);
-
-        vm.expectRevert(Distributor__NothingToClaim.selector);
-        distributorContract.claim(pid, winners[0], pledged, proof);
-
-        time += CYCLE_IN_SECONDS;
-        vm.warp(time);
-
         vm.expectRevert(
             abi.encodeWithSelector(
                 Distributor__NotEnoughTokenLeft.selector,
@@ -130,6 +124,7 @@ contract DistributorContractTest is DSTest, Test {
             winners[0],
             pledged
         );
+        assertNotEq(claimable, 0);
         uint totalBalance = claimable * 8;
         rewardToken.mint(address(distributorContract), totalBalance);
 
@@ -153,6 +148,8 @@ contract DistributorContractTest is DSTest, Test {
         assertEq(distributorContract.s_userClaims(winners[0], pid), 1);
         assertEq(distributorContract.s_userClaims(winners[1], pid), 0);
 
+        vm.expectRevert(Distributor__NothingToClaim.selector);
+        distributorContract.claim(pid, winners[0], pledged, proof);
         //claim for 3 months
         time += CYCLE_IN_SECONDS * 3;
         vm.warp(time);
@@ -252,12 +249,6 @@ contract DistributorContractTest is DSTest, Test {
         distributorContract.claim(pid, winners[0], 0, proof);
         vm.warp(time);
 
-        vm.expectRevert(Distributor__NothingToClaim.selector);
-        distributorContract.claim(pid, winners[0], pledged, proof);
-
-        time += CYCLE_IN_SECONDS;
-        vm.warp(time);
-
         vm.expectRevert(
             abi.encodeWithSelector(
                 Distributor__NotEnoughTokenLeft.selector,
@@ -276,7 +267,7 @@ contract DistributorContractTest is DSTest, Test {
         uint totalBalance = claimable * 8;
         rewardToken.mint(address(distributorContract), totalBalance);
 
-        //claim for a month
+        //claim for 2 months
         vm.expectEmit(address(distributorContract));
         emit BionicTokenDistributor.Claimed(pid, winners[0], 1, claimable);
         distributorContract.claim(pid, winners[0], pledged, proof);
@@ -299,7 +290,6 @@ contract DistributorContractTest is DSTest, Test {
         vm.expectEmit(address(distributorContract));
         emit BionicTokenDistributor.DistributionStatusChanged(pid, true);
         distributorContract.updateDistributionStatus(pid, true);
-
         vm.expectEmit(address(distributorContract));
         emit BionicTokenDistributor.Claimed(pid, winners[0], 2, claimable * 2);
         distributorContract.claim(pid, winners[0], pledged, proof);
