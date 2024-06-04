@@ -41,7 +41,6 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x8557A3404470660544992276d75cdf247BD916a2",
     automationUpdateInterval: "30",
 };
 
@@ -49,7 +48,6 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     ERC6551_REGISTRY_ADDR = "0x000000006551c19487814612e58FE06813775758",
     USDT_ADDR = NETWORK_CONFIG.usdtAddr, // on polygon network
     USDT_WHALE = NETWORK_CONFIG.usdtWhale, // on polygon network
-    ACCOUNT_ADDRESS = NETWORK_CONFIG.accountAddress,
     CALLBACK_GAS_LIMIT_PER_USER = 90300,
     REQUEST_VRF_PER_WINNER = true,
     PLEDGING_START_TIME = 1810704849,
@@ -67,7 +65,7 @@ describe("e2e", function () {
     let bionicDecimals: number;
     let pledgingTiers: BionicStructs.PledgeTierStruct[];
     let CYCLE_IN_SECONDS: number;
-
+    let smartAccountAddress: string;
 
     before(async () => {
         [owner, client, guardian, ...signers] = await ethers.getSigners();
@@ -80,7 +78,10 @@ describe("e2e", function () {
         let accountGuardian = await AccountGuardianFactory.deploy();
         tokenBoundImpContract = await deployTBA(mockEntryPoint.address, accountGuardian.address);
         bionicDecimals = await bionicContract.decimals();
-        abstractedAccount = await ethers.getContractAt("BionicAccount", ACCOUNT_ADDRESS);
+        smartAccountAddress = await tokenBoundContractRegistry.account(tokenBoundImpContract.address, ethers.utils.formatBytes32String('0'),
+            network.config.chainId as number, bipContract.address,
+            "10");
+        abstractedAccount = await ethers.getContractAt("BionicAccount", smartAccountAddress);
         pledgingTiers = [
             { maximumPledge: PLEDGE_AMOUNT, minimumPledge: PLEDGE_AMOUNT, tierId: 1 },
             { maximumPledge: PLEDGE_AMOUNT * 3, minimumPledge: PLEDGE_AMOUNT * 3, tierId: 2 },
@@ -186,7 +187,7 @@ describe("e2e", function () {
             let res = await tokenBoundContractRegistry.account(tokenBoundImpContract.address, ethers.utils.formatBytes32String('0'),
                 network.config.chainId as number, bipContract.address,
                 "10");
-            expect(res).to.equal(ACCOUNT_ADDRESS);
+            expect(res).to.equal(smartAccountAddress);
         })
         it("should deploy a new address for the user based on their token", async () => {
             await network.provider.send("hardhat_mine", ["0x100"]); //mine 256 blocks
@@ -195,7 +196,7 @@ describe("e2e", function () {
                 "10");
             let newAcc = await res.wait();
 
-            expect(newAcc?.events[0]?.args?.account).to.equal(ACCOUNT_ADDRESS);
+            expect(newAcc?.events[0]?.args?.account).to.equal(smartAccountAddress);
         })
         it("should permit fundingContract to transfer currencies out of users wallet", async () => {
             const deadline = ethers.constants.MaxUint256;
