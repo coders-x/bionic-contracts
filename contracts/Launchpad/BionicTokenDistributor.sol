@@ -78,7 +78,8 @@ contract BionicTokenDistributor is
         uint256 monthQuota,
         uint256 startAt,
         uint64 totalCycles,
-        bytes32 merkleRoot
+        bytes32 merkleRoot,
+        uint256 cycleInSeconds
     );
     // This event is triggered whenever a call to #claim succeeds.
     event Claimed(
@@ -139,7 +140,8 @@ contract BionicTokenDistributor is
             monthQuota,
             startAt,
             totalCycles,
-            merkleRoot
+            merkleRoot,
+            cycleInSeconds
         );
     }
     function updateDistributionStatus(
