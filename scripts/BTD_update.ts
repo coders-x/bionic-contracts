@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { ethers, upgrades } from "hardhat";
 import hre from "hardhat";
 import { FactoryOptions } from 'hardhat/types';
-import { arbitrum as CONFIG } from './config.json';
+import { mumbai as CONFIG } from './config.json';
 import { BionicTokenDistributor } from '../typechain-types';
 dotenv.config()
 
