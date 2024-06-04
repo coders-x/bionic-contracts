@@ -56,7 +56,8 @@ const ENTRY_POINT = "0x5FF137D4b0FDCD49DcA30c7CF57E578a026d2789",
     PLEDGING_END_TIME = 2710704849,
     tokenAllocationStartTime = PLEDGING_END_TIME + 1000,
     PLEDGE_AMOUNT = 1000,
-    TIER_ALLOCATION = [3, 2, 1];
+    TIER_ALLOCATION = [3, 2, 1],
+    CYCLE_IN_SECONDS = 2592000;
 
 describe("e2e", function () {
     let bionicContract: Bionic, bipContract: BionicInvestorPass, BionicPoolRegistry: BionicPoolRegistry,
@@ -66,7 +67,6 @@ describe("e2e", function () {
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
     let pledgingTiers: BionicStructs.PledgeTierStruct[];
-    let CYCLE_IN_SECONDS = 2592000;
 
 
     before(async () => {
