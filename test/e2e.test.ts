@@ -41,7 +41,7 @@ const NETWORK_CONFIG = {
     fundAmount: "100000000000000000", // 0.1
     usdtAddr: "0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d",
     usdtWhale: "0x6ED0C4ADDC308bb800096B8DaA41DE5ae219cd36",
-    accountAddress: "0x092D5bbCf5c9C17C0cd7001FA3042BB45183De3D",
+    accountAddress: "0x5Eb6FdE4B5a1c9bbc82AF9700Fb08216aBBf4688",
     automationUpdateInterval: "30",
 };
 
@@ -66,7 +66,7 @@ describe("e2e", function () {
     let signers: SignerWithAddress[];
     let bionicDecimals: number;
     let pledgingTiers: BionicStructs.PledgeTierStruct[];
-    let CYCLE_IN_SECONDS: number;
+    let CYCLE_IN_SECONDS = 2592000;
 
 
     before(async () => {
@@ -121,7 +121,7 @@ describe("e2e", function () {
         BionicPoolRegistry = await deployBionicPoolRegistry(bionicContract.address, usdtContract.address, bipContract.address);
 
         DistributorContract = await deployBionicTokenDistributor();
-        CYCLE_IN_SECONDS = Number(await DistributorContract.CYCLE_IN_SECONDS());
+        // CYCLE_IN_SECONDS = Number(await DistributorContract.CYCLE_IN_SECONDS());
     });
 
 
@@ -342,14 +342,15 @@ describe("e2e", function () {
 
         describe("registerProjectToken", () => {
             it("Should fail if not owner", async function () {
-                await expect(DistributorContract.connect(client).registerProjectToken(0, bionicContract.address, 0, 0, 0, merkleTree.root))
+                await expect(DistributorContract.connect(client).registerProjectToken(0, bionicContract.address, 0, 0, 0, merkleTree.root, CYCLE_IN_SECONDS))
                     .to.be.revertedWith("Ownable: caller is not the owner");
             });
             it("Should register a new project", async function () {
-                const tx = await DistributorContract.registerProjectToken(0, bionicContract.address, 10, tokenAllocationStartTime, 2, merkleTree.root);
+                const tx = await DistributorContract.registerProjectToken(0, bionicContract.address, 10, tokenAllocationStartTime, 2, merkleTree.root, CYCLE_IN_SECONDS);
                 const config = await DistributorContract.s_projectTokens(0);
                 expect(config.token).to.equal(bionicContract.address);
                 expect(config.merkleRoot).to.equal(merkleTree.root);
+                expect(config.cycleInSeconds).to.equal(CYCLE_IN_SECONDS);
             });
         });
         describe("claim", () => {
@@ -462,7 +463,7 @@ async function getPermitSignature(signer: SignerWithAddress, token: IERC20Permit
         )
     )
 }
-async function getCurrencyPermitSignature(signer: SignerWithAddress, account: BionicAccount, currency: IERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
+async function getCurrencyPermitSignature(signer: SignerWithAddress, account: BionicAccount, currency: ERC20, spender: string, value: BigNumber, deadline: BigNumber = ethers.constants.MaxUint256) {
     const [nonce, name, version, chainId] = await Promise.all([
         account.getNonce(),
         "BionicAccount",

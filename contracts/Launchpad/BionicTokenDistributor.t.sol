@@ -36,7 +36,8 @@ contract DistributorContractTest is DSTest, Test {
             1e2,
             100,
             12, // a year
-            merkleRoot
+            merkleRoot,
+            CYCLE_IN_SECONDS
         );
     }
 
@@ -59,7 +60,8 @@ contract DistributorContractTest is DSTest, Test {
             uint256 startAt,
             uint256 totalCycles,
             bytes32 root,
-            bool isActive
+            bool isActive,
+            uint256 cycleInSeconds
         ) = distributorContract.s_projectTokens(pid);
         assertEq(address(token), address(rewardToken));
         assertEq(monthQuota, 1e2);
@@ -67,6 +69,7 @@ contract DistributorContractTest is DSTest, Test {
         assertEq(totalCycles, 12);
         assertEq(root, merkleRoot);
         assertEq(isActive, true);
+        assertEq(cycleInSeconds, CYCLE_IN_SECONDS);
     }
 
     function testAddUserAndClaim() public {
@@ -125,12 +128,12 @@ contract DistributorContractTest is DSTest, Test {
         vm.stopPrank();
 
         //Fund The Claiming Contract
-        (uint claimable, ) = distributorContract.calcClaimableAmount(
+        (uint256 claimable, ) = distributorContract.calcClaimableAmount(
             pid,
             winners[0],
             pledged
         );
-        uint totalBalance = claimable * 8;
+        uint256 totalBalance = claimable * 8;
         rewardToken.mint(address(distributorContract), totalBalance);
 
         //claim for a month
