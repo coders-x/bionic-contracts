@@ -52,12 +52,13 @@ contract BionicTokenDistributor is
         uint64 totalCycles; // number of months allocation will go on
         bytes32 merkleRoot; //use openzappline merkle tree to verify claims
         bool isActive; //the claim is active or not
+        uint256 cycleInSeconds;
     }
 
     /*///////////////////////////////////////////////////////////////
                             States
     //////////////////////////////////////////////////////////////*/
-    uint256 public constant CYCLE_IN_SECONDS = 30 days; // Approx 1 month (assuming 15 seconds per block)
+    // uint256 public constant CYCLE_IN_SECONDS = 30 days; // Approx 1 month (assuming 15 seconds per block)
 
     // User's claim history for each project token useraddress => pid => DistributionHeight
     // by DistributionHeight we mean the time when user claimed tokens last time(numbers of cycles of claimed tokens)
@@ -77,7 +78,8 @@ contract BionicTokenDistributor is
         uint256 monthQuota,
         uint256 startAt,
         uint64 totalCycles,
-        bytes32 merkleRoot
+        bytes32 merkleRoot,
+        uint256 cycleInSeconds
     );
     // This event is triggered whenever a call to #claim succeeds.
     event Claimed(
@@ -116,7 +118,8 @@ contract BionicTokenDistributor is
         uint256 monthQuota,
         uint256 startAt,
         uint32 totalCycles,
-        bytes32 merkleRoot
+        bytes32 merkleRoot,
+        uint256 cycleInSeconds
     ) external onlyOwner {
         if (address(projectTokenAddress) == address(0)) {
             //@audit-todo: check for IERC20
@@ -128,7 +131,8 @@ contract BionicTokenDistributor is
             startAt,
             totalCycles,
             merkleRoot,
-            true
+            true,
+            cycleInSeconds
         );
         emit ProjectAdded(
             pid,
@@ -136,7 +140,8 @@ contract BionicTokenDistributor is
             monthQuota,
             startAt,
             totalCycles,
-            merkleRoot
+            merkleRoot,
+            cycleInSeconds
         );
     }
     function updateDistributionStatus(
@@ -230,7 +235,7 @@ contract BionicTokenDistributor is
         uint256 claimableMonthCount = block
             .timestamp
             .sub(s_projectTokens[pid].startAt)
-            .div(CYCLE_IN_SECONDS)
+            .div(s_projectTokens[pid].cycleInSeconds)
             .add(1);
         if (claimableMonthCount > s_projectTokens[pid].totalCycles) {
             return s_projectTokens[pid].totalCycles;

@@ -259,7 +259,8 @@ contract BionicPoolRegistryTest is DSTest, Test {
             allocatedTokenPerMonth,
             block.timestamp + 20 minutes,
             10,
-            merkleRoot
+            merkleRoot,
+            CYCLE_IN_SECONDS
         );
 
         (
@@ -268,6 +269,7 @@ contract BionicPoolRegistryTest is DSTest, Test {
             uint256 start,
             ,
             bytes32 root,
+            ,
 
         ) = _distrbutorContract.s_projectTokens(pid);
         assertEq(address(token), address(_rewardToken));

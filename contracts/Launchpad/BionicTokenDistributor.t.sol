@@ -9,7 +9,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {BionicPoolRegistry} from "./BionicPoolRegistry.sol";
 import {Merkle} from "murky/src/Merkle.sol";
 import "./BionicTokenDistributor.sol";
-import "forge-std/console.sol";
+// import "forge-std/console.sol";
 
 contract DistributorContractTest is DSTest, Test {
     uint256 public constant CYCLE_IN_SECONDS = 30 days; // Approx 1 month
@@ -29,14 +29,19 @@ contract DistributorContractTest is DSTest, Test {
         rewardToken2 = new ERC20Mock("REWARD2 TOKEN", "RWRD2");
     }
 
-    function registerProject(uint256 pid, bytes32 merkleRoot) public {
+    function registerProject(
+        uint256 pid,
+        bytes32 merkleRoot,
+        uint256 cyclesInSeconds
+    ) public {
         distributorContract.registerProjectToken(
             pid,
             address(rewardToken),
             1e2,
             100,
             12, // a year
-            merkleRoot
+            merkleRoot,
+            cyclesInSeconds
         );
     }
 
@@ -51,7 +56,7 @@ contract DistributorContractTest is DSTest, Test {
             bytes.concat(keccak256(abi.encode(pid, winners[1], pledged)))
         );
         bytes32 merkleRoot = m.getRoot(data);
-        registerProject(pid, merkleRoot);
+        registerProject(pid, merkleRoot, CYCLE_IN_SECONDS);
 
         (
             IERC20 token,
@@ -59,7 +64,8 @@ contract DistributorContractTest is DSTest, Test {
             uint256 startAt,
             uint256 totalCycles,
             bytes32 root,
-            bool isActive
+            bool isActive,
+            uint256 cycleInSeconds
         ) = distributorContract.s_projectTokens(pid);
         assertEq(address(token), address(rewardToken));
         assertEq(monthQuota, 1e2);
@@ -67,6 +73,7 @@ contract DistributorContractTest is DSTest, Test {
         assertEq(totalCycles, 12);
         assertEq(root, merkleRoot);
         assertEq(isActive, true);
+        assertEq(cycleInSeconds, CYCLE_IN_SECONDS);
     }
 
     function testAddUserAndClaim() public {
@@ -84,7 +91,7 @@ contract DistributorContractTest is DSTest, Test {
         );
         bytes32 merkleRoot = m.getRoot(data);
 
-        registerProject(pid, merkleRoot);
+        registerProject(pid, merkleRoot, CYCLE_IN_SECONDS);
         uint256 time = 200;
         bytes32[] memory proof = m.getProof(data, 0); // will get proof for 0x2 value
         //invalid project
@@ -119,13 +126,13 @@ contract DistributorContractTest is DSTest, Test {
         vm.stopPrank();
 
         //Fund The Claiming Contract
-        (uint claimable, ) = distributorContract.calcClaimableAmount(
+        (uint256 claimable, ) = distributorContract.calcClaimableAmount(
             pid,
             winners[0],
             pledged
         );
         assertNotEq(claimable, 0);
-        uint totalBalance = claimable * 8;
+        uint256 totalBalance = claimable * 8;
         rewardToken.mint(address(distributorContract), totalBalance);
 
         //claim for a month
@@ -210,6 +217,146 @@ contract DistributorContractTest is DSTest, Test {
         distributorContract.claim(pid, winners[1], pledged, proof);
     }
 
+    function testClaimWithOtherCycleClaims() public {
+        uint256 pid = 0;
+        uint256 pledged = 1e3;
+        uint256 cycleSeconds = 1e3;
+        bytes32[] memory data = new bytes32[](4);
+        data[0] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[0], pledged)))
+        );
+        data[1] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[1], pledged)))
+        );
+        data[2] = keccak256(
+            bytes.concat(keccak256(abi.encode(pid, winners[2], pledged)))
+        );
+        bytes32 merkleRoot = m.getRoot(data);
+
+        registerProject(pid, merkleRoot, cycleSeconds);
+        uint256 time = 200;
+        bytes32[] memory proof = m.getProof(data, 0); // will get proof for 0x2 value
+        //invalid project
+        vm.expectRevert(Distributor__InvalidProject.selector);
+        distributorContract.claim(1000, address(100), 0, proof);
+
+        // nothing to claim not winner of project
+        vm.expectRevert(
+            abi.encodePacked(
+                Distributor__ClaimingIsNotAllowedYet.selector,
+                uint256(100)
+            )
+        );
+        distributorContract.claim(pid, winners[0], pledged, proof);
+
+        vm.startPrank(winners[0]);
+        vm.clearMockedCalls();
+
+        //not valid proof or claim
+        vm.expectRevert(Distributor__NotEligible.selector);
+        distributorContract.claim(pid, winners[0], 0, proof);
+
+        vm.warp(time);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Distributor__NotEnoughTokenLeft.selector,
+                pid,
+                address(rewardToken)
+            )
+        );
+        distributorContract.claim(pid, winners[0], pledged, proof);
+        vm.stopPrank();
+
+        //Fund The Claiming Contract
+        (uint256 claimable, ) = distributorContract.calcClaimableAmount(
+            pid,
+            winners[0],
+            pledged
+        );
+        uint256 totalBalance = claimable * 8;
+        rewardToken.mint(address(distributorContract), totalBalance);
+
+        //claim for a month
+        vm.startPrank(winners[0]);
+
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid, winners[0], 1, claimable);
+        distributorContract.claim(pid, winners[0], pledged, proof);
+        assertEq(rewardToken.balanceOf(winners[0]), claimable);
+        assertEq(
+            rewardToken.balanceOf(address(distributorContract)),
+            totalBalance -= claimable
+        );
+
+        (uint256 amount, uint256 claimableMonthCount) = distributorContract
+            .calcClaimableAmount(pid, winners[0], pledged);
+        assertEq(amount, 0);
+        assertEq(claimableMonthCount, 0);
+
+        assertEq(distributorContract.s_userClaims(winners[0], pid), 1);
+        assertEq(distributorContract.s_userClaims(winners[1], pid), 0);
+
+        //claim for 3 months
+        time += cycleSeconds * 3;
+        vm.warp(time);
+
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid, winners[0], 3, claimable * 3);
+        distributorContract.claim(pid, winners[0], pledged, proof);
+
+        assertEq(distributorContract.s_userClaims(winners[0], pid), 4);
+        assertEq(distributorContract.s_userClaims(winners[1], pid), 0);
+        assertEq(
+            rewardToken.balanceOf(address(distributorContract)),
+            totalBalance -= claimable * 3
+        );
+        assertEq(rewardToken.balanceOf(address(winners[0])), claimable * 4);
+
+        vm.expectRevert(Distributor__NothingToClaim.selector);
+        distributorContract.claim(pid, winners[0], pledged, proof);
+
+        //claim for other winner 4 month claim
+        vm.startPrank(winners[1]);
+        proof = m.getProof(data, 1);
+        distributorContract.claim(pid, winners[1], pledged, proof);
+
+        assertEq(distributorContract.s_userClaims(winners[0], pid), 4);
+        assertEq(distributorContract.s_userClaims(winners[1], pid), 4);
+        assertEq(rewardToken.balanceOf(address(winners[1])), claimable * 4);
+        assertEq(
+            rewardToken.balanceOf(address(distributorContract)),
+            totalBalance -= claimable * 4
+        );
+        //claim for remaining months 4-12=8
+        // time+=cycleSeconds*12;
+        vm.warp(time + (cycleSeconds * 12));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Distributor__NotEnoughTokenLeft.selector,
+                pid,
+                address(rewardToken)
+            )
+        );
+        distributorContract.claim(pid, winners[1], pledged, proof);
+
+        //Fund The Claiming Contract
+        totalBalance += claimable * 10;
+        rewardToken.mint(address(distributorContract), claimable * 10);
+        vm.expectEmit(address(distributorContract));
+        emit BionicTokenDistributor.Claimed(pid, winners[1], 8, claimable * 8);
+        distributorContract.claim(pid, winners[1], pledged, proof);
+
+        assertEq(rewardToken.balanceOf(address(winners[1])), claimable * 12);
+        assertEq(
+            rewardToken.balanceOf(address(distributorContract)),
+            totalBalance -= claimable * 8
+        );
+
+        vm.expectRevert(Distributor__Done.selector);
+        distributorContract.claim(pid, winners[1], pledged, proof);
+    }
+
     function testDisableClaim() public {
         uint256 pid = 0;
         uint256 pledged = 1e3;
@@ -225,7 +372,7 @@ contract DistributorContractTest is DSTest, Test {
         );
         bytes32 merkleRoot = m.getRoot(data);
 
-        registerProject(pid, merkleRoot);
+        registerProject(pid, merkleRoot, CYCLE_IN_SECONDS);
         uint256 time = 200;
         bytes32[] memory proof = m.getProof(data, 0); // will get proof for 0x2 value
         //invalid project
