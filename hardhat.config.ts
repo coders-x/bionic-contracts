@@ -32,12 +32,12 @@ const config: HardhatUserConfig = {
         // blockNumber: 28200000
       }
     },
-    goerli: {
-      chainId: 5,
+    sepolia: {
+      chainId: 11155111,
       url: process.env.RPC_URL,
       accounts: [process.env.PRIVATE_KEY || ""],
     },
-    anoy: {
+    polygonAmoy: {
       chainId: 80002,
       url: process.env.MUMBAI_RPC,
       accounts: [process.env.PRIVATE_KEY || ""],
@@ -61,12 +61,12 @@ const config: HardhatUserConfig = {
       mainnet: process.env.ETHERSCAN_API_KEY || "",
       ropsten: process.env.ETHERSCAN_API_KEY || "",
       rinkeby: process.env.ETHERSCAN_API_KEY || "",
-      goerli: process.env.ETHERSCAN_API_KEY || "",
+      sepolia: process.env.ETHERSCAN_API_KEY || "",
       kovan: process.env.ETHERSCAN_API_KEY || "",
       //polygon
       polygon: process.env.POLYGONSCAN_API_KEY || "",
       polygonMumbai: process.env.POLYGONSCAN_API_KEY || "",
-      anoy: process.env.POLYGONSCAN_API_KEY || "",
+      polygonAmoy: process.env.POLYGONSCAN_API_KEY || "",
 
       //arbitrum
       arb_sepolia: process.env.ARBITRUMSCAN_API_KEY || "",
@@ -81,13 +81,12 @@ const config: HardhatUserConfig = {
         }
       },
       {
-        network: "anoy",
+        network: "polygonAmoy",
         chainId: 80002,
         urls: {
-          apiURL:
-            "https://www.oklink.com/api/explorer/v1/contract/verify/async/api/polygonAmoy",
-          browserURL: "https://www.oklink.com/polygonAmoy",
-        }
+          apiURL: "https://api-amoy.polygonscan.com/api",
+          browserURL: "https://amoy.polygonscan.com"
+        },
       }
     ]
   }
