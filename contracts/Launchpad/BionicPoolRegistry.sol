@@ -102,6 +102,7 @@ contract BionicPoolRegistry is
     //////////////////////////////////////////////////////////////*/
     event ContractDeployed(address indexed treasury);
     event PoolAdded(uint256 indexed pid);
+    event PoolStatusChanged(uint256 indexed pid, bool isActive);
     event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
     event DrawInitiated(uint256 indexed pid, uint256 requestId);
     event PledgeFunded(
@@ -278,6 +279,14 @@ contract BionicPoolRegistry is
         uint256 _minimumBionicStake
     ) external onlyRole(BROKER_ROLE) {
         minimumBionicStake = _minimumBionicStake;
+    }
+    
+    function setPoolStatus(
+        uint256 poolId,
+        bool _isActvie
+    ) external onlyRole(BROKER_ROLE) {
+        poolInfo[poolId].isActive = _isActvie;
+        emit PoolStatusChanged(poolId, _isActvie);
     }
 
     /**

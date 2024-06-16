@@ -203,7 +203,6 @@ contract BionicPoolRegistryTest is DSTest, Test {
                 structHash
             );
 
-            vm.prank(user);
             bytes memory data = abi.encodeWithSelector(
                 _bionicFundRaising.pledge.selector,
                 pid,
@@ -213,8 +212,25 @@ contract BionicPoolRegistryTest is DSTest, Test {
                 r,
                 s
             );
-            // will call _bionicContract.pledge(pid, amount, deadline, v, r, s).;
+
+            //disable the pool
+            vm.expectEmit(address(_bionicFundRaising));
+            emit BionicPoolRegistry.PoolStatusChanged(pid, false);
+            _bionicFundRaising.setPoolStatus(pid, false);
+            // revert for diactivated pool
+            vm.prank(user);
+            vm.expectRevert(BPR__InvalidPool.selector);
             acc.execute(address(_bionicFundRaising), 0, data, 0);
+            vm.stopPrank();
+            //turn pool back on
+            vm.expectEmit(address(_bionicFundRaising));
+            emit BionicPoolRegistry.PoolStatusChanged(pid, true);
+            _bionicFundRaising.setPoolStatus(pid, true);
+
+            // will call _bionicContract.pledge(pid, amount, deadline, v, r, s).;
+            vm.prank(user);
+            acc.execute(address(_bionicFundRaising), 0, data, 0);
+            vm.stopPrank();
         }
 
         //2. move time and do draw get the winners
