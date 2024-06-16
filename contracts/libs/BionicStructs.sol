@@ -24,6 +24,7 @@ library BionicStructs {
         uint256 targetRaise; // Amount that the project wishes to raise
         uint32 winnersCount;
         bool useRaffle; // New field to indicate whether the pool uses a raffle or not
+        bool isActive; // New field to indicate whether the pool is active or not
         PledgeTier[] pledgeTiers; // Information about each tier
     }
 

@@ -142,9 +142,12 @@ contract BionicPoolRegistryTest is DSTest, Test {
 
     function testAddProject() public {
         uint256 pid = registerProject(false);
-        (, , , , bool useRaffle) = _bionicFundRaising.poolInfo(pid);
+        (, , , , bool useRaffle, bool isActive) = _bionicFundRaising.poolInfo(
+            pid
+        );
 
         assertEq(false, useRaffle);
+        assertEq(true, isActive);
     }
 
     function testPerformInvestmentAndClaim() public {

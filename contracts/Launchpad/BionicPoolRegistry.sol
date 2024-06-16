@@ -192,6 +192,7 @@ contract BionicPoolRegistry is
             targetRaise: _targetRaise,
             pledgeTiers: _pledgeTiers,
             winnersCount: winnersCount,
+            isActive: true,
             useRaffle: _useRaffle
         });
         poolInfo[pid] = pool;
@@ -210,7 +211,7 @@ contract BionicPoolRegistry is
         bytes32 s
     ) external nonReentrant onlyBionicAccount {
         BionicStructs.PoolInfo storage pool = poolInfo[pid];
-        if (pool.targetRaise == 0) {
+        if (!pool.isActive || pool.targetRaise == 0) {
             revert BPR__InvalidPool();
         }
         if (block.timestamp < pool.pledgingStartTime) {
