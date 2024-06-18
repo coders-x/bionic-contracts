@@ -290,6 +290,11 @@ describe("e2e", function () {
                 await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
                     .to.be.revertedWith("ECDSA: invalid signature");
             });
+            it("Should fail on invalid signature", async function () {
+                let raw = BionicPoolRegistry.interface.encodeFunctionData("pledge", [0, 1000, 32000000000, 0, ethers.utils.formatBytes32String("0"), ethers.utils.formatBytes32String("0")]);
+                await expect(abstractedAccount.connect(client).execute(BionicPoolRegistry.address, 0, raw, 0))
+                    .to.be.revertedWith("ECDSA: invalid signature");
+            });
             it("Should pledge user and permit contract to move amount", async function () {
                 const deadline = ethers.constants.MaxUint256;
                 for (let i = 0; i < AbstractAccounts.length; i++) {
