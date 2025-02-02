@@ -1,12 +1,13 @@
 {
-    "cSpell.words": [
-        "arbitrum",
-        "chainlink",
-        "gaslane",
-        "Merkle",
-        "nomicfoundation",
-        "nomiclabs",
-        "thirdweb"
-    ],
-    "sarif-viewer.connectToGithubCodeScanning": "off"
+  "cSpell.words": [
+    "arbitrum",
+    "chainlink",
+    "gaslane",
+    "Merkle",
+    "nomicfoundation",
+    "nomiclabs",
+    "remappings",
+    "thirdweb"
+  ],
+  "sarif-viewer.connectToGithubCodeScanning": "off"
 }

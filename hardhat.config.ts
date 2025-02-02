@@ -28,7 +28,7 @@ const config: HardhatUserConfig = {
         count: 60,
       },
       forking: {
-        url: "https://public.stackup.sh/api/v1/node/arbitrum-sepolia" || process.env.ARB_RPC as string,
+        url: process.env.ARB_RPC ? process.env.ARB_RPC as string : "https://public.stackup.sh/api/v1/node/arbitrum-sepolia",
         // blockNumber: 28200000
       }
     },

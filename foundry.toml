@@ -13,9 +13,11 @@ optimizer_runs = 1000
 
 # no_match_test = "testPerformLotteryAndClaim"
 
-# remappings = [
-#     # "lib/tokenbound:@openzeppelin/=node_modules/@openzeppelin/",
-#     "@openzeppelin/=node_modules/@openzeppelin/",
-#     "openzeppelin-contracts/=node_modules/@openzeppelin/",
-#     # "erc6551/=node_modules/@openzeppelin/contracts/",
-# ]
+ remappings = [
+    "@openzeppelin/=node_modules/@openzeppelin/",
+    "openzeppelin-contracts/=node_modules/@openzeppelin/",
+    "erc6551/src/lib=node_modules/erc6551/lib",        
+    "murky/=lib/murky/",
+    "@tokenbound/contracts/=node_modules/@tokenbound/contracts/",
+    "@tokenbound/sdk/=node_modules/@tokenbound/sdk/"
+ ]
