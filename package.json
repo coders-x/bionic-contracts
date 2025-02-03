@@ -26,12 +26,10 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "@account-abstraction/contracts": "^0.6.0",
     "@openzeppelin/contracts": "^4.9.3",
     "@openzeppelin/contracts-upgradeable": "^4.9.2",
-    "@tokenbound/contracts": "0.3.1-beta.1",
     "@tokenbound/sdk": "^0.4.5",
-    "erc6551": "^0.3.1"
+    "@account-abstraction/contracts": "^0.6.0"
   },
   "scripts": {
     "slither": "slither .",

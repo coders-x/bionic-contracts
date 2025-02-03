@@ -2,11 +2,6 @@
 # yarn lockfile v1
 
 
-"@account-abstraction/contracts@^0.6.0":
-  version "0.6.0"
-  resolved "https://registry.yarnpkg.com/@account-abstraction/contracts/-/contracts-0.6.0.tgz#7188a01839999226e6b2796328af338329543b76"
-  integrity sha512-8ooRJuR7XzohMDM4MV34I12Ci2bmxfE9+cixakRL7lA4BAwJKQ3ahvd8FbJa9kiwkUPCUNtj+/zxDQWYYalLMQ==
-
 "@adraffy/ens-normalize@1.10.0":
   version "1.10.0"
   resolved "https://registry.yarnpkg.com/@adraffy/ens-normalize/-/ens-normalize-1.10.0.tgz#d2a39395c587e092d77cbbc80acf956a54f38bf7"
@@ -31,12 +26,12 @@
     tslib "^1.11.1"
 
 "@aws-sdk/types@^3.1.0":
-  version "3.734.0"
-  resolved "https://registry.yarnpkg.com/@aws-sdk/types/-/types-3.734.0.tgz#af5e620b0e761918282aa1c8e53cac6091d169a2"
-  integrity sha512-o11tSPTT70nAkGV1fN9wm/hAIiLPyWX6SuGf+9JyTp7S/rC2cFWhR26MvA69nplcjNaXVzB0f+QFrLXXjOqCrg==
+  version "3.523.0"
+  resolved "https://registry.yarnpkg.com/@aws-sdk/types/-/types-3.523.0.tgz#2bb11390023949f31d9211212f41e245a7f03489"
+  integrity sha512-AqGIu4u+SxPiUuNBp2acCVcq80KDUFjxe6e3cMTvKWTzCbrVk1AXv0dAaJnCmdkWIha6zJDWxpIk/aL4EGhZ9A==
   dependencies:
-    "@smithy/types" "^4.1.0"
-    tslib "^2.6.2"
+    "@smithy/types" "^2.10.1"
+    tslib "^2.5.0"
 
 "@aws-sdk/util-utf8-browser@^3.0.0":
   version "3.259.0"
@@ -1867,11 +1862,6 @@
     form-data "^4.0.0"
     uuid "^9.0.1"
 
-"@tokenbound/contracts@0.3.1-beta.1":
-  version "0.3.1-beta.1"
-  resolved "https://registry.yarnpkg.com/@tokenbound/contracts/-/contracts-0.3.1-beta.1.tgz#df8222634491a6c6e5b9e516483e5d46abf0d712"
-  integrity sha512-eH+oabSoeCw0cPKhXnGLQIJSkhErXHPqm4Pdsk+Up40fIihR/FC+lMQPHyvWofIr5L1lp9qPrNySzvl67hbBUA==
-
 "@tokenbound/sdk@^0.4.5":
   version "0.4.6"
   resolved "https://registry.yarnpkg.com/@tokenbound/sdk/-/sdk-0.4.6.tgz#8ce55fa9fa96d960d1f084ad6ee8b356c74fffed"
@@ -3597,11 +3587,6 @@ env-paths@^2.2.0:
   version "2.2.1"
   resolved "https://registry.yarnpkg.com/env-paths/-/env-paths-2.2.1.tgz#420399d416ce1fbe9bc0a07c62fa68d67fd0f8f2"
   integrity sha512-+h1lkLKhZMTYjog1VEpJNG7NZJWcuc2DDk/qsqSTRRCOXiLjeQ1d1/udrUGhqMxUgAlwKNZ0cf2uqan5GLuS2A==
-
-erc6551@^0.3.1:
-  version "0.3.1"
-  resolved "https://registry.yarnpkg.com/erc6551/-/erc6551-0.3.1.tgz#f9ccc0901c210b0cc29c1c730398878319a1fd30"
-  integrity sha512-4+O7CJ5gn3/s2Mum1QiJDJUbGE1P1m0t3do2nnFAKWEXLubWfZjS12HqraUJ6Y6su3WJ8EqdWm0270gC0bqpCA==
 
 erc721a-upgradeable@^3.3.0:
   version "3.3.0"
