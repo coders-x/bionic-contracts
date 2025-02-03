@@ -13,7 +13,7 @@ error VestingPeriodNotMet();
 error Unauthorized();
 error PoolDoesNotExist();
 
-contract SingleStakingPool is ReentrancyGuard, Ownable {
+contract SinglePoolStaking is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     IERC20 public stakingToken;

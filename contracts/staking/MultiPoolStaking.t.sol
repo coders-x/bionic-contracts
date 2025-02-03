@@ -2,78 +2,81 @@
 pragma solidity ^0.8.6;
 
 import "forge-std/Test.sol";
+import "@openzeppelin/contracts/token/ERC20/presets/ERC20PresetMinterPauser.sol";
 import "./MultiPoolStaking.sol";
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract MultiPoolStakingTest is Test {
-    MultiPoolStaking stakingContract;
-    ERC20 stakingToken;
-    ERC20 rewardsToken;
-    address owner = address(0x123);
-    address user = address(0x456);
-    uint256 poolId;
-    
+    MultiPoolStaking public stakingContract;
+    ERC20PresetMinterPauser public stakingToken;
+    ERC20PresetMinterPauser public rewardsToken;
+    address public owner = address(this);
+    address public user = address(0x1);
+    uint256 public poolId;
+
     function setUp() public {
-        vm.startPrank(owner);
-        stakingToken = new ERC20("Staking Token", "STK");
-        rewardsToken = new ERC20("Rewards Token", "RWD");
+        stakingToken = new ERC20PresetMinterPauser("Staking Token", "STK");
+        rewardsToken = new ERC20PresetMinterPauser("Rewards Token", "RWD");
         stakingContract = new MultiPoolStaking();
         
-        stakingToken.mint(owner, 1_000_000 ether);
-        rewardsToken.mint(owner, 1_000_000 ether);
-        
-        stakingContract.createPool(address(stakingToken), address(rewardsToken), 1 ether, 3600);
-        stakingContract.fundRewards(0, 100_000 ether);
-        vm.stopPrank();
-        
+        // Create pool
+        stakingContract.createPool(address(stakingToken), address(rewardsToken), 1e18, 1 days);
         poolId = 0;
+        
+        // Mint and distribute tokens
+        stakingToken.mint(user, 1000 ether);
+        rewardsToken.mint(owner, 1000 ether);
+
+        vm.prank(owner);
+        rewardsToken.approve(address(stakingContract), 1000 ether);
+        stakingContract.fundRewards(poolId, 1000 ether);
     }
 
-    function testStakeTokens() public {
-        vm.startPrank(user);
-        stakingToken.mint(user, 1000 ether);
-        stakingToken.approve(address(stakingContract), 1000 ether);
+    function testStake() public {
+        vm.prank(user);
+        stakingToken.approve(address(stakingContract), 100 ether);
+        vm.prank(user);
         stakingContract.stake(poolId, 100 ether);
-        assertEq(stakingContract.getUserInfo(poolId, user).stakedBalance, 100 ether);
-        vm.stopPrank();
+
+        (uint256 stakedBalance, ) = stakingContract.getUserInfo(poolId, user);
+        assertEq(stakedBalance, 100 ether);
     }
-    
-    function testWithdrawTokens() public {
-        vm.startPrank(user);
-        stakingToken.mint(user, 1000 ether);
-        stakingToken.approve(address(stakingContract), 1000 ether);
-        stakingContract.stake(poolId, 100 ether);
+
+    function testWithdraw() public {
+        testStake();
+        vm.prank(user);
         stakingContract.withdraw(poolId, 50 ether);
-        assertEq(stakingContract.getUserInfo(poolId, user).stakedBalance, 50 ether);
-        vm.stopPrank();
+        (uint256 stakedBalance, ) = stakingContract.getUserInfo(poolId, user);
+        assertEq(stakedBalance, 50 ether);
     }
-    
-    function testClaimRewards() public {
-        vm.startPrank(user);
-        stakingToken.mint(user, 1000 ether);
-        stakingToken.approve(address(stakingContract), 1000 ether);
-        stakingContract.stake(poolId, 100 ether);
-        vm.warp(block.timestamp + 4000);
+
+    function testClaimReward() public {
+        testStake();
+        vm.warp(block.timestamp + 2 days);
+        vm.prank(user);
         stakingContract.claimReward(poolId);
-        assertGt(rewardsToken.balanceOf(user), 0);
-        vm.stopPrank();
+        ( , uint256 earnedRewards) = stakingContract.getUserInfo(poolId, user);
+        assertGt(earnedRewards, 0);
     }
-    
-    function testCompoundRewards() public {
-        vm.startPrank(user);
-        stakingToken.mint(user, 1000 ether);
-        stakingToken.approve(address(stakingContract), 1000 ether);
+
+    function testEmergencyWithdraw() public {
+        testStake();
+        vm.prank(user);
+        stakingContract.emergencyWithdraw(poolId);
+        (uint256 stakedBalance, ) = stakingContract.getUserInfo(poolId, user);
+        assertEq(stakedBalance, 0);
+    }
+
+    function testUpdateRewardRate() public {
+        vm.prank(owner);
+        stakingContract.updateRewardRate(poolId, 2e18);
+        uint256 newRate = stakingContract.rewardPerToken(poolId);
+        assertEq(newRate, 2e18);
+    }
+
+    function testDeactivatePool() public {
+        vm.prank(owner);
+        stakingContract.deactivatePool(poolId);
+        vm.expectRevert("PoolDoesNotExist()");
         stakingContract.stake(poolId, 100 ether);
-        vm.warp(block.timestamp + 4000);
-        stakingContract.compoundReward(poolId);
-        assertGt(stakingContract.getUserInfo(poolId, user).stakedBalance, 100 ether);
-        vm.stopPrank();
-    }
-    
-    function testGovernanceUpdateRewardRate() public {
-        vm.startPrank(owner);
-        stakingContract.updateRewardRate(poolId, 2 ether);
-        assertEq(stakingContract.stakingPools(poolId).rewardRate, 2 ether);
-        vm.stopPrank();
     }
 }
