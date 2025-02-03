@@ -1092,6 +1092,11 @@
     form-data "^4.0.0"
     uuid "^9.0.1"
 
+"@tokenbound/contracts@0.3.1-beta.1":
+  version "0.3.1-beta.1"
+  resolved "https://registry.yarnpkg.com/@tokenbound/contracts/-/contracts-0.3.1-beta.1.tgz#df8222634491a6c6e5b9e516483e5d46abf0d712"
+  integrity sha512-eH+oabSoeCw0cPKhXnGLQIJSkhErXHPqm4Pdsk+Up40fIihR/FC+lMQPHyvWofIr5L1lp9qPrNySzvl67hbBUA==
+
 "@tokenbound/sdk@^0.4.5":
   version "0.4.5"
   resolved "https://registry.yarnpkg.com/@tokenbound/sdk/-/sdk-0.4.5.tgz#aee9d4d9c45b15c45c56f1b0e342dd4e058b44ff"
