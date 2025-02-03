@@ -1,3 +1,4 @@
 @openzeppelin/=node_modules/@openzeppelin/
 openzeppelin-contracts/=node_modules/@openzeppelin/
 erc6551/=lib/tokenbound/lib/erc6551/src
+tokenbound/=lib/tokenbound/
