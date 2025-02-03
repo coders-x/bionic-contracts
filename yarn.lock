@@ -26,12 +26,12 @@
     tslib "^1.11.1"
 
 "@aws-sdk/types@^3.1.0":
-  version "3.734.0"
-  resolved "https://registry.yarnpkg.com/@aws-sdk/types/-/types-3.734.0.tgz#af5e620b0e761918282aa1c8e53cac6091d169a2"
-  integrity sha512-o11tSPTT70nAkGV1fN9wm/hAIiLPyWX6SuGf+9JyTp7S/rC2cFWhR26MvA69nplcjNaXVzB0f+QFrLXXjOqCrg==
+  version "3.523.0"
+  resolved "https://registry.yarnpkg.com/@aws-sdk/types/-/types-3.523.0.tgz#2bb11390023949f31d9211212f41e245a7f03489"
+  integrity sha512-AqGIu4u+SxPiUuNBp2acCVcq80KDUFjxe6e3cMTvKWTzCbrVk1AXv0dAaJnCmdkWIha6zJDWxpIk/aL4EGhZ9A==
   dependencies:
-    "@smithy/types" "^4.1.0"
-    tslib "^2.6.2"
+    "@smithy/types" "^2.10.1"
+    tslib "^2.5.0"
 
 "@aws-sdk/util-utf8-browser@^3.0.0":
   version "3.259.0"
