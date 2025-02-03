@@ -28,7 +28,8 @@
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.3",
     "@openzeppelin/contracts-upgradeable": "^4.9.2",
-    "@tokenbound/sdk": "^0.4.5"
+    "@tokenbound/sdk": "^0.4.5",
+    "@account-abstraction/contracts": "^0.6.0"
   },
   "scripts": {
     "slither": "slither .",
